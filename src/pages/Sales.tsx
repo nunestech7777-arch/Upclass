@@ -22,7 +22,10 @@ import {
   getMonthRange,
   getWeekRange,
   getDayRange,
+  fetchSaleOrderDetails,
 } from '../lib/api';
+import { parseSaleExternalId } from '../lib/saleDetails';
+import type { SaleOrderDetails } from '../lib/saleDetails';
 import type { Sale, Product, Seller } from '../lib/database.types';
 
 export type DatePreset = 'today' | 'yesterday' | 'this_week' | 'this_month' | 'last_month' | 'custom';
@@ -44,6 +47,10 @@ function formatDateTime(iso: string): string {
 
 function formatCurrency(value: number): string {
   return value.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
+}
+
+function formatOptionalCurrency(value: number | null): string {
+  return value == null ? '—' : formatCurrency(value);
 }
 
 function toISODateInput(date: Date): string {
@@ -178,18 +185,53 @@ function CustomRangeModal({ initialStart, initialEnd, onApply, onClose }: Custom
 // ============================================================
 // Modal de Detalhes da Venda
 // ============================================================
-function SaleDetailModal({ sale, onClose }: { sale: SaleRow | null; onClose: () => void }) {
-  if (!sale) return null;
+type OrderState =
+  | { status: 'loading' }
+  | { status: 'ready'; details: SaleOrderDetails }
+  | { status: 'missing' }
+  | { status: 'error' };
+
+function SaleDetailModal({
+  sale,
+  sellerNames,
+  onClose,
+}: {
+  sale: SaleRow;
+  sellerNames: Map<string, string>;
+  onClose: () => void;
+}) {
+  const [order, setOrder] = useState<OrderState>({ status: 'loading' });
   const unitPrice = sale.quantity > 0 ? sale.amount / sale.quantity : sale.amount;
+  const orderId = parseSaleExternalId(sale.external_id)?.orderId ?? null;
+
+  useEffect(() => {
+    let isMounted = true;
+    fetchSaleOrderDetails(sale.external_id)
+      .then((details) => {
+        if (isMounted) setOrder(details ? { status: 'ready', details } : { status: 'missing' });
+      })
+      .catch((err) => {
+        console.error('Erro ao buscar detalhes da venda:', err);
+        if (isMounted) setOrder({ status: 'error' });
+      });
+    return () => {
+      isMounted = false;
+    };
+  }, [sale.external_id]);
+
+  const details = order.status === 'ready' ? order.details : null;
+  const currentItem = details?.items[details.currentItemIndex] ?? null;
+  const isCanceled = Boolean(details && (details.canceledAt || (details.status && details.status.toLowerCase() !== 'concluido')));
 
   return (
     <div className="modal-overlay" onClick={onClose}>
-      <div className="sales-modal-shell" onClick={(e) => e.stopPropagation()}>
+      <div className="sales-modal-shell sales-detail-shell" onClick={(e) => e.stopPropagation()}>
         <div className="sales-modal-header">
           <div>
             <h3 className="sales-modal-title">Detalhes da Venda</h3>
             <p className="text-muted text-sm" style={{ marginTop: '2px' }}>
               Realizada em {formatDateTime(sale.sold_at)}
+              {orderId && ` · Venda nº ${orderId}`}
             </p>
           </div>
           <button className="sales-modal-close-btn" onClick={onClose} aria-label="Fechar">
@@ -198,6 +240,30 @@ function SaleDetailModal({ sale, onClose }: { sale: SaleRow | null; onClose: () 
         </div>
 
         <div className="sales-modal-body">
+          <div className="sales-detail-item sales-detail-customer">
+            <span className="sales-detail-label">Cliente</span>
+            {order.status === 'loading' && <span className="sales-detail-val sales-detail-placeholder">Carregando...</span>}
+            {details && (
+              <span className={`sales-detail-val ${details.customerName ? '' : 'sales-detail-placeholder'}`}>
+                {details.customerName ?? 'Não informado pelo MercadoPhone'}
+              </span>
+            )}
+            {order.status === 'missing' && (
+              <span className="sales-detail-val sales-detail-placeholder">Não disponível para esta venda</span>
+            )}
+            {order.status === 'error' && (
+              <span className="sales-detail-val sales-detail-placeholder">Não foi possível carregar</span>
+            )}
+          </div>
+
+          {isCanceled && details && (
+            <div className="sales-detail-notice danger">
+              Situação no MercadoPhone: <strong>{details.status ?? 'cancelada'}</strong>
+              {details.canceledAt && ` · cancelada em ${details.canceledAt}`}
+              {details.cancelReason && ` · ${details.cancelReason}`}
+            </div>
+          )}
+
           <div className="sales-detail-grid">
             <div className="sales-detail-item full-width">
               <span className="sales-detail-label">Produto</span>
@@ -214,7 +280,7 @@ function SaleDetailModal({ sale, onClose }: { sale: SaleRow | null; onClose: () 
             </div>
 
             <div className="sales-detail-item">
-              <span className="sales-detail-label">Vendedor</span>
+              <span className="sales-detail-label">Vendedor do Item</span>
               <span className="sales-detail-val">{sale.sellerName}</span>
             </div>
 
@@ -228,8 +294,29 @@ function SaleDetailModal({ sale, onClose }: { sale: SaleRow | null; onClose: () 
               <span className="sales-detail-val">{formatCurrency(unitPrice)}</span>
             </div>
 
+            {currentItem?.imei && (
+              <div className="sales-detail-item">
+                <span className="sales-detail-label">IMEI</span>
+                <span className="sales-detail-val sales-detail-mono">{currentItem.imei}</span>
+              </div>
+            )}
+
+            {currentItem?.serialNumber && (
+              <div className="sales-detail-item">
+                <span className="sales-detail-label">Nº de Série</span>
+                <span className="sales-detail-val sales-detail-mono">{currentItem.serialNumber}</span>
+              </div>
+            )}
+
+            {currentItem?.discount != null && currentItem.discount > 0 && (
+              <div className="sales-detail-item">
+                <span className="sales-detail-label">Desconto no Item</span>
+                <span className="sales-detail-val">{formatCurrency(currentItem.discount)}</span>
+              </div>
+            )}
+
             <div className="sales-detail-item full-width">
-              <span className="sales-detail-label">Valor Total da Venda</span>
+              <span className="sales-detail-label">Valor do Item</span>
               <span className="sales-detail-val" style={{ color: 'var(--primary)', fontSize: '18px' }}>
                 {formatCurrency(sale.amount)}
                 {sale.amount === 0 && sale.productCategory === 'Acessórios' && (
@@ -240,6 +327,115 @@ function SaleDetailModal({ sale, onClose }: { sale: SaleRow | null; onClose: () 
               </span>
             </div>
           </div>
+
+          {details && (
+            <>
+              {(details.orderSellerName || details.saleType || details.deliveryType || details.salesChannel) && (
+                <div className="sales-detail-grid">
+                  {details.orderSellerName && (
+                    <div className="sales-detail-item">
+                      <span className="sales-detail-label">Vendedor da Venda</span>
+                      <span className="sales-detail-val">{details.orderSellerName}</span>
+                    </div>
+                  )}
+                  {details.saleType && (
+                    <div className="sales-detail-item">
+                      <span className="sales-detail-label">Tipo de Venda</span>
+                      <span className="sales-detail-val">{details.saleType}</span>
+                    </div>
+                  )}
+                  {details.deliveryType && (
+                    <div className="sales-detail-item">
+                      <span className="sales-detail-label">Entrega</span>
+                      <span className="sales-detail-val">{details.deliveryType}</span>
+                    </div>
+                  )}
+                  {details.salesChannel && (
+                    <div className="sales-detail-item">
+                      <span className="sales-detail-label">Canal de Venda</span>
+                      <span className="sales-detail-val">{details.salesChannel}</span>
+                    </div>
+                  )}
+                </div>
+              )}
+
+              {details.items.length > 1 && (
+                <div className="sales-detail-section">
+                  <span className="sales-detail-label">Itens desta venda ({details.items.length})</span>
+                  <ul className="sales-detail-list">
+                    {details.items.map((item, index) => {
+                      const itemSeller = item.sellerId ? sellerNames.get(item.sellerId) : undefined;
+                      return (
+                        <li key={index} className={index === details.currentItemIndex ? 'is-current' : undefined}>
+                          <span className="sales-detail-list-name">
+                            {item.name ?? 'Item sem descrição'}
+                            <span className="sales-detail-list-meta">
+                              {itemSeller && `Vendedor: ${itemSeller}`}
+                              {itemSeller && item.quantity != null && ' · '}
+                              {item.quantity != null && `Quantidade: ${item.quantity}`}
+                            </span>
+                          </span>
+                          <span className="sales-detail-list-amount">
+                            {item.total === 0 && <span className="sales-detail-gift">Brinde</span>}
+                            {formatOptionalCurrency(item.total)}
+                          </span>
+                        </li>
+                      );
+                    })}
+                  </ul>
+                </div>
+              )}
+
+              {details.payments.length > 0 && (
+                <div className="sales-detail-section">
+                  <span className="sales-detail-label">Formas de Pagamento</span>
+                  <ul className="sales-detail-list">
+                    {details.payments.map((payment, index) => (
+                      <li key={index}>
+                        <span className="sales-detail-list-name">{payment.description ?? 'Não informada'}</span>
+                        <span className="sales-detail-list-amount">{formatOptionalCurrency(payment.amount)}</span>
+                      </li>
+                    ))}
+                  </ul>
+                </div>
+              )}
+
+              <div className="sales-detail-section">
+                <ul className="sales-detail-list">
+                  {details.discount != null && details.discount > 0 && (
+                    <li>
+                      <span className="sales-detail-list-name">Desconto na venda</span>
+                      <span className="sales-detail-list-amount">{formatCurrency(details.discount)}</span>
+                    </li>
+                  )}
+                  <li className="sales-detail-total">
+                    <span className="sales-detail-list-name">Total da venda</span>
+                    <span className="sales-detail-list-amount">{formatOptionalCurrency(details.total)}</span>
+                  </li>
+                </ul>
+              </div>
+            </>
+          )}
+
+          {details && details.currentItemIndex === -1 && (
+            <div className="sales-detail-notice">
+              Este item não aparece na versão mais recente desta venda no MercadoPhone — a venda pode ter sido
+              editada depois do registro.
+            </div>
+          )}
+
+          {order.status === 'missing' && (
+            <div className="sales-detail-notice">
+              O MercadoPhone não enviou os dados completos desta venda (cliente, pagamento e demais itens). Isso
+              acontece com vendas importadas antes da integração por webhook.
+            </div>
+          )}
+
+          {order.status === 'error' && (
+            <div className="sales-detail-notice danger">
+              Não foi possível carregar os dados do cliente e do pagamento. Feche e abra os detalhes novamente.
+            </div>
+          )}
         </div>
 
         <div className="sales-modal-footer">
@@ -328,6 +524,7 @@ export function Sales() {
   // Mapeamentos
   const productMap = useMemo(() => new Map(products.map((p) => [p.id, p])), [products]);
   const sellerMap = useMemo(() => new Map(sellers.map((s) => [s.id, s])), [sellers]);
+  const sellerNames = useMemo(() => new Map(sellers.map((s) => [s.id, s.name])), [sellers]);
 
   // Vendas mapeadas com categoria e nomes
   const salesRows: SaleRow[] = useMemo(() => {
@@ -732,7 +929,14 @@ export function Sales() {
       )}
 
       {/* Modal de Detalhes da Venda */}
-      <SaleDetailModal sale={detailSale} onClose={() => setDetailSale(null)} />
+      {detailSale && (
+        <SaleDetailModal
+          key={detailSale.id}
+          sale={detailSale}
+          sellerNames={sellerNames}
+          onClose={() => setDetailSale(null)}
+        />
+      )}
     </div>
   );
 }

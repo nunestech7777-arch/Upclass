@@ -1,5 +1,7 @@
 import { supabase } from './supabaseClient';
 import { classifyProductCategory } from './productClassifier';
+import { parseSaleExternalId, parseSaleOrderDetails } from './saleDetails';
+import type { SaleOrderDetails, SaleOrderEventRow } from './saleDetails';
 import type {
   Seller,
   Product,
@@ -145,6 +147,51 @@ export async function fetchAllSales(): Promise<Sale[]> {
   return fetchAllRows<Sale>((from, to) =>
     supabase.from('sales').select('*').order('sold_at', { ascending: false }).order('id').range(from, to)
   );
+}
+
+// Só os campos exibidos no modal — CPF, endereço e contato do cliente ficam fora da consulta.
+const SALE_ORDER_SELECT = [
+  'order_id:payload->>id',
+  'customer_name:payload->cliente->>nome',
+  'seller_name:payload->>vendedorNome',
+  'status:payload->>status',
+  'sale_type:payload->>tipoVendaDescricao',
+  'delivery_type:payload->>tipoEntregaDescricao',
+  'sales_channel:payload->>canalVendaDescricao',
+  'discount:payload->>desconto',
+  'total:payload->>totalVenda',
+  'canceled_at:payload->>dataCancelamento',
+  'cancel_reason:payload->>motivoCancelamento',
+  'items:payload->itens',
+  'payments:payload->formasPagamento',
+].join(', ');
+
+/**
+ * Detalhes da venda (cliente, pagamentos, itens e vendedor de cada item) no último `venda_salva` que o MercadoPhone
+ * enviou para ela. Devolve `null` quando não há payload guardado — caso das vendas importadas
+ * antes do webhook. O filtro por `tipoEvento` é obrigatório: ordens de serviço usam a mesma
+ * tabela e têm numeração de `id` própria.
+ */
+export async function fetchSaleOrderDetails(externalId: string | null): Promise<SaleOrderDetails | null> {
+  const ref = parseSaleExternalId(externalId);
+  if (!ref) return null;
+
+  const [event, orderSales] = await Promise.all([
+    supabase
+      .from('mercadophone_webhook_events')
+      .select(SALE_ORDER_SELECT)
+      .eq('payload->>id', ref.orderId)
+      .eq('payload->>tipoEvento', 'venda_salva')
+      .order('received_at', { ascending: false })
+      .limit(1),
+    // Cada item da venda é uma linha de `sales` com o seu próprio vendedor.
+    supabase.from('sales').select('external_id, seller_id').like('external_id', `${ref.orderId}-%`),
+  ]);
+  if (event.error) throw new Error(event.error.message);
+  if (orderSales.error) throw new Error(orderSales.error.message);
+
+  const row = (event.data as unknown as SaleOrderEventRow[] | null)?.[0];
+  return row ? parseSaleOrderDetails(row, ref, orderSales.data ?? []) : null;
 }
 
 /** Só as colunas usadas nos rankings e no modal de vendas — `raw_payload` e a análise completa ficam de fora. */

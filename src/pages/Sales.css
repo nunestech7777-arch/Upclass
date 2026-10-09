@@ -608,6 +608,114 @@
   color: var(--text-dark);
 }
 
+.sales-detail-shell {
+  max-width: 600px;
+}
+
+.sales-detail-customer .sales-detail-val {
+  font-size: 18px;
+  overflow-wrap: anywhere;
+}
+
+.sales-detail-val.sales-detail-placeholder {
+  font-weight: 500;
+  color: var(--text-muted);
+}
+
+.sales-detail-mono {
+  font-variant-numeric: tabular-nums;
+  overflow-wrap: anywhere;
+}
+
+.sales-detail-section {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.sales-detail-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  border: 1px solid var(--border-color);
+  border-radius: var(--radius-md);
+  overflow: hidden;
+}
+
+.sales-detail-list li {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 10px 16px;
+  font-size: 14px;
+  color: var(--text-dark);
+}
+
+.sales-detail-list li + li {
+  border-top: 1px solid var(--border-color);
+}
+
+.sales-detail-list li.is-current {
+  background-color: rgba(59, 130, 246, 0.08);
+  font-weight: 700;
+}
+
+.sales-detail-list-name {
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+
+.sales-detail-list-meta {
+  display: block;
+  margin-top: 2px;
+  font-size: 12px;
+  font-weight: 500;
+  color: var(--text-muted);
+}
+
+.sales-detail-list-amount {
+  flex-shrink: 0;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+
+.sales-detail-gift {
+  margin-right: 8px;
+  padding: 2px 8px;
+  border-radius: var(--radius-full);
+  background-color: rgba(168, 85, 247, 0.12);
+  color: #A855F7;
+  font-size: 11px;
+  font-weight: 600;
+}
+
+.sales-detail-list li.sales-detail-total {
+  font-weight: 700;
+}
+
+.sales-detail-total .sales-detail-list-amount {
+  color: var(--primary);
+  font-size: 18px;
+}
+
+.sales-detail-notice {
+  padding: 12px 16px;
+  border-radius: var(--radius-md);
+  border: 1px dashed var(--border-color);
+  font-size: 13px;
+  line-height: 1.5;
+  color: var(--text-muted);
+}
+
+.sales-detail-notice.danger {
+  border-style: solid;
+  border-color: rgba(239, 68, 68, 0.35);
+  background-color: rgba(239, 68, 68, 0.08);
+  color: var(--text-dark);
+}
+
 /* Formulário de Período Customizado */
 .custom-date-form {
   display: flex;
@@ -709,5 +817,23 @@
 
   .sales-modal-shell {
     border-radius: 16px;
+  }
+
+  .sales-modal-header {
+    padding: 16px;
+    gap: 12px;
+    align-items: flex-start;
+  }
+
+  .sales-modal-body {
+    padding: 16px;
+  }
+
+  .sales-modal-footer {
+    padding: 12px 16px;
+  }
+
+  .sales-detail-list li {
+    padding: 10px 12px;
   }
 }

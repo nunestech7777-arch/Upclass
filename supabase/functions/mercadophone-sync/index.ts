@@ -1,5 +1,53 @@
 import { createClient } from 'jsr:@supabase/supabase-js@2';
-import { fetchAllEstoque, fetchAllVendedores } from '../_shared/mercadophone.ts';
+import { fetchAllEstoque, fetchAllVendedores, fetchHistoricoVendas } from '../_shared/mercadophone.ts';
+import { mapItemSellers, planSellerUpdates, type SaleSellerRow } from '../_shared/itemSellers.ts';
+
+const RECONCILE_DAYS = 3;
+const pad = (n: number) => String(n).padStart(2, '0');
+/** `Date` em UTC → `YYYY-MM-DD HH:mm:ss`. */
+const wallClock = (d: Date) =>
+  `${d.getUTCFullYear()}-${pad(d.getUTCMonth() + 1)}-${pad(d.getUTCDate())} ${pad(d.getUTCHours())}:${pad(d.getUTCMinutes())}:${pad(d.getUTCSeconds())}`;
+
+/**
+ * Confere o vendedor de cada item das vendas recentes com o histórico do MercadoPhone e corrige
+ * `sales.seller_id` onde difere. Cobre o que o webhook não conseguiu atribuir na hora e as vendas
+ * editadas depois. Só altera o vendedor — nunca cria, apaga ou muda valor de venda.
+ */
+// deno-lint-ignore no-explicit-any
+async function reconcileItemSellers(supabase: any): Promise<number> {
+  // `sold_at` guarda o horário da loja como se fosse UTC, então a janela é larga dos dois lados.
+  const from = new Date(Date.now() - (RECONCILE_DAYS + 1) * 86_400_000);
+  const to = new Date(Date.now() + 86_400_000);
+  const itemSellers = mapItemSellers(await fetchHistoricoVendas(wallClock(from), wallClock(to)));
+  if (itemSellers.size === 0) return 0;
+
+  const { data: sellers, error: sellersError } = await supabase.from('sellers').select('id, external_id');
+  if (sellersError) throw new Error(`listar vendedores: ${sellersError.message}`);
+  const sellerIdByExternalId = new Map<string, string>(
+    // deno-lint-ignore no-explicit-any
+    (sellers ?? []).filter((s: any) => s.external_id).map((s: any) => [s.external_id, s.id])
+  );
+
+  const sales: SaleSellerRow[] = [];
+  for (let offset = 0; ; offset += 1000) {
+    const { data, error } = await supabase
+      .from('sales')
+      .select('id, external_id, seller_id')
+      .gte('sold_at', from.toISOString())
+      .order('id')
+      .range(offset, offset + 999);
+    if (error) throw new Error(`listar vendas: ${error.message}`);
+    sales.push(...(data ?? []));
+    if ((data ?? []).length < 1000) break;
+  }
+
+  const updates = planSellerUpdates(sales, itemSellers, sellerIdByExternalId);
+  for (const update of updates) {
+    const { error } = await supabase.from('sales').update({ seller_id: update.to }).eq('id', update.saleId);
+    if (error) throw new Error(`corrigir vendedor do item ${update.externalId}: ${error.message}`);
+  }
+  return updates.length;
+}
 
 Deno.serve(async (_req) => {
   try {
@@ -41,8 +89,21 @@ Deno.serve(async (_req) => {
       if (error) throw new Error(`upsert products: ${error.message}`);
     }
 
+    // Não derruba a sincronização de estoque/vendedores se o histórico de vendas falhar.
+    let itemSellersFixed: number | null = null;
+    try {
+      itemSellersFixed = await reconcileItemSellers(supabase);
+    } catch (err) {
+      console.error('failed to reconcile item sellers', err);
+    }
+
     return new Response(
-      JSON.stringify({ ok: true, sellers: sellerRows.length, products: productRows.length }),
+      JSON.stringify({
+        ok: true,
+        sellers: sellerRows.length,
+        products: productRows.length,
+        item_sellers_fixed: itemSellersFixed,
+      }),
       { headers: { 'Content-Type': 'application/json' } }
     );
   } catch (err) {

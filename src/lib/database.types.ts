@@ -38,6 +38,17 @@ export type Sale = {
   amount: number;
   sold_at: string;
   created_at: string;
+  /** `<id da venda>-<id do produto>-<índice do item>` no MercadoPhone (ver mercadophone-webhook). */
+  external_id: string | null;
+};
+
+/** Payload bruto de cada webhook do MercadoPhone (vendas e ordens de serviço). */
+export type MercadoPhoneWebhookEvent = {
+  id: string;
+  payload: Record<string, unknown>;
+  received_at: string;
+  processed: boolean;
+  error: string | null;
 };
 
 export type Conversation = {
@@ -120,6 +131,7 @@ export type Database = {
       kommo_users: { Row: KommoUser; Insert: Partial<KommoUser>; Update: Partial<KommoUser>; Relationships: [] };
       products: { Row: Product; Insert: Partial<Product>; Update: Partial<Product>; Relationships: [] };
       sales: { Row: Sale; Insert: Partial<Sale>; Update: Partial<Sale>; Relationships: [] };
+      mercadophone_webhook_events: { Row: MercadoPhoneWebhookEvent; Insert: Partial<MercadoPhoneWebhookEvent>; Update: Partial<MercadoPhoneWebhookEvent>; Relationships: [] };
       conversations: { Row: Conversation; Insert: Partial<Conversation>; Update: Partial<Conversation>; Relationships: [] };
       conversation_messages: { Row: ConversationMessage; Insert: Partial<ConversationMessage>; Update: Partial<ConversationMessage>; Relationships: [] };
       goals: { Row: Goals; Insert: Partial<Goals>; Update: Partial<Goals>; Relationships: [] };

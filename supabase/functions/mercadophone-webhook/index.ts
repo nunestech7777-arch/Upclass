@@ -1,4 +1,6 @@
 import { createClient } from 'jsr:@supabase/supabase-js@2';
+import { fetchHistoricoVendas } from '../_shared/mercadophone.ts';
+import { itemSellerKey, mapItemSellers, type ItemSeller } from '../_shared/itemSellers.ts';
 
 interface VendaItem {
   produtoId: number | string;
@@ -82,28 +84,45 @@ Deno.serve(async (req) => {
       return new Response('ok', { status: 200 });
     }
 
-    let sellerId: string;
-    {
+    const sellerIdCache = new Map<string, string>();
+    const resolveSellerId = async (externalId: string, name: string | null | undefined): Promise<string> => {
+      const cachedId = sellerIdCache.get(externalId);
+      if (cachedId) return cachedId;
+      let id: string;
       const { data: existing } = await supabase
         .from('sellers')
         .select('id')
-        .eq('external_id', String(venda.vendedorId))
+        .eq('external_id', externalId)
         .maybeSingle();
       if (existing) {
-        sellerId = existing.id;
+        id = existing.id;
       } else {
         const { data: created, error } = await supabase
           .from('sellers')
           .insert({
-            external_id: String(venda.vendedorId),
-            name: venda.vendedorNome?.trim() || `Vendedor ${venda.vendedorId}`,
+            external_id: externalId,
+            name: name?.trim() || `Vendedor ${externalId}`,
             active: true,
           })
           .select('id')
           .single();
         if (error) throw new Error(`criar vendedor: ${error.message}`);
-        sellerId = created.id;
+        id = created.id;
       }
+      sellerIdCache.set(externalId, id);
+      return id;
+    };
+
+    // Vendedor da venda inteira — só é usado no item quando o histórico não informa o vendedor dele.
+    const sellerId = await resolveSellerId(String(venda.vendedorId), venda.vendedorNome);
+
+    // O payload não traz o vendedor de cada item; ele vem do histórico de vendas (uma linha por item).
+    let itemSellers = new Map<string, ItemSeller | null>();
+    try {
+      const minute = String(venda.dataVenda).slice(0, 16);
+      itemSellers = mapItemSellers(await fetchHistoricoVendas(`${minute}:00`, `${minute}:59`));
+    } catch (err) {
+      console.error('failed to fetch item sellers; mercadophone-sync reconcilia depois', err);
     }
 
     for (const [itemIndex, item] of venda.itens.entries()) {
@@ -135,17 +154,38 @@ Deno.serve(async (req) => {
         productId = created.id;
       }
 
-      const { error: saleError } = await supabase.from('sales').upsert(
-        {
-          external_id: `${venda.id}-${item.produtoId}-${itemIndex}`,
-          seller_id: sellerId,
-          product_id: productId,
-          quantity: item.quantidade,
-          amount: item.valorTotal ?? (item.valorUnitario ?? 0) * item.quantidade,
-          sold_at: venda.dataVenda,
-        },
-        { onConflict: 'external_id' }
-      );
+      const externalId = `${venda.id}-${item.produtoId}-${itemIndex}`;
+      const saleFields = {
+        product_id: productId,
+        quantity: item.quantidade,
+        amount: item.valorTotal ?? (item.valorUnitario ?? 0) * item.quantidade,
+        sold_at: venda.dataVenda,
+      };
+      const itemSeller = itemSellers.get(itemSellerKey(venda.id, item.produtoId));
+
+      if (itemSeller) {
+        const { error: saleError } = await supabase.from('sales').upsert(
+          {
+            external_id: externalId,
+            seller_id: await resolveSellerId(itemSeller.externalId, itemSeller.name),
+            ...saleFields,
+          },
+          { onConflict: 'external_id' }
+        );
+        if (saleError) throw new Error(`gravar venda: ${saleError.message}`);
+        continue;
+      }
+
+      // Sem vendedor do item: linha nova entra com o vendedor da venda; linha existente mantém o
+      // vendedor que já tem, para não desfazer uma atribuição por item feita antes.
+      const { data: existingSale } = await supabase
+        .from('sales')
+        .select('id')
+        .eq('external_id', externalId)
+        .maybeSingle();
+      const { error: saleError } = existingSale
+        ? await supabase.from('sales').update(saleFields).eq('id', existingSale.id)
+        : await supabase.from('sales').insert({ external_id: externalId, seller_id: sellerId, ...saleFields });
       if (saleError) throw new Error(`gravar venda: ${saleError.message}`);
     }
 

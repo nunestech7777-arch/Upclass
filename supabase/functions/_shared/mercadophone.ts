@@ -1,3 +1,5 @@
+import type { HistoricoItem } from './itemSellers.ts';
+
 const BASE_URL = 'https://app.mercadophone.tech/api.php';
 
 function getToken(): string {
@@ -75,4 +77,26 @@ export async function fetchAllEstoque(): Promise<MercadoPhoneProduct[]> {
 export async function fetchAllVendedores(): Promise<MercadoPhoneSeller[]> {
   const res = await call('VendedorApiController', 'index', undefined, 'GET');
   return res?.data?.itens ?? [];
+}
+
+/**
+ * Histórico de vendas, uma linha por item, com o vendedor de cada item. Datas no horário da loja
+ * (`YYYY-MM-DD HH:mm:ss`), como o MercadoPhone as grava. O limite por página da API é 300.
+ */
+export async function fetchHistoricoVendas(dataInicial: string, dataFinal: string): Promise<HistoricoItem[]> {
+  const items: HistoricoItem[] = [];
+  const limit = 300;
+  for (let page = 1; ; page += 1) {
+    const res = await call('HistoricoVendaApiController', 'index', {
+      page,
+      limit,
+      order: 'data_venda',
+      direction: 'asc',
+      filters: { dataVendaInicial: dataInicial, dataVendaFinal: dataFinal },
+    });
+    const pageItems: HistoricoItem[] = res?.data?.itens ?? [];
+    items.push(...pageItems);
+    if (pageItems.length < limit) break;
+  }
+  return items;
 }
