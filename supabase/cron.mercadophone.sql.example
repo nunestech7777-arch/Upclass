@@ -1,0 +1,31 @@
+-- Agendamento da sincronização do MercadoPhone (pg_cron + pg_net). Modelo: rodar no SQL Editor trocando
+-- <SECRET> pelo valor de MERCADOPHONE_SYNC_SECRET (segredo próprio do agendamento; a function aceita também o
+-- MERCADOPHONE_WEBHOOK_SECRET). Não versionar o segredo. Para criar o segredo, no Terminal:
+--   SECRET=$(openssl rand -hex 24); npx supabase secrets set MERCADOPHONE_SYNC_SECRET=$SECRET --project-ref kcbjaknpaezmjiafdgpe; echo $SECRET
+--
+-- A function mercadophone-sync é chamada sem JWT e autenticada por segredo na URL (verify_jwt = false em
+-- config.toml), como as funções do Kommo — não é preciso guardar a chave service_role no banco.
+--
+-- O que ela faz a cada execução:
+--   * atualiza vendedores e estoque;
+--   * corrige o VENDEDOR DE CADA ITEM dos últimos dias (o MercadoPhone altera o vendedor do item depois da venda
+--     e não avisa o webhook — sem esta rotina o item fica com o vendedor principal do pedido);
+--   * concilia custo/lucro, cancelamentos e itens removidos dos últimos dias.
+--
+-- 1) Remover agendamentos antigos que chamam a function com JWT (respondem 401 "Invalid JWT"):
+select cron.unschedule(jobid) from cron.job where command ilike '%functions/v1/mercadophone-sync%';
+
+-- 2) Agendar (a cada 30 minutos):
+select cron.schedule('mercadophone-sync-30min', '*/30 * * * *', $$
+  select net.http_post(
+    url := 'https://kcbjaknpaezmjiafdgpe.supabase.co/functions/v1/mercadophone-sync?secret=<SECRET>',
+    headers := '{"Content-Type": "application/json"}'::jsonb,
+    body := '{}'::jsonb,
+    timeout_milliseconds := 150000
+  );
+$$);
+
+-- 3) Conferir (depois do próximo :00 ou :30):
+--      select start_time, status from cron.job_run_details order by start_time desc limit 5;
+--      select created, status_code, left(content::text, 200) from net._http_response order by created desc limit 5;
+--    Do lado do painel, cada execução também fica em financial_sync_runs (coluna trigger = 'cron').

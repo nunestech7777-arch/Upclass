@@ -40,6 +40,59 @@ export type Sale = {
   created_at: string;
   /** `<id da venda>-<id do produto>-<índice do item>` no MercadoPhone (ver mercadophone-webhook). */
   external_id: string | null;
+  /**
+   * Colunas da migração 0013 (módulo financeiro). Opcionais aqui para as telas antigas seguirem
+   * funcionando antes da migração; `item_status` diferente de `active` = cancelada ou removida.
+   */
+  mp_order_id?: string | null;
+  sold_date?: string | null;
+  item_status?: 'active' | 'cancelled' | 'removed';
+  revenue?: number | null;
+  cost?: number | null;
+  profit?: number | null;
+  financial_status?: 'pending' | 'ok' | 'mismatch' | 'ambiguous' | 'not_found';
+  customer_name?: string | null;
+};
+
+/** Meta mensal de lucro por vendedor (`month` = primeiro dia do mês). */
+export type SellerProfitGoal = {
+  id: string;
+  seller_id: string;
+  month: string;
+  profit_target: number | null;
+  worst_case_target: number | null;
+  updated_by: string | null;
+  updated_by_email: string | null;
+  created_at: string;
+  updated_at: string;
+};
+
+/** Meta mensal de aparelhos por vendedor (`month` = primeiro dia do mês). */
+export type SellerDeviceGoal = {
+  id: string;
+  seller_id: string;
+  month: string;
+  device_target: number | null;
+  /** Migração 0015. */
+  accessory_target?: number | null;
+  updated_by: string | null;
+  updated_by_email: string | null;
+  created_at: string;
+  updated_at: string;
+};
+
+export type FinancialSyncRunRow = {
+  id: string;
+  started_at: string;
+  finished_at: string | null;
+  period_start: string;
+  period_end: string;
+  mode: 'preview' | 'apply';
+  trigger: string;
+  status: 'running' | 'ok' | 'error';
+  counts: Record<string, unknown> | null;
+  next_start: string | null;
+  error: string | null;
 };
 
 /** Payload bruto de cada webhook do MercadoPhone (vendas e ordens de serviço). */
@@ -136,6 +189,9 @@ export type Database = {
       conversation_messages: { Row: ConversationMessage; Insert: Partial<ConversationMessage>; Update: Partial<ConversationMessage>; Relationships: [] };
       goals: { Row: Goals; Insert: Partial<Goals>; Update: Partial<Goals>; Relationships: [] };
       panel_settings: { Row: PanelSettings; Insert: Partial<PanelSettings>; Update: Partial<PanelSettings>; Relationships: [] };
+      seller_profit_goals: { Row: SellerProfitGoal; Insert: Partial<SellerProfitGoal>; Update: Partial<SellerProfitGoal>; Relationships: [] };
+      seller_device_goals: { Row: SellerDeviceGoal; Insert: Partial<SellerDeviceGoal>; Update: Partial<SellerDeviceGoal>; Relationships: [] };
+      financial_sync_runs: { Row: FinancialSyncRunRow; Insert: Partial<FinancialSyncRunRow>; Update: Partial<FinancialSyncRunRow>; Relationships: [] };
     };
     Views: Record<string, never>;
     Functions: Record<string, never>;

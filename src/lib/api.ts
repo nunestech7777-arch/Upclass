@@ -129,24 +129,46 @@ export async function updateProductStock(id: string, stock: number): Promise<voi
   cache.delete('products');
 }
 
+/**
+ * Linhas que contam como venda: canceladas na origem ou removidas do pedido (duplicatas de
+ * edições) ficam no banco para auditoria, mas não entram em rankings, metas e totais. Antes da
+ * migração 0013 a coluna não existe e todas as linhas contam.
+ */
+export function isCountedSaleRow(sale: Pick<Sale, 'item_status'>): boolean {
+  return (sale.item_status ?? 'active') === 'active';
+}
+
+/**
+ * `sold_at` guarda o relógio da loja como se fosse UTC. Os limites recebidos (Date local, ex.:
+ * meia-noite do dia) são lidos como relógio da loja — `toISOString()` os deslocaria em 3 horas e
+ * jogaria vendas da madrugada no dia errado.
+ */
+function wallClockIso(d: Date): string {
+  return new Date(
+    Date.UTC(d.getFullYear(), d.getMonth(), d.getDate(), d.getHours(), d.getMinutes(), d.getSeconds(), d.getMilliseconds())
+  ).toISOString();
+}
+
 export async function fetchSalesInRange(start: Date, end: Date): Promise<Sale[]> {
-  return fetchAllRows<Sale>((from, to) =>
+  const rows = await fetchAllRows<Sale>((from, to) =>
     supabase
       .from('sales')
       .select('*')
-      .gte('sold_at', start.toISOString())
-      .lt('sold_at', end.toISOString())
+      .gte('sold_at', wallClockIso(start))
+      .lt('sold_at', wallClockIso(end))
       .order('sold_at')
       .order('id')
       .range(from, to)
   );
+  return rows.filter(isCountedSaleRow);
 }
 
 /** Todas as vendas já registradas na plataforma, mais recentes primeiro. */
 export async function fetchAllSales(): Promise<Sale[]> {
-  return fetchAllRows<Sale>((from, to) =>
+  const rows = await fetchAllRows<Sale>((from, to) =>
     supabase.from('sales').select('*').order('sold_at', { ascending: false }).order('id').range(from, to)
   );
+  return rows.filter(isCountedSaleRow);
 }
 
 // Só os campos exibidos no modal — CPF, endereço e contato do cliente ficam fora da consulta.

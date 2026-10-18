@@ -1,6 +1,6 @@
 import { describe, it } from 'node:test';
 import assert from 'node:assert/strict';
-import { parseSaleExternalId, parseSaleOrderDetails, type SaleOrderEventRow } from './saleDetails.ts';
+import { parseSaleExternalId, parseSaleOrderDetails, summarizeSaleItems, type SaleOrderEventRow } from './saleDetails.ts';
 
 const baseRow: SaleOrderEventRow = {
   order_id: '1001',
@@ -94,5 +94,33 @@ describe('parseSaleOrderDetails', () => {
       { external_id: '1001-20-5', seller_id: 'b' },
     ]);
     assert.equal(ambiguous.items[1].sellerId, null);
+  });
+});
+
+describe('summarizeSaleItems (venda com vários iPhones)', () => {
+  const item = (name: string, quantity: number | null, total: number) => ({ name, quantity, total });
+  it('venda real 8613940: 2 iPhones, 0 acessórios, 4 brindes', () => {
+    assert.deepEqual(
+      summarizeSaleItems([
+        item('CAPA TRANSPARENTE - BND - . - .', 1, 0),
+        item('CARREGADOR  COMPLETO  - BND - . - .', 1, 0),
+        item('PELICULA  VIDRO 3D - BND - . - .', 1, 0),
+        item('FONE COM FIO LIGHT E  TIPO C BND - . - .', 1, 0),
+        item('IPHONE 18 PRO - 256GB - SLV', 1, 8500),
+        item('IPHONE 17 PRO MAX - 256GB - SLV', 1, 7850),
+      ]),
+      { devices: 2, accessories: 0, gifts: 4, unknown: 0 }
+    );
+  });
+  it('2 unidades do mesmo iPhone + 1 de outro modelo = 3 aparelhos', () => {
+    assert.equal(summarizeSaleItems([item('IPHONE 15 PRO', 2, 9000), item('IPHONE 16 PRO', 1, 6000)]).devices, 3);
+  });
+  it('acessório pago conta; Apple Watch não é aparelho; quantidade ausente não é inventada', () => {
+    assert.deepEqual(summarizeSaleItems([item('APPLE WATCH', 1, 2500), item('PELICULA', 2, 140), item('CAPA', null, 50)]), {
+      devices: 0,
+      accessories: 3,
+      gifts: 0,
+      unknown: 1,
+    });
   });
 });

@@ -448,3 +448,17 @@
     padding: 18px 16px;
   }
 }
+
+.sellers-profit-link {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  margin-top: 10px;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--primary);
+}
+
+.sellers-profit-link:hover {
+  text-decoration: underline;
+}

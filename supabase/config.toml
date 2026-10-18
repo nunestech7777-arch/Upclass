@@ -17,3 +17,6 @@ verify_jwt = false
 
 [functions.mercadophone-webhook]
 verify_jwt = false
+
+[functions.mercadophone-sync]
+verify_jwt = false

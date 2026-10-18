@@ -1,406 +1,260 @@
-import React, { useEffect, useMemo, useState } from 'react';
-import { AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts';
-import { Doughnut } from 'react-chartjs-2';
-import { Chart as ChartJS, ArcElement, Tooltip as ChartTooltip, Legend } from 'chart.js';
-import { TrendingUp, Target, CircleDollarSign, ChevronLeft, ChevronRight } from 'lucide-react';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
+import { useSearchParams } from 'react-router-dom';
+import { CircleDollarSign, Headphones, Percent, RefreshCw, Smartphone, TrendingUp, Wallet } from 'lucide-react';
 import './Dashboard.css';
-import { useTheme } from '../context/ThemeContext';
+import '../components/finance/finance.css';
+import '../components/dashboard/dashboard.css';
 import { SoldProductsModal } from '../components/SoldProductsModal';
+import { EmptyState, KpiCard, SectionEyebrow } from '../components/finance/FinancePrimitives';
+import { CoverageStatus } from '../components/dashboard/CoverageStatus';
+import { useFinanceSource } from '../components/finance/useFinance';
+import { PeriodFilter } from '../components/dashboard/PeriodFilter';
+import { GoalCards } from '../components/dashboard/GoalCards';
+import { SalesItemsDialog, TopProductCard, TopProductDialog } from '../components/dashboard/TopProducts';
+import { SalesEvolutionChart } from '../components/dashboard/SalesEvolutionChart';
+import { ConversionNotice, SellerRankings } from '../components/dashboard/SellerRankings';
+import { MigrationPendingError, type ConversionStatus, type DashboardData, type DeviceGoal } from '../lib/finance/financeApi';
+import { formatInstantBR, monthOf, monthTitle, storeHourNow, storeToday } from '../lib/finance/dates';
+import { brl, int, pct } from '../lib/finance/format';
 import {
-  fetchGoals,
-  fetchSalesInRange,
-  fetchProducts,
-  fetchVisibleSellers,
-  fetchAllConversations,
-  computeSellerPerformance,
-  classifyProductCategory,
-  getWeekRange,
-  getMonthRange,
-  getDayRange,
-  type SellerPerformance,
-  type ConversationSummary,
-} from '../lib/api';
-import type { Sale, Seller, Product } from '../lib/database.types';
+  PRESET_LABELS,
+  buildDeviceRows,
+  buildSellerRows,
+  buildSeries,
+  deviceItemsOf,
+  dataRange,
+  defaultMode,
+  formatRange,
+  goalWindow,
+  presetRange,
+  rangeCoverage,
+  salesIn,
+  summarizeMoney,
+  summarizeUnits,
+  topProduct,
+  unitGoalProgress,
+  type PeriodPreset,
+  type SeriesMode,
+} from '../lib/finance/dashboard';
 
-ChartJS.register(ArcElement, ChartTooltip, Legend);
-
-const donutOptions = {
-  plugins: {
-    legend: {
-      display: false
-    }
-  },
-  maintainAspectRatio: false,
-};
-
-const MONTH_NAMES_FULL = ['Janeiro', 'Fevereiro', 'Março', 'Abril', 'Maio', 'Junho', 'Julho', 'Agosto', 'Setembro', 'Outubro', 'Novembro', 'Dezembro'];
-const WEEKDAY_NAMES = ['Dom', 'Seg', 'Ter', 'Qua', 'Qui', 'Sex', 'Sáb'];
-
-interface DashboardData {
-  weeklySold: number;
-  weeklyTarget: number;
-  monthlySold: number;
-  monthlyTarget: number;
-  topProducts: { name: string; qty: number }[];
-  totalUnitsSold: number;
-  topSellers: SellerPerformance[];
-  sellers: Seller[];
-  monthSales: Sale[];
-  products: Product[];
-}
+const PRESETS = Object.keys(PRESET_LABELS) as PeriodPreset[];
 
 export function Dashboard() {
-  const { theme } = useTheme();
-  const isDark = theme === 'dark';
+  const source = useFinanceSource();
+  const [params, setParams] = useSearchParams();
+  const today = storeToday();
+
+  const rawPreset = params.get('periodo');
+  const preset: PeriodPreset = PRESETS.includes(rawPreset as PeriodPreset) ? (rawPreset as PeriodPreset) : 'month';
+  const range = useMemo(
+    () => presetRange(preset, today, { from: params.get('de') ?? undefined, to: params.get('ate') ?? undefined }),
+    [preset, today, params]
+  );
+  const need = useMemo(() => dataRange(range, today), [range, today]);
 
   const [data, setData] = useState<DashboardData | null>(null);
+  const dataRef = useRef<DashboardData | null>(null);
+  const [error, setError] = useState<Error | null>(null);
   const [loading, setLoading] = useState(true);
-  const [conversations, setConversations] = useState<ConversationSummary[] | null>(null);
-  const [isSoldModalOpen, setIsSoldModalOpen] = useState(false);
-  const [selectedDate, setSelectedDate] = useState<Date>(() => new Date());
-  const [weekOffset, setWeekOffset] = useState<number>(0);
-  const [dayChartData, setDayChartData] = useState<{ name: string; value: number }[]>([]);
+  const [nonce, setNonce] = useState(0);
+  const [conversion, setConversion] = useState<ConversionStatus | null | undefined>(undefined);
+  const [mode, setMode] = useState<{ key: string; value: SeriesMode } | null>(null);
+  const [salesOpen, setSalesOpen] = useState(false);
+  const [detail, setDetail] = useState<'devices' | 'accessories' | null>(null);
+  const [deviceSeller, setDeviceSeller] = useState<string | null>(null);
+  const [goalsState, setGoalsState] = useState<{ month: string; goals: DeviceGoal[]; available: boolean } | null>(null);
 
+  // Metas individuais de aparelhos (mensais) do mês de referência — consulta leve e isolada.
+  const refMonth = monthOf(goalWindow(range, 'month', today).window.from);
   useEffect(() => {
-    const now = new Date();
-    const { start: weekStart, end: weekEnd } = getWeekRange(now);
-    const { start: monthStart, end: monthEnd } = getMonthRange(now);
+    let alive = true;
+    source
+      .loadDeviceGoals(refMonth)
+      .then((goals) => alive && setGoalsState({ month: refMonth, goals, available: true }))
+      .catch(() => alive && setGoalsState({ month: refMonth, goals: [], available: false }));
+    return () => {
+      alive = false;
+    };
+  }, [source, refMonth, nonce]);
 
-    Promise.all([
-      fetchGoals(),
-      fetchSalesInRange(weekStart, weekEnd),
-      fetchSalesInRange(monthStart, monthEnd),
-      fetchProducts(),
-      fetchVisibleSellers(),
-    ]).then(([goals, weekSales, monthSales, products, sellers]) => {
-      const productMap = new Map(products.map((p) => [p.id, p]));
-      const isCountableSale = (s: Sale) => {
-        const prod = productMap.get(s.product_id);
-        const category = classifyProductCategory(prod?.name);
-        if (category === 'Acessórios') {
-          return (Number(s.amount) || 0) > 0;
-        }
-        return true;
-      };
-
-      const weeklySold = weekSales.filter(isCountableSale).reduce((sum, s) => sum + s.quantity, 0);
-      const monthlySold = monthSales.filter(isCountableSale).reduce((sum, s) => sum + s.quantity, 0);
-
-      const qtyByProduct = new Map<string, number>();
-      monthSales.filter(isCountableSale).forEach((s) => qtyByProduct.set(s.product_id, (qtyByProduct.get(s.product_id) ?? 0) + s.quantity));
-      const topProducts = [...qtyByProduct.entries()]
-        .map(([id, qty]) => ({ name: productMap.get(id)?.name ?? 'Produto removido', qty }))
-        .sort((a, b) => b.qty - a.qty)
-        .slice(0, 3);
-
-      const performance = computeSellerPerformance(sellers, monthSales, [], products);
-      const topSellers = [...performance].sort((a, b) => b.sold - a.sold).slice(0, 3);
-
-      setData({
-        weeklySold,
-        weeklyTarget: goals.weekly_devices_target + goals.weekly_accessories_target,
-        monthlySold,
-        monthlyTarget: goals.monthly_devices_target + goals.monthly_accessories_target,
-        topProducts,
-        totalUnitsSold: monthlySold,
-        topSellers,
-        sellers,
-        monthSales,
-        products,
-      });
-    }).catch((err) => {
-      console.error('Erro ao carregar dados do Dashboard:', err);
-    }).finally(() => setLoading(false));
-
-    // As conversas só alimentam o Ranking de Conversão — não seguram o resto da tela.
-    fetchAllConversations()
-      .then(setConversations)
-      .catch((err) => {
-        console.error('Erro ao carregar conversas do Dashboard:', err);
-        setConversations([]);
-      });
-  }, []);
-
-  const topConversion = useMemo(() => {
-    if (!data || !conversations) return [];
-    return computeSellerPerformance(data.sellers, data.monthSales, conversations, data.products)
-      .sort((a, b) => b.conversion - a.conversion)
-      .slice(0, 3);
-  }, [data, conversations]);
-
+  // Uma consulta cobre período + janelas de meta; trocar o filtro dentro do intervalo já carregado não consulta de novo.
   useEffect(() => {
-    const { start, end } = getDayRange(selectedDate);
-    fetchSalesInRange(start, end).then((sales) => {
-      const byHour = new Array(24).fill(0);
-      sales.forEach((s) => {
-        byHour[new Date(s.sold_at).getHours()] += s.quantity;
-      });
-      setDayChartData(byHour.map((value, hour) => ({ name: `${String(hour).padStart(2, '0')}h`, value })));
-    });
-  }, [selectedDate]);
-
-  const chartColor = isDark ? '#3B82F6' : '#0A25FF';
-  const gridColor = isDark ? 'rgba(255, 255, 255, 0.08)' : '#E5E7EB';
-  const donutBg = isDark ? ['#3B82F6', '#8B5CF6', '#334155'] : ['#0A25FF', '#000000', '#E5E7EB'];
-
-  const weekDays = useMemo(() => {
-    const d = new Date();
-    d.setDate(d.getDate() + weekOffset * 7);
-    const { start } = getWeekRange(d);
-    return Array.from({ length: 7 }, (_, i) => {
-      return new Date(start.getFullYear(), start.getMonth(), start.getDate() + i);
-    });
-  }, [weekOffset]);
-
-  const displayMonthYear = useMemo(() => {
-    if (weekDays.length === 0) return '';
-    const first = weekDays[0];
-    const last = weekDays[6];
-    if (first.getMonth() === last.getMonth()) {
-      return `${MONTH_NAMES_FULL[first.getMonth()]} ${first.getFullYear()}`;
-    } else if (first.getFullYear() === last.getFullYear()) {
-      return `${MONTH_NAMES_FULL[first.getMonth()]} / ${MONTH_NAMES_FULL[last.getMonth()]} ${first.getFullYear()}`;
-    } else {
-      return `${MONTH_NAMES_FULL[first.getMonth()]} ${first.getFullYear()} / ${MONTH_NAMES_FULL[last.getMonth()]} ${last.getFullYear()}`;
+    const cur = dataRef.current;
+    if (nonce === 0 && cur && cur.range.from <= need.from && cur.range.to >= need.to) {
+      setLoading(false);
+      return;
     }
-  }, [weekDays]);
+    let alive = true;
+    setLoading(true);
+    setError(null);
+    source
+      .loadDashboard(need.from, need.to)
+      .then((d) => {
+        if (!alive) return;
+        dataRef.current = d;
+        setData(d);
+      })
+      .catch((err) => alive && setError(err instanceof Error ? err : new Error(String(err))))
+      .finally(() => alive && setLoading(false));
+    return () => {
+      alive = false;
+    };
+  }, [source, need.from, need.to, nonce]);
 
-  const isSameDay = (a: Date, b: Date) =>
-    a.getFullYear() === b.getFullYear() && a.getMonth() === b.getMonth() && a.getDate() === b.getDate();
+  // Conversão: só contagens, isolada do resto (falha do CRM não afeta o Dashboard).
+  useEffect(() => {
+    source
+      .loadConversionStatus()
+      .then(setConversion)
+      .catch(() => setConversion(null));
+  }, [source]);
 
-  const handlePrevWeek = () => {
-    setWeekOffset((prev) => {
-      const nextOffset = prev - 1;
-      const d = new Date();
-      d.setDate(d.getDate() + nextOffset * 7);
-      const { start } = getWeekRange(d);
-      const currentDayIdx = (selectedDate.getDay() + 6) % 7;
-      const targetDate = new Date(start.getFullYear(), start.getMonth(), start.getDate() + currentDayIdx);
-      setSelectedDate(targetDate);
-      return nextOffset;
+  const view = useMemo(() => {
+    if (!data || data.range.from > need.from || data.range.to < need.to) return null;
+    const names = data.productNames;
+    const inRange = salesIn(data.sales, range);
+    const weekWindow = goalWindow(range, 'week', today);
+    const monthWindow = goalWindow(range, 'month', today);
+    const now = { today, hour: storeHourNow() };
+    return {
+      names,
+      inRange,
+      units: summarizeUnits(inRange, names),
+      money: summarizeMoney(inRange),
+      coverage: rangeCoverage(inRange, names),
+      week: unitGoalProgress(data.sales, names, weekWindow, { devices: data.targets.weekly_devices_target, accessories: data.targets.weekly_accessories_target }),
+      month: unitGoalProgress(data.sales, names, monthWindow, { devices: data.targets.monthly_devices_target, accessories: data.targets.monthly_accessories_target }),
+      topDevice: topProduct(inRange, names, 'devices'),
+      topAccessory: topProduct(inRange, names, 'accessories'),
+      sellerRows: buildSellerRows(inRange, names, data.sellers),
+      deviceRows: buildDeviceRows(
+        data.sales,
+        names,
+        data.sellers,
+        range,
+        monthWindow,
+        new Map((goalsState?.month === monthOf(monthWindow.window.from) ? goalsState.goals : []).map((g) => [g.seller_id, g.device_target]))
+      ),
+      series: buildSeries(data.sales, names, range, now),
+      sellerNames: new Map(data.sellers.map((s) => [s.id, s.name])),
+    };
+  }, [data, need.from, need.to, range, today, goalsState]);
+
+  const deviceRow = view?.deviceRows.find((r) => r.seller.id === deviceSeller);
+  const modeKey = `${range.from}|${range.to}`;
+  const activeMode: SeriesMode = mode && mode.key === modeKey ? mode.value : defaultMode(range);
+
+  const setFilter = (next: PeriodPreset, custom?: { from: string; to: string }) => {
+    setParams((prev) => {
+      const q = new URLSearchParams(prev);
+      q.set('periodo', next);
+      if (next === 'custom' && custom) {
+        q.set('de', custom.from);
+        q.set('ate', custom.to);
+      } else {
+        q.delete('de');
+        q.delete('ate');
+      }
+      return q;
     });
   };
-
-  const handleNextWeek = () => {
-    setWeekOffset((prev) => {
-      const nextOffset = prev + 1;
-      const d = new Date();
-      d.setDate(d.getDate() + nextOffset * 7);
-      const { start } = getWeekRange(d);
-      const currentDayIdx = (selectedDate.getDay() + 6) % 7;
-      const targetDate = new Date(start.getFullYear(), start.getMonth(), start.getDate() + currentDayIdx);
-      setSelectedDate(targetDate);
-      return nextOffset;
-    });
-  };
-
-  const donutData = {
-    labels: data?.topProducts.map((p) => p.name) ?? [],
-    datasets: [
-      {
-        data: data?.topProducts.map((p) => p.qty) ?? [],
-        backgroundColor: donutBg,
-        borderWidth: 0,
-        cutout: '75%',
-      },
-    ],
-  };
-
-  const weeklyPercent = data && data.weeklyTarget > 0 ? Math.round((data.weeklySold / data.weeklyTarget) * 100) : 0;
-  const monthlyPercent = data && data.monthlyTarget > 0 ? Math.round((data.monthlySold / data.monthlyTarget) * 100) : 0;
 
   return (
-    <div className="dashboard" style={{ opacity: loading ? 0.6 : 1 }}>
-      <div className="grid-cards">
-        <div className="stat-card">
-          <div className="stat-icon-wrapper">
-            <span className="stat-icon"><TrendingUp size={24} /></span>
-          </div>
-          <div className="stat-info">
-            <span className="stat-label">Meta da Semana</span>
-            <span className="stat-value">{(data?.weeklySold ?? 0).toLocaleString('pt-BR')}</span>
-            <span className="stat-trend positive">{weeklyPercent}% da meta ({(data?.weeklyTarget ?? 0).toLocaleString('pt-BR')})</span>
-          </div>
+    <div className="fin-page dv-page">
+      <header className="dv-head">
+        <div>
+          <SectionEyebrow icon={<TrendingUp size={14} />}>Painel comercial</SectionEyebrow>
+          <h1 className="fin-title">Dashboard</h1>
+          <p className="fin-lead">
+            {PRESET_LABELS[preset]} · {formatRange(range)} · horário da loja (América/São Paulo)
+          </p>
         </div>
-
-        <div className="stat-card highlight">
-          <div className="stat-icon-wrapper">
-            <span className="stat-icon"><Target size={24} /></span>
-          </div>
-          <div className="stat-info">
-            <span className="stat-label">Meta do Mês</span>
-            <span className="stat-value">{(data?.monthlySold ?? 0).toLocaleString('pt-BR')}</span>
-            <span className="stat-trend positive">{monthlyPercent}% da meta ({(data?.monthlyTarget ?? 0).toLocaleString('pt-BR')})</span>
-          </div>
+        <div className="dv-head-actions">
+          <button type="button" className="fin-btn" onClick={() => setNonce((n) => n + 1)} disabled={loading}>
+            <RefreshCw size={15} className={loading ? 'fin-spin' : ''} /> Atualizar
+          </button>
+          <CoverageStatus coverage={view?.coverage ?? null} />
+          <PeriodFilter preset={preset} range={range} today={today} onChange={setFilter} />
         </div>
+      </header>
 
-        <div
-          className="stat-card clickable"
-          onClick={() => setIsSoldModalOpen(true)}
-          role="button"
-          tabIndex={0}
-          onKeyDown={(e) => (e.key === 'Enter' || e.key === ' ') && setIsSoldModalOpen(true)}
-          style={{ cursor: 'pointer' }}
-          title="Clique para ver todos os produtos vendidos"
-        >
-          <div className="stat-icon-wrapper">
-            <span className="stat-icon"><CircleDollarSign size={24} /></span>
+      {error ? (
+        <EmptyState title={error instanceof MigrationPendingError ? 'Módulo financeiro ainda não ativado no banco' : 'Não foi possível carregar o Dashboard'}>{error.message}</EmptyState>
+      ) : !view || !data ? (
+        <div className="fin-loading">Carregando o Dashboard…</div>
+      ) : (
+        <div className={loading ? 'is-reloading' : ''}>
+          <div className="dv-kpis">
+            <KpiCard label="Aparelhos vendidos" value={int(view.units.devices)} icon={<Smartphone size={18} />} tone="goal" caption="iPhones no período" />
+            <KpiCard label="Acessórios vendidos" value={int(view.units.accessories)} icon={<Headphones size={18} />} tone="profit" caption={view.units.gifts ? `${int(view.units.gifts)} brinde(s) fora da contagem` : 'Acessórios pagos'} />
+            <KpiCard label="Faturamento" value={brl(view.money.revenue)} icon={<CircleDollarSign size={18} />} tone="neutral" badge={view.coverage.complete ? undefined : 'Parcial'} caption="Receita líquida conciliada" />
+            <KpiCard label="Lucro bruto" value={brl(view.money.profit)} icon={<Wallet size={18} />} tone={view.money.profit < 0 ? 'deficit' : 'profit'} highlight badge={view.coverage.complete ? undefined : 'Parcial'} caption="Faturamento − custo dos produtos" />
+            <KpiCard label="Margem" value={pct(view.money.margin)} icon={<Percent size={18} />} tone="neutral" caption={view.money.margin == null ? 'Indisponível sem faturamento' : 'Lucro bruto ÷ faturamento'} />
           </div>
-          <div className="stat-info">
-            <span className="stat-label">Total de Vendas no Mês</span>
-            <span className="stat-value">{(data?.monthlySold ?? 0).toLocaleString('pt-BR')}</span>
-            <span className="stat-trend" style={{ color: 'var(--primary)', fontWeight: 600 }}>
-              Ver produtos vendidos →
-            </span>
+
+          <GoalCards week={view.week} month={view.month} units={view.units} onOpenSales={() => setSalesOpen(true)} />
+
+          <div className="dv-tops">
+            <TopProductCard kind="devices" product={view.topDevice} onOpen={() => setDetail('devices')} />
+            <TopProductCard kind="accessories" product={view.topAccessory} onOpen={() => setDetail('accessories')} />
           </div>
+
+          <SalesEvolutionChart
+            points={view.series.points}
+            granularity={view.series.granularity}
+            mode={activeMode}
+            onModeChange={(m) => setMode({ key: modeKey, value: m })}
+            totals={{ devices: view.units.devices, accessories: view.units.accessories }}
+            subtitle={`${view.series.granularity === 'hour' ? 'Por hora' : view.series.granularity === 'day' ? 'Por dia' : 'Por mês'} · ${formatRange(range)}${activeMode === 'cumulative' ? ' · acumulado até o último dado real' : ''}`}
+          />
+
+          <SellerRankings
+            rows={view.sellerRows}
+            month={monthOf(range.to)}
+            operation={{ profit: view.money.profit, revenue: view.money.revenue, orders: view.units.orders }}
+            devices={{
+              rows: view.deviceRows,
+              monthLabel: monthTitle(refMonth),
+              goalsAvailable: goalsState?.available ?? true,
+              operationDevices: view.units.devices,
+              onOpenSeller: setDeviceSeller,
+            }}
+          />
+
+          <ConversionNotice status={conversion} />
+          <p className="fin-muted fin-small fin-table-note">Dados carregados em {formatInstantBR(data.loadedAt)} · os mesmos filtros e classificações valem para cards, gráfico e rankings.</p>
         </div>
-      </div>
+      )}
 
-      <div className="grid-dashboard" style={{marginTop: '24px'}}>
-        <div className="flex-col gap-6">
-          <div className="card chart-card">
-            <div className="chart-header">
-              <h2 className="h2">Evolução de Vendas</h2>
-              <span className="text-muted text-sm">{selectedDate.getDate()} de {MONTH_NAMES_FULL[selectedDate.getMonth()]}</span>
-            </div>
-            <div className="chart-container">
-              <ResponsiveContainer width="100%" height="100%">
-                <AreaChart data={dayChartData}>
-                  <defs>
-                    <linearGradient id="colorValue" x1="0" y1="0" x2="0" y2="1">
-                      <stop offset="5%" stopColor={chartColor} stopOpacity={0.3}/>
-                      <stop offset="95%" stopColor={chartColor} stopOpacity={0}/>
-                    </linearGradient>
-                  </defs>
-                  <CartesianGrid strokeDasharray="3 3" vertical={false} stroke={gridColor} />
-                  <XAxis dataKey="name" axisLine={false} tickLine={false} tick={{fill: '#9CA3AF', fontSize: 12}} dy={10} />
-                  <YAxis axisLine={false} tickLine={false} tick={{fill: '#9CA3AF', fontSize: 12}} width={70} />
-                  <Tooltip
-                    contentStyle={{
-                      backgroundColor: isDark ? '#131926' : '#FFFFFF',
-                      borderColor: isDark ? 'rgba(255,255,255,0.1)' : '#E5E7EB',
-                      color: isDark ? '#F9FAFB' : '#1F2937',
-                      borderRadius: '8px'
-                    }}
-                  />
-                  <Area type="monotone" dataKey="value" stroke={chartColor} strokeWidth={3} fillOpacity={1} fill="url(#colorValue)" />
-                </AreaChart>
-              </ResponsiveContainer>
-            </div>
-          </div>
+      {view && detail && (
+        <TopProductDialog
+          title={detail === 'devices' ? 'Aparelho mais vendido' : 'Acessório mais vendido'}
+          product={(detail === 'devices' ? view.topDevice : view.topAccessory)!}
+          productNames={view.names}
+          sellerNames={view.sellerNames}
+          onClose={() => setDetail(null)}
+        />
+      )}
 
-          <div className="date-selector">
-            <h2 className="h2" style={{marginBottom: '16px'}}>{displayMonthYear}</h2>
-            <div className="days-row">
-              <button 
-                className="nav-arrow" 
-                onClick={handlePrevWeek} 
-                title="Semana anterior" 
-                aria-label="Semana anterior"
-              >
-                <ChevronLeft size={20} />
-              </button>
-              {weekDays.map((d) => (
-                <div
-                  className={`day ${isSameDay(d, selectedDate) ? 'active' : ''}`}
-                  key={d.toISOString()}
-                  onClick={() => setSelectedDate(d)}
-                >
-                  <span className="day-name">{WEEKDAY_NAMES[d.getDay()]}</span>
-                  <span className="day-num">{d.getDate()}</span>
-                </div>
-              ))}
-              <button 
-                className="nav-arrow" 
-                onClick={handleNextWeek} 
-                title="Próxima semana" 
-                aria-label="Próxima semana"
-              >
-                <ChevronRight size={20} />
-              </button>
-            </div>
-          </div>
-        </div>
-
-        <div className="flex-col gap-6">
-          <div className="card donut-card">
-            <h2 className="h2">Produto Mais Vendido</h2>
-            {data && data.topProducts.length > 0 ? (
-              <div className="donut-container">
-                <div className="donut-chart-wrapper">
-                  <Doughnut data={donutData} options={donutOptions} />
-                  <div className="donut-center-text">
-                    <span className="donut-label">Total Vendas</span>
-                    <span className="donut-value">{data.totalUnitsSold.toLocaleString('pt-BR')}</span>
-                  </div>
-                </div>
-                <div className="donut-legend">
-                  {data.topProducts.map((p, i) => (
-                    <div className="legend-item" key={p.name}>
-                      <span className="legend-color" style={{backgroundColor: donutBg[i]}}></span>
-                      <span className="legend-text">{p.name}</span>
-                    </div>
-                  ))}
-                </div>
-              </div>
-            ) : (
-              <p className="text-muted" style={{ padding: '24px 0', textAlign: 'center' }}>Nenhuma venda registrada este mês.</p>
-            )}
-          </div>
-
-          <div className="card progress-card">
-            <h2 className="h2">Vendedor do Mês</h2>
-            {data && data.topSellers.length > 0 ? (
-              <div className="progress-list">
-                {data.topSellers.map(({ seller, sold }, i) => (
-                  <div className="progress-item" key={seller.id}>
-                    <div className="progress-header">
-                      <span className="progress-name">{seller.name}</span>
-                      <span className="progress-percent">{sold} un.</span>
-                    </div>
-                    <div className="progress-bar-bg">
-                      <div className="progress-bar-fill" style={{width: `${data.totalUnitsSold > 0 ? Math.round((sold / data.totalUnitsSold) * 100) : 0}%`, backgroundColor: donutBg[i % donutBg.length]}}></div>
-                    </div>
-                  </div>
-                ))}
-              </div>
-            ) : (
-              <p className="text-muted" style={{ padding: '16px 0', textAlign: 'center' }}>Sem vendas registradas este mês.</p>
-            )}
-          </div>
-
-          <div className="card progress-card">
-            <h2 className="h2">Ranking de Conversão</h2>
-            {topConversion.length > 0 ? (
-              <div className="progress-list">
-                {topConversion.map(({ seller, conversion }, i) => (
-                  <div className="progress-item" key={seller.id}>
-                    <div className="progress-header">
-                      <span className="progress-name">{seller.name}</span>
-                      <span className="progress-percent">{conversion}%</span>
-                    </div>
-                    <div className="progress-bar-bg">
-                      <div className="progress-bar-fill" style={{width: `${conversion}%`, backgroundColor: donutBg[i % donutBg.length]}}></div>
-                    </div>
-                  </div>
-                ))}
-              </div>
-            ) : (
-              <p className="text-muted" style={{ padding: '16px 0', textAlign: 'center' }}>
-                {conversations === null ? 'Carregando conversas...' : 'Sem dados de conversas ainda.'}
-              </p>
-            )}
-          </div>
-
-        </div>
-
-      </div>
+      {view && data && deviceSeller && (
+        <SalesItemsDialog
+          title={`Aparelhos vendidos por ${view.sellerNames.get(deviceSeller) ?? 'vendedor'}`}
+          summary={`${formatRange(range)} · ${int(deviceRow?.sold ?? 0)} aparelho(s) · faturamento ${brl(deviceRow?.revenue ?? 0)} · lucro bruto ${brl(deviceRow?.profit ?? 0)}`}
+          rows={deviceItemsOf(data.sales, view.names, deviceSeller, range)}
+          productNames={view.names}
+          sellerNames={view.sellerNames}
+          columns={{ order: true, profit: true }}
+          unreconciled={deviceRow ? deviceRow.items - deviceRow.reconciledItems : 0}
+          onClose={() => setDeviceSeller(null)}
+        />
+      )}
 
       <SoldProductsModal
-        isOpen={isSoldModalOpen}
-        onClose={() => setIsSoldModalOpen(false)}
+        isOpen={salesOpen}
+        onClose={() => setSalesOpen(false)}
         initialCategory="all"
-        initialPeriod="month"
+        initialStartDate={range.from}
+        initialEndDate={range.to}
       />
     </div>
   );

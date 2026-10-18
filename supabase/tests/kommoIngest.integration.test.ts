@@ -130,6 +130,7 @@ before(async () => {
     create role anon; create role authenticated; create role service_role;
     create schema auth;
     create function auth.role() returns text language sql as $$ select 'service_role'::text $$;
+    create function auth.uid() returns uuid language sql as $$ select null::uuid $$;
   `);
   const files = readdirSync(MIGRATIONS_DIR).filter((f) => f.endsWith('.sql')).sort();
   for (const f of files) {

@@ -1,3 +1,4 @@
+import { formatDateBR, wallClock } from '../lib/finance/dates';
 import React, { useEffect, useMemo, useState } from 'react';
 import {
   Calendar,
@@ -17,14 +18,14 @@ import {
   fetchSellers,
   fetchSalesInRange,
   classifyProductCategory,
-  isDeviceProduct,
-  isCountableAccessorySale,
   getMonthRange,
   getWeekRange,
   getDayRange,
   fetchSaleOrderDetails,
 } from '../lib/api';
-import { parseSaleExternalId } from '../lib/saleDetails';
+import { parseSaleExternalId, summarizeSaleItems } from '../lib/saleDetails';
+import { summarizeUnits, topProduct } from '../lib/finance/dashboard';
+import type { FinanceSale } from '../lib/finance/calc';
 import type { SaleOrderDetails } from '../lib/saleDetails';
 import type { Sale, Product, Seller } from '../lib/database.types';
 
@@ -36,13 +37,15 @@ export interface SaleRow extends Sale {
   sellerName: string;
 }
 
+// `sold_at` é o relógio da loja gravado como UTC: strings usam wallClock (sem converter fuso).
 function formatDate(isoOrDate: string | Date): string {
-  const d = typeof isoOrDate === 'string' ? new Date(isoOrDate) : isoOrDate;
-  return d.toLocaleDateString('pt-BR');
+  if (typeof isoOrDate === 'string') return formatDateBR(wallClock(isoOrDate).date);
+  return isoOrDate.toLocaleDateString('pt-BR');
 }
 
 function formatDateTime(iso: string): string {
-  return new Date(iso).toLocaleString('pt-BR', { dateStyle: 'short', timeStyle: 'short' });
+  const w = wallClock(iso);
+  return `${formatDateBR(w.date)} ${w.time}`;
 }
 
 function formatCurrency(value: number): string {
@@ -266,7 +269,7 @@ function SaleDetailModal({
 
           <div className="sales-detail-grid">
             <div className="sales-detail-item full-width">
-              <span className="sales-detail-label">Produto</span>
+              <span className="sales-detail-label">Item selecionado</span>
               <span className="sales-detail-val">{sale.productName}</span>
             </div>
 
@@ -362,6 +365,16 @@ function SaleDetailModal({
               {details.items.length > 1 && (
                 <div className="sales-detail-section">
                   <span className="sales-detail-label">Itens desta venda ({details.items.length})</span>
+                  {(() => {
+                    const summary = summarizeSaleItems(details.items);
+                    return (
+                      <span className="sales-detail-summary">
+                        Esta venda: <strong>{summary.devices} {summary.devices === 1 ? 'aparelho' : 'aparelhos'}</strong> ·{' '}
+                        {summary.accessories} {summary.accessories === 1 ? 'acessório' : 'acessórios'} · {summary.gifts}{' '}
+                        {summary.gifts === 1 ? 'brinde' : 'brindes'}
+                      </span>
+                    );
+                  })()}
                   <ul className="sales-detail-list">
                     {details.items.map((item, index) => {
                       const itemSeller = item.sellerId ? sellerNames.get(item.sellerId) : undefined;
@@ -547,47 +560,23 @@ export function Sales() {
   // CÁLCULO DOS 3 CARDS PRINCIPAIS
   // ============================================================
   const metrics = useMemo(() => {
-    // Total de vendas/pedidos no período
-    const totalSalesCount = sales.length;
-
-    // Mapas para agregar quantidades
-    const deviceQtyMap = new Map<string, { name: string; qty: number }>();
-    const accessoryQtyMap = new Map<string, { name: string; qty: number }>();
-
-    for (const sale of sales) {
-      const prod = productMap.get(sale.product_id);
-      const prodName = prod?.name ?? 'Produto não identificado';
-      const isDevice = isDeviceProduct(prodName);
-      const isAccessory = isCountableAccessorySale(sale, prodName);
-      const qty = sale.quantity;
-
-      if (isDevice) {
-        // Regra Aparelho: só conta se começar com iPhone
-        const key = prodName.trim();
-        const current = deviceQtyMap.get(key) ?? { name: key, qty: 0 };
-        current.qty += qty;
-        deviceQtyMap.set(key, current);
-      } else if (isAccessory) {
-        // Regra Acessório: tudo que não for iPhone E valor > 0 (brindes R$ 0 não entram)
-        const key = prodName.trim();
-        const current = accessoryQtyMap.get(key) ?? { name: key, qty: 0 };
-        current.qty += qty;
-        accessoryQtyMap.set(key, current);
-      }
-    }
-
-    // Aparelho mais vendido
-    const sortedDevices = [...deviceQtyMap.values()].sort((a, b) => b.qty - a.qty);
-    const topDevice = sortedDevices[0] ?? null;
-
-    // Acessório mais vendido
-    const sortedAccessories = [...accessoryQtyMap.values()].sort((a, b) => b.qty - a.qty);
-    const topAccessory = sortedAccessories[0] ?? null;
+    // Uma linha de `sales` é um ITEM; uma venda pode ter vários itens (ex.: 8613940 tem 2 iPhones e
+    // 4 brindes). Vendas = pedidos distintos; aparelhos/acessórios = soma das quantidades dos itens —
+    // as mesmas regras e funções do Dashboard (aparelho = iPhone; acessório = valor > 0; brinde fora).
+    const names = new Map([...productMap.values()].map((p) => [p.id, p.name]));
+    const rows = sales.map((s) => ({
+      ...s,
+      mp_order_id: s.mp_order_id ?? parseSaleExternalId(s.external_id)?.orderId ?? null,
+    })) as unknown as FinanceSale[];
+    const units = summarizeUnits(rows, names);
+    const topDevice = topProduct(rows, names, 'devices');
+    const topAccessory = topProduct(rows, names, 'accessories');
 
     return {
-      totalSalesCount,
-      topDevice,
-      topAccessory,
+      totalSalesCount: units.orders,
+      units,
+      topDevice: topDevice ? { name: topDevice.name, qty: topDevice.qty } : null,
+      topAccessory: topAccessory ? { name: topAccessory.name, qty: topAccessory.qty } : null,
     };
   }, [sales, productMap]);
 
@@ -690,7 +679,11 @@ export function Sales() {
           <div className="sales-metric-main-value">
             {isLoading ? '...' : `${metrics.totalSalesCount} ${metrics.totalSalesCount === 1 ? 'venda' : 'vendas'}`}
           </div>
-          <span className="sales-metric-subtext">no período selecionado</span>
+          <span className="sales-metric-subtext">
+            {isLoading
+              ? 'no período selecionado'
+              : `${metrics.units.devices} ${metrics.units.devices === 1 ? 'aparelho' : 'aparelhos'} · ${metrics.units.accessories} ${metrics.units.accessories === 1 ? 'acessório' : 'acessórios'} · ${metrics.units.gifts} ${metrics.units.gifts === 1 ? 'brinde' : 'brindes'} · ${metrics.units.items} itens`}
+          </span>
         </div>
 
         {/* Card 2 — Aparelho Mais Vendido */}

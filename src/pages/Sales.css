@@ -837,3 +837,14 @@
     padding: 10px 12px;
   }
 }
+
+.sales-detail-summary {
+  display: block;
+  margin: 4px 0 8px;
+  font-size: 13px;
+  color: var(--text-muted);
+}
+
+.sales-detail-summary strong {
+  color: var(--text-dark);
+}

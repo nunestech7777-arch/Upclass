@@ -1,4 +1,8 @@
 import type { HistoricoItem } from './itemSellers.ts';
+import type { HistoricoFinanceItem } from './financialReconcile.ts';
+
+/** Linha do histórico de vendas: vendedor do item + valores financeiros da linha. */
+export type HistoricoVendaRow = HistoricoItem & HistoricoFinanceItem;
 
 const BASE_URL = 'https://app.mercadophone.tech/api.php';
 
@@ -80,11 +84,13 @@ export async function fetchAllVendedores(): Promise<MercadoPhoneSeller[]> {
 }
 
 /**
- * Histórico de vendas, uma linha por item, com o vendedor de cada item. Datas no horário da loja
- * (`YYYY-MM-DD HH:mm:ss`), como o MercadoPhone as grava. O limite por página da API é 300.
+ * Histórico de vendas, uma linha por item, com o vendedor, a receita (`valorTotal`), o custo
+ * (`valorCusto`) e o lucro da linha. Datas no horário da loja (`YYYY-MM-DD HH:mm:ss`), como o
+ * MercadoPhone as grava. O limite por página da API é 300; `totalItens` não respeita o filtro de
+ * datas, então a paginação para na primeira página incompleta.
  */
-export async function fetchHistoricoVendas(dataInicial: string, dataFinal: string): Promise<HistoricoItem[]> {
-  const items: HistoricoItem[] = [];
+export async function fetchHistoricoVendas(dataInicial: string, dataFinal: string): Promise<HistoricoVendaRow[]> {
+  const items: HistoricoVendaRow[] = [];
   const limit = 300;
   for (let page = 1; ; page += 1) {
     const res = await call('HistoricoVendaApiController', 'index', {
@@ -94,7 +100,7 @@ export async function fetchHistoricoVendas(dataInicial: string, dataFinal: strin
       direction: 'asc',
       filters: { dataVendaInicial: dataInicial, dataVendaFinal: dataFinal },
     });
-    const pageItems: HistoricoItem[] = res?.data?.itens ?? [];
+    const pageItems: HistoricoVendaRow[] = res?.data?.itens ?? [];
     items.push(...pageItems);
     if (pageItems.length < limit) break;
   }

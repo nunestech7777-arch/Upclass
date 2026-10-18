@@ -1,6 +1,8 @@
 import { createClient } from 'jsr:@supabase/supabase-js@2';
 import { fetchHistoricoVendas } from '../_shared/mercadophone.ts';
 import { itemSellerKey, mapItemSellers, type ItemSeller } from '../_shared/itemSellers.ts';
+import { isCancelledStatus, planFinancialReconcile, type HistoricoFinanceItem } from '../_shared/financialReconcile.ts';
+import { SALE_FINANCE_COLUMNS } from '../_shared/financialSync.ts';
 
 interface VendaItem {
   produtoId: number | string;
@@ -14,6 +16,7 @@ interface Venda {
   id: number | string;
   dataVenda: string;
   status?: string;
+  dataCancelamento?: string | null;
   vendedorId: number | string;
   vendedorNome?: string;
   itens: VendaItem[];
@@ -76,6 +79,21 @@ Deno.serve(async (req) => {
     }
 
     const status = (venda.status ?? '').toLowerCase().trim();
+    // Cancelamento de venda já importada: as linhas ficam, marcadas como canceladas (saem do
+    // lucro e das unidades). Nada é apagado.
+    if (isCancelledStatus(status) || venda.dataCancelamento) {
+      const { error: cancelError } = await supabase
+        .from('sales')
+        .update({ item_status: 'cancelled', status_reason: 'Venda cancelada no MercadoPhone', status_changed_at: new Date().toISOString() })
+        .eq('mp_order_id', String(venda.id))
+        .neq('item_status', 'removed');
+      if (cancelError) throw new Error(`cancelar venda: ${cancelError.message}`);
+      await supabase
+        .from('mercadophone_webhook_events')
+        .update({ processed: true, error: null })
+        .eq('id', eventRow.id);
+      return new Response('ok', { status: 200 });
+    }
     if (status && status !== 'concluido') {
       await supabase
         .from('mercadophone_webhook_events')
@@ -118,13 +136,17 @@ Deno.serve(async (req) => {
 
     // O payload não traz o vendedor de cada item; ele vem do histórico de vendas (uma linha por item).
     let itemSellers = new Map<string, ItemSeller | null>();
+    let orderHistory: HistoricoFinanceItem[] | null = null;
     try {
       const minute = String(venda.dataVenda).slice(0, 16);
-      itemSellers = mapItemSellers(await fetchHistoricoVendas(`${minute}:00`, `${minute}:59`));
+      const historico = await fetchHistoricoVendas(`${minute}:00`, `${minute}:59`);
+      itemSellers = mapItemSellers(historico);
+      orderHistory = historico.filter((row) => String(row.vendaId) === String(venda.id));
     } catch (err) {
       console.error('failed to fetch item sellers; mercadophone-sync reconcilia depois', err);
     }
 
+    const currentExternalIds: string[] = [];
     for (const [itemIndex, item] of venda.itens.entries()) {
       let productId: string;
       const { data: existingProduct } = await supabase
@@ -155,11 +177,14 @@ Deno.serve(async (req) => {
       }
 
       const externalId = `${venda.id}-${item.produtoId}-${itemIndex}`;
+      currentExternalIds.push(externalId);
       const saleFields = {
         product_id: productId,
         quantity: item.quantidade,
         amount: item.valorTotal ?? (item.valorUnitario ?? 0) * item.quantidade,
         sold_at: venda.dataVenda,
+        item_status: 'active',
+        status_reason: null,
       };
       const itemSeller = itemSellers.get(itemSellerKey(venda.id, item.produtoId));
 
@@ -187,6 +212,40 @@ Deno.serve(async (req) => {
         ? await supabase.from('sales').update(saleFields).eq('id', existingSale.id)
         : await supabase.from('sales').insert({ external_id: externalId, seller_id: sellerId, ...saleFields });
       if (saleError) throw new Error(`gravar venda: ${saleError.message}`);
+    }
+
+    // O payload `venda_salva` concluído traz o pedido completo: itens de versões anteriores que
+    // não estão nele (índice mudou ou produto foi trocado/retirado) deixam de contar.
+    if (venda.itens.length > 0) {
+      const { error: staleError } = await supabase
+        .from('sales')
+        .update({
+          item_status: 'removed',
+          status_reason: 'Item ausente na versão atual do pedido no MercadoPhone',
+          status_changed_at: new Date().toISOString(),
+        })
+        .eq('mp_order_id', String(venda.id))
+        .eq('item_status', 'active')
+        .not('external_id', 'in', `(${currentExternalIds.map((id) => `"${id}"`).join(',')})`);
+      if (staleError) throw new Error(`marcar itens removidos: ${staleError.message}`);
+    }
+
+    // Custo e lucro do pedido, quando o histórico já o trouxe; senão o mercadophone-sync concilia.
+    if (orderHistory && orderHistory.length > 0) {
+      const { data: orderRows, error: rowsError } = await supabase
+        .from('sales')
+        .select(SALE_FINANCE_COLUMNS)
+        .eq('mp_order_id', String(venda.id));
+      if (rowsError) throw new Error(`listar itens do pedido: ${rowsError.message}`);
+      const plan = planFinancialReconcile(orderHistory, orderRows ?? []);
+      const syncedAt = new Date().toISOString();
+      for (const update of plan.updates) {
+        const { error } = await supabase
+          .from('sales')
+          .update({ ...update.patch, financial_synced_at: syncedAt })
+          .eq('id', update.id);
+        if (error) throw new Error(`gravar financeiro do item ${update.externalId}: ${error.message}`);
+      }
     }
 
     await supabase

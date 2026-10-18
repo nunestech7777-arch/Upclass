@@ -4,6 +4,8 @@
  * vira `null` e nunca é preenchido com valor inventado.
  */
 
+import { isDeviceProduct } from './productClassifier.ts';
+
 export interface SaleOrderItem {
   productId: string | null;
   name: string | null;
@@ -152,4 +154,30 @@ export function parseSaleOrderDetails(
     })),
     currentItemIndex,
   };
+}
+
+/** Resumo comercial de UMA venda: soma das quantidades por categoria (não conta linhas). */
+export interface SaleItemsSummary {
+  /** iPhones (todas as unidades de todos os itens iPhone). */
+  devices: number;
+  /** Acessórios vendidos por valor > 0. */
+  accessories: number;
+  /** Itens com valor 0 que não são iPhone (não contam como venda comercial). */
+  gifts: number;
+  /** Itens sem quantidade informada (não entram nas somas). */
+  unknown: number;
+}
+
+export function summarizeSaleItems(items: Pick<SaleOrderItem, 'name' | 'quantity' | 'total'>[]): SaleItemsSummary {
+  const out: SaleItemsSummary = { devices: 0, accessories: 0, gifts: 0, unknown: 0 };
+  for (const item of items) {
+    if (item.quantity == null) {
+      out.unknown += 1;
+      continue;
+    }
+    if (isDeviceProduct(item.name)) out.devices += item.quantity;
+    else if ((item.total ?? 0) > 0) out.accessories += item.quantity;
+    else out.gifts += item.quantity;
+  }
+  return out;
 }

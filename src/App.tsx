@@ -14,6 +14,8 @@ import { Inventory } from './pages/Inventory';
 import { Goals } from './pages/Goals';
 import { TVPanel } from './pages/TVPanel';
 import { Settings } from './pages/Settings';
+import { FinancialResults } from './pages/FinancialResults';
+import { DailyResults } from './pages/DailyResults';
 
 export default function App() {
   return (
@@ -32,6 +34,8 @@ export default function App() {
                 <Route path="vendas" element={<Sales />} />
                 <Route path="vendedores" element={<Sellers />} />
                 <Route path="vendedores/:id" element={<SellerReport />} />
+                <Route path="resultado-financeiro" element={<FinancialResults />} />
+                <Route path="resultados-diarios" element={<DailyResults />} />
                 <Route path="estoque" element={<Inventory />} />
                 <Route path="metas" element={<Goals />} />
                 <Route path="configuracoes" element={<Settings />} />

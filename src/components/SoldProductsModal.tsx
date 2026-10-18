@@ -10,7 +10,6 @@ import {
   DollarSign,
   TrendingUp,
   CreditCard,
-  CheckCircle2,
   ArrowUpDown,
   Download,
   Tag,
@@ -23,18 +22,16 @@ import {
   fetchSellers,
   fetchSalesInRange,
   fetchAllSales,
-  fetchAllConversations,
   classifyProductCategory,
   getMonthRange,
   getDayRange,
-  type ConversationSummary,
 } from '../lib/api';
 import type { Sale, Product, Seller } from '../lib/database.types';
+import { formatDateBR, formatWallDateTime, wallClock } from '../lib/finance/dates';
 import './SoldProductsModal.css';
 
 export type ProductTypeFilter = 'all' | 'Aparelhos' | 'Acessórios';
 export type PeriodFilterOption = 'today' | '7days' | '30days' | 'month' | 'custom' | 'all';
-export type PaymentStatusFilter = 'all' | 'pago' | 'parcial' | 'pendente';
 
 export interface SoldProductsModalProps {
   isOpen: boolean;
@@ -42,6 +39,9 @@ export interface SoldProductsModalProps {
   initialCategory?: ProductTypeFilter;
   initialSellerId?: string | null;
   initialPeriod?: PeriodFilterOption;
+  /** Período exato (AAAA-MM-DD) vindo do filtro do Dashboard; sobrepõe `initialPeriod`. */
+  initialStartDate?: string;
+  initialEndDate?: string;
   sellerName?: string;
 }
 
@@ -77,10 +77,8 @@ export interface EnrichedSoldItem {
   sellerId: string;
   sellerName: string;
 
-  // Customer Data
+  // Cliente informado pelo histórico do MercadoPhone; pagamento não é armazenado por item.
   customerName: string;
-  paymentStatus: 'pago' | 'parcial' | 'pendente';
-  paymentMethod: string;
 }
 
 function parseCapacity(name: string): string | null {
@@ -120,14 +118,12 @@ function formatCurrency(val: number | null | undefined): string {
 
 function formatDate(iso: string): string {
   if (!iso) return '—';
-  const d = new Date(iso);
-  return d.toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit', year: 'numeric' });
+  return formatDateBR(wallClock(iso).date);
 }
 
 function formatDateTime(iso: string): string {
   if (!iso) return '—';
-  const d = new Date(iso);
-  return `${d.toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit', year: 'numeric' })} às ${d.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })}`;
+  return formatWallDateTime(iso).replace(' às ', ' às ');
 }
 
 export function SoldProductsModal({
@@ -136,6 +132,8 @@ export function SoldProductsModal({
   initialCategory = 'all',
   initialSellerId = null,
   initialPeriod = 'month',
+  initialStartDate,
+  initialEndDate,
   sellerName,
 }: SoldProductsModalProps) {
   // Filters state
@@ -143,7 +141,6 @@ export function SoldProductsModal({
   const [selectedSellerId, setSelectedSellerId] = useState<string>(initialSellerId ?? 'all');
   const [period, setPeriod] = useState<PeriodFilterOption>(initialPeriod);
   const [searchQuery, setSearchQuery] = useState('');
-  const [paymentStatusFilter, setPaymentStatusFilter] = useState<PaymentStatusFilter>('all');
 
   // Custom date range
   const [customStartDate, setCustomStartDate] = useState(() => {
@@ -163,7 +160,6 @@ export function SoldProductsModal({
   const [sales, setSales] = useState<Sale[]>([]);
   const [products, setProducts] = useState<Product[]>([]);
   const [sellers, setSellers] = useState<Seller[]>([]);
-  const [conversations, setConversations] = useState<ConversationSummary[]>([]);
   const [loading, setLoading] = useState(true);
 
   // Sync props when opening
@@ -173,9 +169,15 @@ export function SoldProductsModal({
       if (initialSellerId) {
         setSelectedSellerId(initialSellerId);
       }
-      setPeriod(initialPeriod);
+      if (initialStartDate && initialEndDate) {
+        setCustomStartDate(initialStartDate);
+        setCustomEndDate(initialEndDate);
+        setPeriod('custom');
+      } else {
+        setPeriod(initialPeriod);
+      }
     }
-  }, [isOpen, initialCategory, initialSellerId, initialPeriod]);
+  }, [isOpen, initialCategory, initialSellerId, initialPeriod, initialStartDate, initialEndDate]);
 
   // Fetch sales based on period
   useEffect(() => {
@@ -215,14 +217,12 @@ export function SoldProductsModal({
       fetchSalesPromise,
       fetchProducts(),
       fetchSellers(),
-      fetchAllConversations(),
     ])
-      .then(([salesData, productsData, sellersData, conversationsData]) => {
+      .then(([salesData, productsData, sellersData]) => {
         if (!isMounted) return;
         setSales(salesData);
         setProducts(productsData);
         setSellers(sellersData);
-        setConversations(conversationsData);
       })
       .catch((err) => {
         console.error('Erro ao carregar dados de produtos vendidos:', err);
@@ -241,15 +241,6 @@ export function SoldProductsModal({
     const productMap = new Map(products.map((p) => [p.id, p]));
     const sellerMap = new Map(sellers.map((s) => [s.id, s]));
 
-    // Index conversations by sellerId and date string (YYYY-MM-DD) for client lookup
-    const convBySellerAndDate = new Map<string, ConversationSummary[]>();
-    for (const conv of conversations) {
-      if (!conv.seller_id) continue;
-      const dateKey = `${conv.seller_id}_${conv.occurred_at.slice(0, 10)}`;
-      const list = convBySellerAndDate.get(dateKey) ?? [];
-      list.push(conv);
-      convBySellerAndDate.set(dateKey, list);
-    }
 
     return sales
       .filter((sale) => {
@@ -276,23 +267,17 @@ export function SoldProductsModal({
       const color = category === 'Aparelhos' ? parseColor(productName) : null;
       const grade = category === 'Aparelhos' ? parseGrade(productName, product?.battery_health ?? null) : null;
 
-      // Find client name if linked
-      const dateKey = `${sale.seller_id}_${sale.sold_at.slice(0, 10)}`;
-      const candidateConvs = convBySellerAndDate.get(dateKey);
-      let customerName = '—';
-      if (candidateConvs && candidateConvs.length > 0) {
-        // Try to match product name substring or pick the nearest conversation
-        const matched = candidateConvs.find((c) =>
-          c.product && (productName.toLowerCase().includes(c.product.toLowerCase()) || c.product.toLowerCase().includes(productName.toLowerCase()))
-        );
-        customerName = (matched ?? candidateConvs[0]).client_name;
-      }
+      // Cliente da venda no MercadoPhone (histórico de vendas). Sem vínculo comprovado, não informado.
+      const customerName = sale.customer_name?.trim() || 'Não informado';
 
-      // Cost and Profit (using product baseline if available or realistic margin)
-      const unitCost = product?.price && product.price > 0 && product.price < unitPrice ? product.price : null;
-      const totalCost = unitCost ? unitCost * sale.quantity : null;
-      const profit = totalCost ? sale.amount - totalCost : null;
-      const marginPercent = profit && sale.amount > 0 ? Math.round((profit / sale.amount) * 100) : null;
+      // Custo histórico e lucro conciliados com o MercadoPhone (módulo financeiro). `products.price`
+      // é preço de venda do cadastro e nunca é usado como custo.
+      const reconciled = sale.financial_status === 'ok' && sale.cost != null && sale.profit != null;
+      const totalCost = reconciled ? Number(sale.cost) : null;
+      const unitCost = totalCost != null && sale.quantity > 0 ? totalCost / sale.quantity : null;
+      const profit = reconciled ? Number(sale.profit) : null;
+      const revenue = reconciled && sale.revenue != null ? Number(sale.revenue) : null;
+      const marginPercent = profit != null && revenue ? Math.round((profit / revenue) * 100) : null;
 
       return {
         id: sale.id,
@@ -318,11 +303,9 @@ export function SoldProductsModal({
         sellerId: sale.seller_id,
         sellerName: seller?.name ?? 'Vendedor Geral',
         customerName,
-        paymentStatus: 'pago',
-        paymentMethod: 'PIX / Cartão',
       };
     });
-  }, [sales, products, sellers, conversations]);
+  }, [sales, products, sellers]);
 
   // Filter enriched items
   const filteredItems = useMemo(() => {
@@ -334,10 +317,6 @@ export function SoldProductsModal({
         }
         // Seller filter
         if (selectedSellerId !== 'all' && item.sellerId !== selectedSellerId) {
-          return false;
-        }
-        // Payment status filter
-        if (paymentStatusFilter !== 'all' && item.paymentStatus !== paymentStatusFilter) {
           return false;
         }
         // Search query
@@ -367,7 +346,7 @@ export function SoldProductsModal({
         }
         return sortOrder === 'desc' ? diff : -diff;
       });
-  }, [enrichedItems, selectedCategory, selectedSellerId, paymentStatusFilter, searchQuery, sortBy, sortOrder]);
+  }, [enrichedItems, selectedCategory, selectedSellerId, searchQuery, sortBy, sortOrder]);
 
   // Compute Summary KPIs
   const summaryMetrics = useMemo(() => {
@@ -423,7 +402,8 @@ export function SoldProductsModal({
       'Valor Total',
       'Cliente',
       'Vendedor',
-      'Status Pagamento',
+      'Custo (conciliado)',
+      'Lucro (conciliado)',
     ];
     const rows = filteredItems.map((item) => [
       item.saleId,
@@ -438,7 +418,8 @@ export function SoldProductsModal({
       item.totalAmount.toFixed(2),
       `"${item.customerName.replace(/"/g, '""')}"`,
       `"${item.sellerName.replace(/"/g, '""')}"`,
-      item.paymentStatus,
+      item.totalCost != null ? item.totalCost.toFixed(2) : '',
+      item.profit != null ? item.profit.toFixed(2) : '',
     ]);
 
     const csvContent = 'data:text/csv;charset=utf-8,\uFEFF' + [headers.join(';'), ...rows.map((e) => e.join(';'))].join('\n');
@@ -485,7 +466,7 @@ export function SoldProductsModal({
             <div>
               <div className="sold-modal-header-top">
                 <h2 className="sold-modal-title">{getTitle()}</h2>
-                <span className="sold-modal-badge">{filteredItems.length} vendas</span>
+                <span className="sold-modal-badge">{filteredItems.length} {filteredItems.length === 1 ? 'item' : 'itens'}</span>
               </div>
               <p className="sold-modal-subtitle">{getSubtitle()}</p>
             </div>
@@ -566,9 +547,9 @@ export function SoldProductsModal({
               <TrendingUp size={18} />
             </div>
             <div className="summary-card-content">
-              <span className="summary-card-label">Ticket Médio</span>
+              <span className="summary-card-label">Média por Produto</span>
               <span className="summary-card-value">{formatCurrency(summaryMetrics.avgTicket)}</span>
-              <span className="summary-card-sub">Por produto vendido</span>
+              <span className="summary-card-sub">Valor vendido ÷ unidades</span>
             </div>
           </div>
 
@@ -577,9 +558,11 @@ export function SoldProductsModal({
               <CreditCard size={18} />
             </div>
             <div className="summary-card-content">
-              <span className="summary-card-label">Status Médio</span>
-              <span className="summary-card-value" style={{ color: '#10B981' }}>100% Pago</span>
-              <span className="summary-card-sub">Vendas confirmadas</span>
+              <span className="summary-card-label">Lucro (conciliado)</span>
+              <span className="summary-card-value">{summaryMetrics.totalProfit != null ? formatCurrency(summaryMetrics.totalProfit) : '—'}</span>
+              <span className="summary-card-sub">
+                {summaryMetrics.totalProfit != null ? 'Custo histórico do Mercado Phone' : 'Custo ainda não conciliado'}
+              </span>
             </div>
           </div>
         </div>
@@ -628,16 +611,6 @@ export function SoldProductsModal({
               </select>
             </div>
 
-            {/* Payment Status Filter */}
-            <div className="filter-select-wrapper">
-              <CreditCard size={14} className="select-icon" />
-              <select value={paymentStatusFilter} onChange={(e) => setPaymentStatusFilter(e.target.value as PaymentStatusFilter)}>
-                <option value="all">Todos os Status</option>
-                <option value="pago">Pago</option>
-                <option value="parcial">Parcial</option>
-                <option value="pendente">Pendente</option>
-              </select>
-            </div>
 
             {/* Sort Dropdown */}
             <div className="filter-select-wrapper">
@@ -703,7 +676,6 @@ export function SoldProductsModal({
                   setSearchQuery('');
                   setSelectedCategory('all');
                   setSelectedSellerId('all');
-                  setPaymentStatusFilter('all');
                   setPeriod('month');
                 }}
               >
@@ -737,7 +709,7 @@ export function SoldProductsModal({
                       <th>CLIENTE</th>
                       <th>VENDEDOR</th>
                       <th>VALOR DE VENDA</th>
-                      <th>STATUS</th>
+                      <th>LUCRO</th>
                       <th>DATA DA VENDA</th>
                     </tr>
                   </thead>
@@ -837,11 +809,14 @@ export function SoldProductsModal({
                           </div>
                         </td>
 
-                        {/* Status Column */}
+                        {/* Lucro conciliado (custo histórico do Mercado Phone) */}
                         <td>
-                          <span className={`payment-badge ${item.paymentStatus}`}>
-                            <CheckCircle2 size={12} /> Pago
-                          </span>
+                          <div className="amount-cell">
+                            <span className="amount-main">{item.profit != null ? formatCurrency(item.profit) : '—'}</span>
+                            <span className="amount-unit-sub">
+                              {item.totalCost != null ? `custo ${formatCurrency(item.totalCost)}` : 'Custo não conciliado'}
+                            </span>
+                          </div>
                         </td>
 
                         {/* Date Column */}
@@ -849,7 +824,7 @@ export function SoldProductsModal({
                           <div className="date-cell" title={formatDateTime(item.soldAt)}>
                             <span className="date-main">{formatDate(item.soldAt)}</span>
                             <span className="date-time-sub">
-                              {new Date(item.soldAt).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })}
+                              {wallClock(item.soldAt).time}
                             </span>
                           </div>
                         </td>
@@ -885,8 +860,8 @@ export function SoldProductsModal({
                         </span>
                       )}
                       <span className="qty-tag">{item.quantity} un.</span>
-                      <span className={`payment-badge ${item.paymentStatus}`}>
-                        <CheckCircle2 size={11} /> Pago
+                      <span className="qty-tag">
+                        {item.profit != null ? `Lucro ${formatCurrency(item.profit)}` : 'Custo não conciliado'}
                       </span>
                     </div>
 
@@ -917,7 +892,7 @@ export function SoldProductsModal({
         {/* Modal Footer */}
         <div className="sold-modal-footer">
           <div className="footer-left-info">
-            <span>Exibindo <strong>{filteredItems.length}</strong> de <strong>{enrichedItems.length}</strong> vendas</span>
+            <span>Exibindo <strong>{filteredItems.length}</strong> de <strong>{enrichedItems.length}</strong> itens</span>
           </div>
           <button className="btn-secondary" onClick={onClose}>
             Fechar

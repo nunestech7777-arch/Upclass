@@ -1,6 +1,7 @@
 import { createClient } from 'jsr:@supabase/supabase-js@2';
 import { fetchAllEstoque, fetchAllVendedores, fetchHistoricoVendas } from '../_shared/mercadophone.ts';
 import { mapItemSellers, planSellerUpdates, type SaleSellerRow } from '../_shared/itemSellers.ts';
+import { addDays, runFinancialSync, todayInStore } from '../_shared/financialSync.ts';
 
 const RECONCILE_DAYS = 3;
 const pad = (n: number) => String(n).padStart(2, '0');
@@ -49,7 +50,18 @@ async function reconcileItemSellers(supabase: any): Promise<number> {
   return updates.length;
 }
 
-Deno.serve(async (_req) => {
+Deno.serve(async (req) => {
+  // Chamada pelo agendador (pg_cron) sem JWT: autenticada por segredo na URL, como o webhook e as funções do
+  // Kommo. Aceita o segredo próprio do agendamento (MERCADOPHONE_SYNC_SECRET) ou o do webhook; sem nenhum
+  // configurado, ou com valor diferente, recusa.
+  const secret = new URL(req.url).searchParams.get('secret');
+  const accepted = [Deno.env.get('MERCADOPHONE_SYNC_SECRET'), Deno.env.get('MERCADOPHONE_WEBHOOK_SECRET')].filter(
+    (value): value is string => !!value
+  );
+  if (!secret || !accepted.includes(secret)) {
+    return new Response('Unauthorized', { status: 401 });
+  }
+
   try {
     const supabase = createClient(
       Deno.env.get('SUPABASE_URL')!,
@@ -97,12 +109,30 @@ Deno.serve(async (_req) => {
       console.error('failed to reconcile item sellers', err);
     }
 
+    // Custo, lucro, cancelamentos e itens removidos dos últimos dias (o histórico completo é
+    // recuperado pela function mercadophone-financial-sync, por período).
+    let financial: unknown = null;
+    try {
+      const today = todayInStore();
+      const result = await runFinancialSync(supabase, fetchHistoricoVendas, {
+        start: addDays(today, -RECONCILE_DAYS),
+        end: today,
+        mode: 'apply',
+        trigger: 'cron',
+        timeBudgetMs: 60_000,
+      });
+      financial = result.counts;
+    } catch (err) {
+      console.error('failed to reconcile financial data', err);
+    }
+
     return new Response(
       JSON.stringify({
         ok: true,
         sellers: sellerRows.length,
         products: productRows.length,
         item_sellers_fixed: itemSellersFixed,
+        financial,
       }),
       { headers: { 'Content-Type': 'application/json' } }
     );

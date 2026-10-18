@@ -1,5 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { fetchGoals, updateGoals } from '../lib/api';
+import { ProfitGoalsManager } from '../components/finance/ProfitGoalsManager';
+import { DeviceGoalsManager } from '../components/forecast/DeviceGoalsManager';
 
 const DEFAULTS = {
   weekly_devices_target: 1250,
@@ -46,6 +48,8 @@ export function Goals() {
       <div className="flex-between" style={{marginBottom: '16px', flexWrap: 'wrap', gap: '12px'}}>
         <h1 className="h1">Configuração de Metas</h1>
       </div>
+
+      <h2 className="h2">Metas de unidades</h2>
 
       <div className="grid-dashboard" style={{opacity: loading ? 0.6 : 1}}>
         <div className="card flex-col gap-4">
@@ -100,6 +104,14 @@ export function Goals() {
         <button className="btn-primary" onClick={handleSave} disabled={saving}>
           {saving ? 'Salvando...' : 'Salvar Configurações'}
         </button>
+      </div>
+
+      <div style={{ marginTop: '24px' }}>
+        <DeviceGoalsManager />
+      </div>
+
+      <div style={{ marginTop: '24px' }}>
+        <ProfitGoalsManager />
       </div>
     </div>
   );

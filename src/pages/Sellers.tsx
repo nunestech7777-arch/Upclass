@@ -12,6 +12,7 @@ import {
   ChevronLeft,
   ChevronRight,
   Camera,
+  CircleDollarSign,
 } from 'lucide-react';
 import { useTheme } from '../context/ThemeContext';
 import { SellerAvatar } from '../components/SellerAvatar';
@@ -155,6 +156,14 @@ export function Sellers() {
           <p className="text-muted" style={{ marginTop: '4px' }}>
             Acompanhe o desempenho individual dividido por iPhones, Acessórios e Taxa de Conversão
           </p>
+          <Link
+            to={`/resultado-financeiro?mes=${viewMonth.getFullYear()}-${String(viewMonth.getMonth() + 1).padStart(2, '0')}`}
+            className="sellers-profit-link"
+          >
+            <CircleDollarSign size={15} />
+            Ver ranking de lucro e metas financeiras
+            <ArrowRight size={14} />
+          </Link>
         </div>
 
         {/* Month Selector */}

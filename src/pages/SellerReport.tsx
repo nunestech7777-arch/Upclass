@@ -1,5 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { useParams, Link } from 'react-router-dom';
+import { SellerFinanceSection } from '../components/finance/SellerFinanceSection';
+import { useFinanceParams } from '../components/finance/useFinance';
 import {
   ArrowLeft, Eye, MessageSquare, CheckCircle2, XCircle,
   ShoppingBag, TrendingUp, Clock, Star, Smartphone, Headphones
@@ -60,11 +62,14 @@ export function SellerReport() {
   const [selectedConversation, setSelectedConversation] = useState<ConversationData | null>(null);
   const [soldProductsCategory, setSoldProductsCategory] = useState<ProductTypeFilter | null>(null);
   const [data, setData] = useState<ReportData | null>(null);
+  // Competência vinda do ranking financeiro (?mes=AAAA-MM); sem parâmetro, mês atual.
+  const { month } = useFinanceParams();
 
   useEffect(() => {
     if (!id) return;
     const now = new Date();
-    const { start, end } = getMonthRange(now);
+    const [year, monthNumber] = month.split('-').map(Number);
+    const { start, end } = getMonthRange(new Date(year, monthNumber - 1, 1));
 
     Promise.all([
       fetchSellerById(id),
@@ -122,7 +127,7 @@ export function SellerReport() {
         conversations,
       });
     });
-  }, [id]);
+  }, [id, month]);
 
   const handleOpenSummary = async (conv: Conversation) => {
     if (!data) return;
@@ -194,6 +199,8 @@ export function SellerReport() {
           </div>
         </div>
       </div>
+
+      {id && <SellerFinanceSection sellerId={id} />}
 
       {/* Top Metric Cards */}
       <div className="seller-metrics-grid">
