@@ -81,3 +81,17 @@ describe('isCountableSale - Contabilização Geral', () => {
     assert.equal(isCountableSale({ amount: 49.9, quantity: 1 }, 'Película 3D'), true);
   });
 });
+
+describe('iPhones cadastrados sem a palavra "iPhone" (nomes reais do Mercado Phone)', () => {
+  it('reconhece modelo + capacidade como Aparelhos', () => {
+    for (const n of ['15 PLUS - 128 GB - PINK', '15 PLUS - 512 GB - GREEN', 'CASE MAGSAFE 15 PRO MAX - 256 GB - NATURAL', '13 PRO MAX - 256GB - GRAFITE']) {
+      assert.equal(classifyProductCategory(n), 'Aparelhos', n);
+      assert.equal(isCountableAccessorySale({ amount: 4000 }, n), false, n);
+    }
+  });
+  it('não confunde com acessórios, outros Apple ou Android', () => {
+    for (const n of ['CAPA 15 PRO MAX', 'PELICULA 15 PLUS', 'IPAD 11 - 128 GB - SILVER', 'MACBOOK AIR M1 13 - 256GB', 'APPLE WATCH S10 42MM', 'POCO X7 - 256 GB', 'REDMI NOTE 13 - 256GB', 'GALAXY A15 128GB', 'CARTAO DE MEMORIA 64GB', '15 PLUS']) {
+      assert.equal(classifyProductCategory(n), 'Acessórios', n);
+    }
+  });
+});

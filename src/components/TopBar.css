@@ -81,8 +81,8 @@
 }
 
 .profile-avatar {
-  background-color: #fff;
-  color: var(--primary);
+  background-color: var(--surface-card);
+  color: var(--accent-text);
   border-radius: 50%;
   padding: 2px;
 }
@@ -91,10 +91,10 @@
 
 /* Dark Mode Overrides for TopBar */
 [data-theme="dark"] .topbar {
-  background-color: #131926;
+  background-color: var(--surface-card);
   border: 1px solid rgba(255, 255, 255, 0.08);
   box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.5), inset 0 1px 0 rgba(255, 255, 255, 0.05);
-  color: #F9FAFB;
+  color: var(--text-primary);
 }
 
 [data-theme="dark"] .search-container {
@@ -103,7 +103,7 @@
 }
 
 [data-theme="dark"] .search-input {
-  color: #F9FAFB;
+  color: var(--text-primary);
 }
 
 [data-theme="dark"] .profile-section {
@@ -111,8 +111,8 @@
 }
 
 [data-theme="dark"] .profile-avatar {
-  background-color: rgba(59, 130, 246, 0.2);
-  color: #3B82F6;
+  background-color: color-mix(in srgb, var(--primary) 20%, transparent);
+  color: var(--accent-text);
 }
 
 

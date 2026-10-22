@@ -73,7 +73,7 @@
 }
 
 .stat-trend.positive {
-  color: #10B981;
+  color: var(--success);
 }
 
 /* Charts */
@@ -285,7 +285,7 @@
 
 .progress-bar-bg {
   height: 6px;
-  background-color: #F3F4F6;
+  background-color: var(--surface-subtle);
   border-radius: 10px;
   overflow: hidden;
 }
@@ -305,30 +305,30 @@
 [data-theme="dark"] .stat-card:hover {
   border-color: rgba(255, 255, 255, 0.12);
   transform: translateY(-2px);
-  box-shadow: 0 15px 30px -5px rgba(0, 0, 0, 0.6), 0 0 15px rgba(59, 130, 246, 0.1);
+  box-shadow: 0 15px 30px -5px rgba(0, 0, 0, 0.6), 0 0 15px color-mix(in srgb, var(--primary) 10%, transparent);
 }
 
 [data-theme="dark"] .stat-card.highlight {
-  background: linear-gradient(135deg, rgba(37, 99, 235, 0.4) 0%, rgba(30, 58, 138, 0.5) 100%);
-  border: 1px solid rgba(96, 165, 250, 0.3);
-  box-shadow: 0 10px 30px -5px rgba(37, 99, 235, 0.3), inset 0 1px 0 0 rgba(255, 255, 255, 0.15);
+  background: linear-gradient(135deg, color-mix(in srgb, var(--primary) 40%, transparent) 0%, rgba(30, 58, 138, 0.5) 100%);
+  border: 1px solid color-mix(in srgb, var(--primary) 30%, transparent);
+  box-shadow: 0 10px 30px -5px color-mix(in srgb, var(--primary) 30%, transparent), inset 0 1px 0 0 rgba(255, 255, 255, 0.15);
 }
 
 [data-theme="dark"] .stat-card.highlight .stat-icon-wrapper {
-  border-color: rgba(96, 165, 250, 0.4);
-  background: rgba(59, 130, 246, 0.2);
-  color: #60A5FA;
+  border-color: color-mix(in srgb, var(--primary) 40%, transparent);
+  background: color-mix(in srgb, var(--primary) 20%, transparent);
+  color: var(--accent-text);
 }
 
 [data-theme="dark"] .stat-icon-wrapper {
   background-color: rgba(255, 255, 255, 0.03);
   border-color: rgba(255, 255, 255, 0.1);
-  color: #60A5FA;
+  color: var(--accent-text);
 }
 
 [data-theme="dark"] .stat-trend.positive {
-  color: #34D399;
-  text-shadow: 0 0 10px rgba(52, 211, 153, 0.3);
+  color: var(--success);
+  text-shadow: 0 0 10px color-mix(in srgb, var(--success) 30%, transparent);
 }
 
 [data-theme="dark"] .day:hover {
@@ -336,16 +336,16 @@
 }
 
 [data-theme="dark"] .day.active {
-  background: linear-gradient(135deg, #3B82F6 0%, #2563EB 100%);
-  box-shadow: 0 4px 15px rgba(37, 99, 235, 0.4);
+  background: linear-gradient(135deg, var(--primary) 0%, var(--primary) 100%);
+  box-shadow: 0 4px 15px color-mix(in srgb, var(--primary) 40%, transparent);
 }
 
 [data-theme="dark"] .nav-arrow {
-  color: #64748B;
+  color: var(--text-secondary);
 }
 
 [data-theme="dark"] .nav-arrow:hover {
-  color: #F9FAFB;
+  color: var(--text-primary);
   background-color: rgba(255, 255, 255, 0.05);
   border-radius: 50%;
 }

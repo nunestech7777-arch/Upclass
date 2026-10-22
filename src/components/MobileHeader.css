@@ -1,9 +1,14 @@
+:root {
+  --mobile-header-height: calc(57px + max(14px, env(safe-area-inset-top, 14px)));
+}
+
 .mobile-header {
   display: none;
   width: 100%;
   box-sizing: border-box;
   background-color: var(--bg-card);
   border-bottom: 1px solid var(--border-color);
+  position: -webkit-sticky;
   position: sticky;
   top: 0;
   left: 0;
@@ -15,11 +20,12 @@
   padding-bottom: 12px;
   padding-left: max(16px, env(safe-area-inset-left, 16px));
   padding-right: max(16px, env(safe-area-inset-right, 16px));
-  min-height: calc(64px + env(safe-area-inset-top, 0px));
+  height: var(--mobile-header-height);
+  min-height: var(--mobile-header-height);
   
   backdrop-filter: blur(16px);
   -webkit-backdrop-filter: blur(16px);
-  box-shadow: 0 4px 16px -2px rgba(0, 0, 0, 0.06);
+  box-shadow: 0 4px 16px -2px rgba(0, 2, 41, 0.08);
 }
 
 .mobile-header-inner {
@@ -30,7 +36,7 @@
   gap: 12px;
 }
 
-/* Premium 44x44px Hamburger Touch Button */
+/* Botão de menu 44x44 */
 .mobile-menu-toggle-btn {
   display: flex;
   align-items: center;
@@ -39,12 +45,12 @@
   min-height: 44px;
   width: 44px;
   height: 44px;
-  border-radius: 12px;
-  color: var(--text-dark);
-  background-color: rgba(0, 0, 0, 0.05);
-  border: 1px solid var(--border-color);
+  border-radius: var(--radius-md);
+  color: var(--text-primary);
+  background-color: var(--surface-subtle);
+  border: 1px solid var(--border-subtle);
   cursor: pointer;
-  transition: all 0.18s cubic-bezier(0.4, 0, 0.2, 1);
+  transition: background-color var(--dur-fast) ease, border-color var(--dur-fast) ease, color var(--dur-fast) ease;
   flex-shrink: 0;
   touch-action: manipulation;
   -webkit-tap-highlight-color: transparent;
@@ -52,14 +58,13 @@
 }
 
 .mobile-menu-toggle-btn:hover {
-  background-color: rgba(59, 130, 246, 0.12);
-  color: var(--primary);
-  border-color: var(--primary);
+  background-color: var(--action-primary-soft);
+  color: var(--accent-text);
+  border-color: var(--accent-text);
 }
 
 .mobile-menu-toggle-btn:active {
-  transform: scale(0.93);
-  background-color: rgba(59, 130, 246, 0.2);
+  transform: scale(0.95);
 }
 
 /* Center Brand Logo */
@@ -72,7 +77,7 @@
 }
 
 .mobile-header-logo {
-  height: 28px;
+  height: 26px;
   width: auto;
   max-width: 150px;
   object-fit: contain;
@@ -93,27 +98,21 @@
   -webkit-tap-highlight-color: transparent;
 }
 
-/* Dark Mode Overrides */
 [data-theme="dark"] .mobile-header {
-  background-color: rgba(13, 17, 28, 0.96);
-  border-bottom-color: rgba(255, 255, 255, 0.08);
-  box-shadow: 0 4px 20px -2px rgba(0, 0, 0, 0.4);
+  background-color: rgba(0, 2, 41, 0.92);
+  box-shadow: 0 4px 20px -2px rgba(0, 0, 0, 0.5);
 }
 
-[data-theme="dark"] .mobile-menu-toggle-btn {
-  background-color: rgba(255, 255, 255, 0.06);
-  border-color: rgba(255, 255, 255, 0.12);
-  color: #F9FAFB;
-}
-
-[data-theme="dark"] .mobile-menu-toggle-btn:hover {
-  background-color: rgba(59, 130, 246, 0.25);
-  color: #60A5FA;
-  border-color: rgba(96, 165, 250, 0.4);
-}
-
-[data-theme="dark"] .mobile-menu-toggle-btn:active {
-  background-color: rgba(59, 130, 246, 0.35);
+/* Filete de marca sob o cabeçalho */
+.mobile-header::after {
+  content: '';
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: -1px;
+  height: 1px;
+  background: var(--gradient-brand);
+  opacity: 0.55;
 }
 
 /* Display rules: Show strictly on Mobile and Tablet (<= 1024px) */

@@ -10,7 +10,7 @@
  *   aparece como resultado parcial, nunca como zero.
  * - Vendas únicas = pedidos distintos (`mp_order_id`); uma venda pode ter vários itens.
  */
-import { classifyProductCategory } from '../productClassifier.ts';
+import { classifyProductCategory, isDeviceProduct } from '../productClassifier.ts';
 import { financeCategory, isActive, isReconciled, type Coverage, type FinanceSale, type FinanceSeller } from './calc.ts';
 import { addDays, firstDay, formatDateBR, lastDay, longDateBR, monthOf, monthTitle, wallClock } from './dates.ts';
 
@@ -435,7 +435,10 @@ export function deviceItemsOf(sales: FinanceSale[], names: Names, sellerId: stri
 /** "IPHONE 18 PRO MAX - 512GB - SLV" → "iPhone 18 Pro Max" (agrupa capacidades e cores do mesmo modelo). */
 export function deviceModel(name: string | null | undefined): string {
   const raw = (name ?? '').trim();
-  const m = /^iphone\s*(x[rsm]?|se|\d{1,2})\s*(pro\s*max|pro|plus|mini|max|e)?(?![a-z0-9])/i.exec(raw);
+  const m =
+    /^iphone\s*(x[rsm]?|se|\d{1,2})\s*(pro\s*max|pro|plus|mini|max|e)?(?![a-z0-9])/i.exec(raw) ??
+    // iPhone cadastrado sem a palavra "iPhone" ("15 PLUS - 128 GB", "CASE MAGSAFE 15 PRO MAX - 256 GB").
+    (isDeviceProduct(raw) ? /(?:^|\s)(1[1-9])\s*(pro\s*max|pro|plus|mini|e)?(?![a-z0-9])/i.exec(raw) : null);
   if (!m) return raw.split(' - ')[0].replace(/\s+/g, ' ').trim() || 'Produto não identificado';
   const suffix = m[2] ? ` ${m[2].replace(/\s+/g, ' ').toLowerCase().replace(/\b\w/g, (c) => c.toUpperCase())}` : '';
   return `iPhone ${m[1].toUpperCase()}${suffix}`;

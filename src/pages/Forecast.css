@@ -17,7 +17,7 @@
 
 .category-tabs {
   display: flex;
-  background-color: #EFEFF4;
+  background-color: var(--surface-subtle);
   padding: 4px;
   border-radius: var(--radius-full);
   gap: 4px;
@@ -45,7 +45,7 @@
 
 .category-tab.active {
   background-color: var(--bg-card);
-  color: var(--primary);
+  color: var(--accent-text);
   font-weight: 600;
   box-shadow: 0 2px 4px rgba(0, 0, 0, 0.06);
 }
@@ -102,8 +102,8 @@
   justify-content: space-between;
   padding: 12px;
   border-radius: 10px;
-  background: #F9FAFB;
-  border: 1px solid #F3F4F6;
+  background: var(--surface-subtle);
+  border: 1px solid var(--border-subtle);
   gap: 12px;
 }
 
@@ -112,7 +112,7 @@
   height: 36px;
   border-radius: 50%;
   background-color: #0A25FF15;
-  color: var(--primary);
+  color: var(--accent-text);
   display: flex;
   align-items: center;
   justify-content: center;
@@ -126,19 +126,19 @@
   padding: 3px 8px;
   border-radius: 12px;
   font-weight: 600;
-  background-color: #E0E7FF;
+  background-color: var(--action-primary-soft);
   color: #3730A3;
   white-space: nowrap;
 }
 
 .badge-unit.success {
-  background-color: #D1FAE5;
+  background-color: var(--success-soft);
   color: #065F46;
 }
 
 .badge-unit.warning {
-  background-color: #FEF3C7;
-  color: #92400E;
+  background-color: var(--warning-soft);
+  color: var(--warning);
 }
 
 /* Dark Mode Overrides for Forecast */
@@ -148,7 +148,7 @@
 }
 
 [data-theme="dark"] .category-tab {
-  color: #94A3B8;
+  color: var(--text-tertiary);
 }
 
 [data-theme="dark"] .category-tab:hover {
@@ -156,8 +156,8 @@
 }
 
 [data-theme="dark"] .category-tab.active {
-  background-color: #1E293B;
-  color: #3B82F6;
+  background-color: var(--surface-elevated);
+  color: var(--accent-text);
   box-shadow: 0 2px 8px rgba(0, 0, 0, 0.4);
   border: 1px solid rgba(255, 255, 255, 0.1);
 }
@@ -173,26 +173,26 @@
 }
 
 [data-theme="dark"] .seller-avatar {
-  background-color: rgba(59, 130, 246, 0.15);
-  color: #60A5FA;
+  background-color: color-mix(in srgb, var(--primary) 15%, transparent);
+  color: var(--accent-text);
 }
 
 [data-theme="dark"] .badge-unit {
-  background-color: rgba(99, 102, 241, 0.15);
-  color: #818CF8;
-  border: 1px solid rgba(99, 102, 241, 0.3);
+  background-color: color-mix(in srgb, var(--chart-5) 15%, transparent);
+  color: var(--accent-text);
+  border: 1px solid color-mix(in srgb, var(--chart-5) 30%, transparent);
 }
 
 [data-theme="dark"] .badge-unit.success {
-  background-color: rgba(16, 185, 129, 0.15);
-  color: #34d399;
-  border: 1px solid rgba(16, 185, 129, 0.3);
+  background-color: color-mix(in srgb, var(--success) 15%, transparent);
+  color: var(--success);
+  border: 1px solid color-mix(in srgb, var(--success) 30%, transparent);
 }
 
 [data-theme="dark"] .badge-unit.warning {
-  background-color: rgba(245, 158, 11, 0.15);
-  color: #FBBF24;
-  border: 1px solid rgba(245, 158, 11, 0.3);
+  background-color: color-mix(in srgb, var(--warning) 15%, transparent);
+  color: var(--warning);
+  border: 1px solid color-mix(in srgb, var(--warning) 30%, transparent);
 }
 
 /* ============================================================

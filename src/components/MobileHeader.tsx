@@ -1,6 +1,6 @@
 import React from 'react';
 import { Menu, Sun, Moon } from 'lucide-react';
-import logoImg from '../assets/logo.png';
+import { BrandLogo } from './brand/BrandLogo';
 import { useTheme } from '../context/ThemeContext';
 import './MobileHeader.css';
 
@@ -26,7 +26,7 @@ export function MobileHeader({ onToggleSidebar }: MobileHeaderProps) {
 
         {/* Center: System Logo */}
         <div className="mobile-header-brand">
-          <img src={logoImg} alt="Você de iPhone" className="mobile-header-logo" />
+          <BrandLogo className="mobile-header-logo" />
         </div>
 
         {/* Right: Theme Switcher */}
@@ -37,11 +37,12 @@ export function MobileHeader({ onToggleSidebar }: MobileHeaderProps) {
             title="Alternar Modo Claro/Escuro"
             role="button"
             tabIndex={0}
-            onKeyDown={(e) => (e.key === 'Enter' || e.key === ' ') && toggleTheme()}
-            aria-label="Alternar Modo Claro/Escuro"
+            onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); toggleTheme(); } }}
+            aria-label="Alternar tema claro/escuro"
+            aria-pressed={theme === 'dark'}
           >
-            <Sun size={13} color="#ffffff" className="switch-icon-sun" />
-            <Moon size={13} color="#ffffff" className="switch-icon-moon" />
+            <Sun size={13} color="#ffffff" className="switch-icon-sun" aria-hidden="true" />
+            <Moon size={13} color="#ffffff" className="switch-icon-moon" aria-hidden="true" />
             <div className="switch-thumb" />
           </div>
         </div>

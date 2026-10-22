@@ -1,7 +1,9 @@
-import React, { useEffect, useState } from 'react';
-import { Camera } from 'lucide-react';
+import React, { useCallback, useEffect, useMemo, useState } from 'react';
+import { Camera, KeyRound } from 'lucide-react';
 import { SellerAvatar } from '../components/SellerAvatar';
 import { SellerPhotoModal } from '../components/SellerPhotoModal';
+import { AccessBadge, SellerAccessModal } from '../components/SellerAccessModal';
+import { AccessApiError, accessStatusOf, sellerAccessApi, type SellerLogin } from '../lib/accessApi';
 import {
   fetchPanelSettings,
   updatePanelSettings,
@@ -25,6 +27,24 @@ export function Settings() {
   const [sellers, setSellers] = useState<Seller[]>([]);
   const [kommoUsers, setKommoUsers] = useState<KommoUser[]>([]);
   const [editingPhotoSeller, setEditingPhotoSeller] = useState<Seller | null>(null);
+  const [accessSellerId, setAccessSellerId] = useState<string | null>(null);
+  const [logins, setLogins] = useState<SellerLogin[]>([]);
+  const [loginsError, setLoginsError] = useState<string | null>(null);
+  const loginBySeller = useMemo(() => new Map(logins.map((l) => [l.seller_id, l])), [logins]);
+
+  const loadLogins = useCallback(async () => {
+    try {
+      setLogins(await sellerAccessApi.list());
+      setLoginsError(null);
+    } catch (err) {
+      const e = err as AccessApiError;
+      setLoginsError(
+        e.code === 'not_deployed'
+          ? 'Gerenciamento de acesso indisponível: publique a function seller-access e aplique a migração 0017.'
+          : `Não foi possível carregar os logins: ${e.message}`
+      );
+    }
+  }, []);
 
   useEffect(() => {
     fetchPanelSettings()
@@ -37,7 +57,8 @@ export function Settings() {
       .finally(() => setLoading(false));
     fetchSellers().then(setSellers);
     fetchKommoUsers().then(setKommoUsers);
-  }, []);
+    loadLogins();
+  }, [loadLogins]);
 
   const toggle = (key: keyof typeof settings) => {
     const nextValue = !settings[key];
@@ -159,8 +180,10 @@ export function Settings() {
         <div style={{marginBottom: '16px'}}>
           <h3 style={{fontWeight: 600, marginBottom: '4px'}}>Vendedores e Fotos de Perfil</h3>
           <p className="text-muted text-sm">
-            Gerencie as fotos e defina quais vendedores aparecem nos rankings (Dashboard, Vendedores, Painel TV e Previsão).
+            Gerencie as fotos, defina quais vendedores aparecem nos rankings (Dashboard, Vendedores, Painel TV e Previsão)
+            e o login individual de cada vendedor no Painel do Vendedor. “Oculto” vale só para os rankings — não bloqueia o login.
           </p>
+          {loginsError && <p className="text-sm" role="alert" style={{ color: 'var(--danger)', marginTop: '8px' }}>{loginsError}</p>}
         </div>
 
         <div className="flex-col gap-4">
@@ -196,13 +219,19 @@ export function Settings() {
                       display: 'inline-flex',
                       alignItems: 'center',
                       gap: '4px',
-                      color: 'var(--primary)',
+                      color: 'var(--accent-text)',
                       marginTop: '2px',
                     }}
                   >
                     <Camera size={12} />
                     {seller.photo_url ? 'Alterar foto' : 'Adicionar foto'}
                   </button>
+                  <div className="flex-center gap-2" style={{ flexWrap: 'wrap', marginTop: '6px', justifyContent: 'flex-start' }}>
+                    <AccessBadge status={accessStatusOf(loginBySeller.get(seller.id))} />
+                    <button type="button" className="access-manage-btn" onClick={() => setAccessSellerId(seller.id)} aria-label={`Gerenciar acesso de ${seller.name}`}>
+                      <KeyRound size={13} /> Gerenciar acesso
+                    </button>
+                  </div>
                 </div>
               </div>
 
@@ -280,6 +309,15 @@ export function Settings() {
           ))}
         </div>
       </div>
+
+      {accessSellerId && sellers.some((s) => s.id === accessSellerId) && (
+        <SellerAccessModal
+          seller={sellers.find((s) => s.id === accessSellerId)!}
+          login={loginBySeller.get(accessSellerId)}
+          onClose={() => setAccessSellerId(null)}
+          onChanged={loadLogins}
+        />
+      )}
 
       {editingPhotoSeller && (
         <SellerPhotoModal

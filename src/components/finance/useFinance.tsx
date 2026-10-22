@@ -1,5 +1,6 @@
 import React, { createContext, useCallback, useContext, useEffect, useMemo, useState } from 'react';
 import { useSearchParams } from 'react-router-dom';
+import { chartThemeFor } from '../../lib/chartTheme';
 import { useTheme } from '../../context/ThemeContext';
 import { buildMonthFinance, type MonthFinance } from '../../lib/finance/calc';
 import { isMonthKey, monthOf, storeToday } from '../../lib/finance/dates';
@@ -117,29 +118,19 @@ export interface FinanceColors {
 
 export function useFinanceColors(): FinanceColors {
   const { theme } = useTheme();
-  return theme === 'dark'
-    ? {
-        profit: '#22d3ee',
-        goal: '#3b82f6',
-        worst: '#facc15',
-        deficit: '#fb7185',
-        warn: '#fb923c',
-        muted: '#94a3b8',
-        grid: 'rgba(148, 163, 184, 0.14)',
-        text: '#e2e8f0',
-        surface: '#0f172a',
-        future: 'rgba(148, 163, 184, 0.35)',
-      }
-    : {
-        profit: '#0891b2',
-        goal: '#2563eb',
-        worst: '#ca8a04',
-        deficit: '#e11d48',
-        warn: '#ea580c',
-        muted: '#64748b',
-        grid: '#e5e7eb',
-        text: '#1f2937',
-        surface: '#ffffff',
-        future: '#cbd5e1',
-      };
+  const c = chartThemeFor(theme);
+  // Realizado = ciano (série 2), meta = azul elétrico (série 1), pior cenário = âmbar,
+  // déficit = vermelho semântico. Metas usam linha tracejada para não depender só da cor.
+  return {
+    profit: c.series[1],
+    goal: c.series[0],
+    worst: c.warning,
+    deficit: c.danger,
+    warn: theme === 'dark' ? '#FB923C' : '#C2410C',
+    muted: c.axis,
+    grid: c.grid,
+    text: c.text,
+    surface: c.surface,
+    future: theme === 'dark' ? 'rgba(142, 166, 255, 0.3)' : '#CDD1E4',
+  };
 }

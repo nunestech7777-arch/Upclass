@@ -14,11 +14,9 @@
 @keyframes salesFadeIn {
   from {
     opacity: 0;
-    transform: translateY(6px);
   }
   to {
     opacity: 1;
-    transform: translateY(0);
   }
 }
 
@@ -90,17 +88,17 @@
 
 .sales-date-select:hover,
 .sales-date-select:focus {
-  background-color: rgba(59, 130, 246, 0.08);
-  color: var(--primary);
+  background-color: color-mix(in srgb, var(--primary) 8%, transparent);
+  color: var(--accent-text);
 }
 
 .sales-custom-date-btn {
   display: inline-flex;
   align-items: center;
   gap: 6px;
-  background-color: rgba(59, 130, 246, 0.1);
-  color: var(--primary);
-  border: 1px solid rgba(59, 130, 246, 0.2);
+  background-color: color-mix(in srgb, var(--primary) 10%, transparent);
+  color: var(--accent-text);
+  border: 1px solid color-mix(in srgb, var(--primary) 20%, transparent);
   padding: 6px 12px;
   border-radius: var(--radius-full);
   font-size: 12px;
@@ -139,13 +137,13 @@
 
 .sales-metric-card:hover {
   transform: translateY(-2px);
-  border-color: rgba(59, 130, 246, 0.3);
+  border-color: color-mix(in srgb, var(--primary) 30%, transparent);
   box-shadow: 0 12px 28px -6px rgba(0, 0, 0, 0.08);
 }
 
 [data-theme="dark"] .sales-metric-card:hover {
   box-shadow: 0 12px 32px -6px rgba(0, 0, 0, 0.5);
-  border-color: rgba(59, 130, 246, 0.4);
+  border-color: color-mix(in srgb, var(--primary) 40%, transparent);
 }
 
 .sales-metric-header {
@@ -166,18 +164,18 @@
 }
 
 .sales-metric-icon-box.sales-total {
-  background-color: rgba(59, 130, 246, 0.12);
-  color: var(--primary);
+  background-color: color-mix(in srgb, var(--primary) 12%, transparent);
+  color: var(--accent-text);
 }
 
 .sales-metric-icon-box.device-top {
-  background-color: rgba(16, 185, 129, 0.12);
-  color: #10B981;
+  background-color: color-mix(in srgb, var(--chart-2) 14%, transparent);
+  color: var(--chart-2);
 }
 
 .sales-metric-icon-box.accessory-top {
-  background-color: rgba(168, 85, 247, 0.12);
-  color: #A855F7;
+  background-color: color-mix(in srgb, var(--chart-3) 12%, transparent);
+  color: var(--chart-3);
 }
 
 .sales-metric-badge {
@@ -227,7 +225,7 @@
 
 .sales-metric-subtext-highlight {
   font-weight: 700;
-  color: var(--primary);
+  color: var(--accent-text);
 }
 
 /* ============================================================
@@ -248,11 +246,13 @@
   grid-template-columns: 1fr 1fr 1fr 1.5fr;
   gap: 12px;
   align-items: center;
+  width: 100%;
 }
 
 .sales-filters-grid select {
   width: 100%;
-  padding: 10px 14px;
+  height: 38px;
+  padding: 8px 12px;
   border-radius: var(--radius-sm);
   border: 1px solid var(--border-color);
   background-color: var(--bg-card);
@@ -261,6 +261,9 @@
   outline: none;
   transition: border-color 0.2s;
   box-sizing: border-box;
+  min-width: 0;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .sales-filters-grid select:focus {
@@ -271,6 +274,7 @@
   position: relative;
   display: flex;
   align-items: center;
+  width: 100%;
 }
 
 .sales-search-icon {
@@ -282,20 +286,21 @@
 
 .sales-search-input {
   width: 100%;
-  padding: 10px 14px 10px 38px;
+  height: 38px;
+  padding: 8px 12px 8px 36px;
   border-radius: var(--radius-sm);
   border: 1px solid var(--border-color);
   background-color: var(--bg-card);
   color: var(--text-dark);
   font-size: 14px;
   outline: none;
-  transition: all 0.2s;
+  transition: border-color 0.2s;
   box-sizing: border-box;
 }
 
 .sales-search-input:focus {
   border-color: var(--primary);
-  box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.15);
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--primary) 15%, transparent);
 }
 
 /* ============================================================
@@ -348,7 +353,7 @@
 }
 
 .sales-table tbody tr:hover {
-  background-color: rgba(59, 130, 246, 0.03);
+  background-color: color-mix(in srgb, var(--primary) 3%, transparent);
 }
 
 [data-theme="dark"] .sales-table tbody tr:hover {
@@ -380,15 +385,15 @@
 }
 
 .category-badge.aparelhos {
-  background-color: rgba(59, 130, 246, 0.12);
-  color: var(--primary);
-  border: 1px solid rgba(59, 130, 246, 0.25);
+  background-color: color-mix(in srgb, var(--primary) 12%, transparent);
+  color: var(--accent-text);
+  border: 1px solid color-mix(in srgb, var(--primary) 25%, transparent);
 }
 
 .category-badge.acessorios {
-  background-color: rgba(168, 85, 247, 0.12);
-  color: #A855F7;
-  border: 1px solid rgba(168, 85, 247, 0.25);
+  background-color: color-mix(in srgb, var(--chart-3) 12%, transparent);
+  color: var(--chart-3);
+  border: 1px solid color-mix(in srgb, var(--chart-3) 25%, transparent);
 }
 
 .qty-cell {
@@ -415,8 +420,8 @@
 
 .sales-view-btn:hover {
   border-color: var(--primary);
-  background-color: rgba(59, 130, 246, 0.08);
-  color: var(--primary);
+  background-color: color-mix(in srgb, var(--primary) 8%, transparent);
+  color: var(--accent-text);
 }
 
 /* ============================================================
@@ -461,8 +466,8 @@
 
 .sales-pagination-btn:hover:not(:disabled) {
   border-color: var(--primary);
-  color: var(--primary);
-  background-color: rgba(59, 130, 246, 0.05);
+  color: var(--accent-text);
+  background-color: color-mix(in srgb, var(--primary) 5%, transparent);
 }
 
 .sales-pagination-btn:disabled {
@@ -486,7 +491,7 @@
   left: 0;
   right: 0;
   bottom: 0;
-  background-color: rgba(15, 23, 42, 0.6);
+  background-color: rgba(0, 2, 41, 0.6);
   backdrop-filter: blur(6px);
   z-index: 9999;
   display: flex;
@@ -657,7 +662,7 @@
 }
 
 .sales-detail-list li.is-current {
-  background-color: rgba(59, 130, 246, 0.08);
+  background-color: color-mix(in srgb, var(--primary) 8%, transparent);
   font-weight: 700;
 }
 
@@ -685,8 +690,8 @@
   margin-right: 8px;
   padding: 2px 8px;
   border-radius: var(--radius-full);
-  background-color: rgba(168, 85, 247, 0.12);
-  color: #A855F7;
+  background-color: color-mix(in srgb, var(--chart-3) 12%, transparent);
+  color: var(--chart-3);
   font-size: 11px;
   font-weight: 600;
 }
@@ -696,7 +701,7 @@
 }
 
 .sales-detail-total .sales-detail-list-amount {
-  color: var(--primary);
+  color: var(--accent-text);
   font-size: 18px;
 }
 
@@ -711,8 +716,8 @@
 
 .sales-detail-notice.danger {
   border-style: solid;
-  border-color: rgba(239, 68, 68, 0.35);
-  background-color: rgba(239, 68, 68, 0.08);
+  border-color: color-mix(in srgb, var(--danger) 35%, transparent);
+  background-color: color-mix(in srgb, var(--danger) 8%, transparent);
   color: var(--text-dark);
 }
 
@@ -790,9 +795,33 @@
     justify-content: space-between;
   }
 
+  /* Organização compacta dos filtros no mobile: Busca no topo, Produto no meio, Categorias e Vendedores lado a lado */
   .sales-filters-grid {
-    grid-template-columns: 1fr;
-    gap: 10px;
+    grid-template-columns: 1fr 1fr;
+    gap: 8px;
+  }
+  .sales-filters-grid .sales-search-wrapper {
+    grid-column: 1 / -1;
+    order: 1;
+  }
+  .sales-filters-grid > :first-child {
+    grid-column: 1 / -1;
+    order: 2;
+  }
+  .sales-filters-grid select:nth-of-type(2) {
+    order: 3;
+  }
+  .sales-filters-grid select:nth-of-type(3) {
+    order: 4;
+  }
+  .sales-filters-grid select,
+  .sales-search-input {
+    height: 38px;
+    padding-top: 8px;
+    padding-bottom: 8px;
+    font-size: 16px; /* evita o zoom automático do iOS ao focar */
+    min-width: 0;
+    width: 100%;
   }
 
   .sales-detail-grid,

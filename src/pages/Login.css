@@ -1,42 +1,55 @@
+/* Telas de acesso Upclass — login, definir senha, verificação e bloqueio.
+   Sempre sobre o fundo oficial escuro, independentemente do tema escolhido. */
+
 .login-page {
   position: relative;
   min-height: 100vh;
+  min-height: 100dvh;
   width: 100%;
   display: flex;
   align-items: center;
   justify-content: center;
-  background-color: #041423;
-  padding: 24px;
+  background-color: var(--uc-ink);
+  padding: 24px 16px 64px;
   overflow: hidden;
-}
-
-.login-shader {
-  position: absolute;
-  inset: 0;
-  z-index: 0;
+  color: #F3F5FF;
 }
 
 .login-card {
   position: relative;
   z-index: 1;
   width: 100%;
-  max-width: 380px;
+  max-width: 400px;
   display: flex;
   flex-direction: column;
   gap: 24px;
   align-items: center;
-  padding: 32px 28px;
-  border-radius: var(--radius-lg);
-  background-color: rgba(255, 255, 255, 0.14);
-  border: 1px solid rgba(255, 255, 255, 0.25);
-  box-shadow: 0 20px 45px -10px rgba(0, 0, 0, 0.35);
-  backdrop-filter: blur(18px);
-  -webkit-backdrop-filter: blur(18px);
+  padding: 36px 32px 32px;
+  border-radius: var(--radius-xl);
+  background-color: rgba(0, 2, 41, 0.86);
+  border: 1px solid rgba(142, 166, 255, 0.2);
+  box-shadow: 0 30px 80px -24px rgba(0, 0, 0, 0.75), 0 1px 0 rgba(255, 255, 255, 0.06) inset;
+  backdrop-filter: blur(14px);
+  -webkit-backdrop-filter: blur(14px);
+}
+
+/* Filete de marca no topo do cartão */
+.login-card::before {
+  content: '';
+  position: absolute;
+  top: -1px;
+  left: 28px;
+  right: 28px;
+  height: 2px;
+  border-radius: 2px;
+  background: var(--gradient-brand);
 }
 
 .login-logo {
   height: 40px;
   width: auto;
+  max-width: 100%;
+  object-fit: contain;
 }
 
 .login-form {
@@ -54,42 +67,47 @@
 
 .login-field label {
   font-size: 13px;
-  font-weight: 500;
-  color: rgba(255, 255, 255, 0.85);
+  font-weight: 600;
+  color: #D6DBFA;
 }
 
-.login-field input {
-  padding: 12px 16px;
-  border-radius: var(--radius-sm);
-  border: 1px solid rgba(255, 255, 255, 0.4);
+.login-field input,
+[data-theme="dark"] .login-field input,
+[data-theme="light"] .login-field input {
+  padding: 12px 14px;
+  min-height: 46px;
+  border-radius: var(--radius-md);
+  border: 1px solid rgba(142, 166, 255, 0.3);
   font-size: 15px;
-  background-color: #ffffff !important;
-  color: #111827 !important;
+  background-color: #03062E;
+  color: #FFFFFF;
   outline: none;
-  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.05);
+  transition: border-color var(--dur-fast) ease, box-shadow var(--dur-fast) ease;
 }
 
 .login-field input::placeholder {
-  color: #6b7280 !important;
+  color: #8A91BE;
 }
 
-.login-field input:focus {
-  background-color: #ffffff !important;
-  color: #111827 !important;
-  border-color: var(--primary);
-  box-shadow: 0 0 0 3px rgba(10, 37, 255, 0.25) !important;
+.login-field input:focus,
+.login-field input:focus-visible {
+  border-color: #80FFFF !important;
+  box-shadow: 0 0 0 3px rgba(128, 255, 255, 0.3) !important;
 }
 
-[data-theme="dark"] .login-field input,
-[data-theme="dark"] .login-field input:focus {
-  background-color: #ffffff !important;
-  color: #111827 !important;
+/* Autopreenchimento do navegador sem fundo amarelo */
+.login-field input:-webkit-autofill {
+  -webkit-text-fill-color: #FFFFFF;
+  -webkit-box-shadow: 0 0 0 1000px #03062E inset;
+  caret-color: #FFFFFF;
 }
 
 .login-error {
   font-size: 13px;
-  color: #EF4444;
-  background-color: rgba(239, 68, 68, 0.08);
+  line-height: 1.45;
+  color: #FFD1D8;
+  background-color: rgba(255, 122, 140, 0.14);
+  border: 1px solid rgba(255, 122, 140, 0.35);
   border-radius: var(--radius-sm);
   padding: 10px 14px;
 }
@@ -98,11 +116,219 @@
   width: 100%;
   justify-content: center;
   padding: 12px 20px;
-  border-radius: var(--radius-sm);
+  min-height: 48px;
+  border-radius: var(--radius-md);
   font-size: 15px;
 }
 
 .login-submit:disabled {
+  background-color: #1A2060;
+  color: #8A91BE;
+}
+
+/* Telas de acesso (bloqueio, verificação, definir senha) — mesmo cartão do login. */
+.access-screen {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  text-align: center;
+  color: #FFFFFF;
+}
+
+.access-screen-title {
+  font-size: 20px;
+  font-weight: 800;
+  letter-spacing: -0.01em;
+  margin: 0;
+}
+
+.access-screen-text {
+  margin: 0;
+  font-size: 14px;
+  line-height: 1.5;
+  color: #D6DBFA;
+}
+
+.access-screen-email {
+  margin: 4px 0 0;
+  font-size: 12px;
+  color: #AEB5DD;
+  word-break: break-all;
+}
+
+.access-screen-actions {
+  width: 100%;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  align-items: center;
+}
+
+.access-screen-link {
+  background: none;
+  border: none;
+  color: #D6DBFA;
+  font-size: 14px;
+  text-decoration: underline;
+  text-underline-offset: 3px;
+  cursor: pointer;
+  padding: 8px 12px;
+  min-height: 44px;
+}
+
+.access-screen-link:hover {
+  color: #80FFFF;
+}
+
+.login-success {
+  font-size: 13px;
+  color: #B5F5DC;
+  background-color: rgba(52, 211, 153, 0.14);
+  border: 1px solid rgba(52, 211, 153, 0.35);
+  border-radius: var(--radius-sm);
+  padding: 10px 14px;
+}
+
+.login-hint {
+  margin: 0;
+  font-size: 12px;
+  line-height: 1.45;
+  color: #AEB5DD;
+}
+
+.login-spinner {
+  width: 32px;
+  height: 32px;
+  border-radius: 50%;
+  border: 3px solid rgba(142, 166, 255, 0.25);
+  border-top-color: #80FFFF;
+  animation: uc-spin 0.8s linear infinite;
+}
+
+@keyframes uc-spin {
+  to { transform: rotate(360deg); }
+}
+
+@media (max-width: 420px) {
+  .login-card {
+    padding: 30px 20px 24px;
+  }
+  .login-logo {
+    height: 34px;
+  }
+}
+
+/* ==========================================================================
+   Fundo animado — somente /login (AuthShell com animatedBackdrop).
+   Camadas isoladas atrás do cartão; só transform e opacity são animados.
+   A imagem oficial fica mais baixa (opacidade) para que os brilhos em movimento
+   dominem a composição — antes eles ficavam sob brilhos estáticos e o movimento sumia.
+   ========================================================================== */
+.login-backdrop.is-animated {
+  overflow: hidden;
+  isolation: isolate;
+  background: var(--uc-ink);
+}
+
+/* 1. Fundo oficial (fundos/Prancheta 3): maior que a tela, deriva e amplia devagar */
+.login-backdrop.is-animated::before {
+  content: '';
+  position: absolute;
+  inset: -12%;
+  z-index: 0;
+  background: url('../assets/brand/upclass/login-background.webp') center / cover no-repeat;
   opacity: 0.6;
-  cursor: not-allowed;
+  transform: translate3d(-4%, -3%, 0) scale(1.04);
+  animation: uc-login-drift 18s ease-in-out infinite alternate;
+  will-change: transform;
+}
+
+/* 2. Brilhos difusos da marca percorrendo o fundo em direções diferentes */
+.login-glow {
+  position: absolute;
+  z-index: 1;
+  border-radius: 50%;
+  pointer-events: none;
+  will-change: transform, opacity;
+}
+
+.login-glow-magenta {
+  top: -18vmax;
+  right: -14vmax;
+  width: 62vmax;
+  height: 62vmax;
+  background: radial-gradient(closest-side, rgba(252, 57, 206, 0.62), rgba(217, 43, 130, 0.22) 50%, transparent 72%);
+  animation: uc-login-glow-a 16s ease-in-out infinite alternate;
+}
+
+.login-glow-blue {
+  bottom: -26vmax;
+  left: -18vmax;
+  width: 68vmax;
+  height: 68vmax;
+  background: radial-gradient(closest-side, rgba(6, 63, 241, 0.7), rgba(2, 0, 124, 0.25) 50%, transparent 72%);
+  animation: uc-login-glow-b 20s ease-in-out infinite alternate;
+}
+
+.login-glow-cyan {
+  bottom: -20vmax;
+  right: -16vmax;
+  width: 50vmax;
+  height: 50vmax;
+  background: radial-gradient(closest-side, rgba(128, 255, 255, 0.4), rgba(6, 63, 241, 0.12) 55%, transparent 74%);
+  animation: uc-login-glow-c 14s ease-in-out infinite alternate;
+}
+
+/* 3. Véu escuro fixo: mais denso no centro (atrás do cartão), leve nas bordas onde o movimento aparece */
+.login-veil {
+  position: absolute;
+  inset: 0;
+  z-index: 2;
+  background:
+    radial-gradient(ellipse 46% 52% at 50% 50%, rgba(0, 2, 41, 0.62) 0%, rgba(0, 2, 41, 0.28) 55%, rgba(0, 2, 41, 0) 100%),
+    linear-gradient(180deg, rgba(0, 2, 41, 0.15) 0%, rgba(0, 2, 41, 0.5) 100%);
+}
+
+/* 4. Padronagem dos raios (definida em AuthShell.css): leve deslocamento e variação de opacidade */
+.login-backdrop.is-animated::after {
+  z-index: 3;
+  animation: uc-login-pattern 15s ease-in-out infinite alternate;
+  will-change: transform, opacity;
+}
+
+@keyframes uc-login-drift {
+  from { transform: translate3d(-4%, -3%, 0) scale(1.04); }
+  to { transform: translate3d(4%, 3%, 0) scale(1.14); }
+}
+
+@keyframes uc-login-glow-a {
+  0% { transform: translate3d(0, 0, 0) scale(1); opacity: 0.9; }
+  50% { transform: translate3d(-16vw, 12vh, 0) scale(1.18); opacity: 0.7; }
+  100% { transform: translate3d(-30vw, 4vh, 0) scale(0.92); opacity: 1; }
+}
+
+@keyframes uc-login-glow-b {
+  0% { transform: translate3d(0, 0, 0) scale(1.08); opacity: 0.95; }
+  50% { transform: translate3d(18vw, -10vh, 0) scale(0.94); opacity: 0.75; }
+  100% { transform: translate3d(30vw, -22vh, 0) scale(1.15); opacity: 0.9; }
+}
+
+@keyframes uc-login-glow-c {
+  0% { transform: translate3d(0, 0, 0) scale(0.95); opacity: 0.6; }
+  50% { transform: translate3d(-12vw, -14vh, 0) scale(1.2); opacity: 0.9; }
+  100% { transform: translate3d(-22vw, -4vh, 0) scale(1); opacity: 0.65; }
+}
+
+@keyframes uc-login-pattern {
+  from { transform: translate3d(0, 0, 0); opacity: 0.12; }
+  to { transform: translate3d(-24px, -16px, 0); opacity: 0.26; }
+}
+
+/* Movimento reduzido: composição estática (posição inicial de cada camada) */
+@media (prefers-reduced-motion: reduce) {
+  .login-backdrop.is-animated::before,
+  .login-backdrop.is-animated::after,
+  .login-glow {
+    animation: none !important;
+  }
 }

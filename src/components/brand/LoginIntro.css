@@ -1,0 +1,99 @@
+/* Entrada da marca no /login (~1,6 s): símbolo gira uma vez, anel de energia some, camada revela o formulário. */
+.login-intro {
+  position: fixed;
+  inset: 0;
+  z-index: 50;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  overflow: hidden;
+  background:
+    radial-gradient(circle at 50% 50%, rgba(6, 63, 241, 0.22) 0%, rgba(0, 2, 41, 0) 38%),
+    rgba(0, 2, 41, 0.86);
+  animation: uc-intro-out 0.32s ease-out 1.28s both;
+  pointer-events: auto;
+}
+
+.login-intro-mark {
+  position: relative;
+  width: 168px;
+  height: 168px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.login-intro-symbol {
+  position: relative;
+  z-index: 1;
+  height: 92px;
+  width: auto;
+  user-select: none;
+  filter: drop-shadow(0 6px 22px rgba(6, 63, 241, 0.45));
+  animation: uc-intro-symbol 1.3s cubic-bezier(0.65, 0, 0.35, 1) both;
+  will-change: transform, opacity;
+}
+
+/* Anel fino com gradiente da marca (conic + máscara radial) */
+.login-intro-ring {
+  position: absolute;
+  inset: 0;
+  border-radius: 50%;
+  background: conic-gradient(from 0deg, rgba(252, 57, 206, 0) 0deg, #FC39CE 80deg, #063FF1 200deg, #80FFFF 300deg, rgba(128, 255, 255, 0) 360deg);
+  -webkit-mask: radial-gradient(farthest-side, transparent calc(100% - 3px), #000 calc(100% - 2px));
+  mask: radial-gradient(farthest-side, transparent calc(100% - 3px), #000 calc(100% - 2px));
+  animation:
+    uc-intro-ring-spin 0.95s linear infinite,
+    uc-intro-ring-in 1.3s ease-out both;
+  will-change: transform, opacity;
+}
+
+/* Fallback sem máscara: anel simples de borda */
+@supports not ((mask: radial-gradient(#000, transparent)) or (-webkit-mask: radial-gradient(#000, transparent))) {
+  .login-intro-ring {
+    background: none;
+    border: 2px solid rgba(128, 255, 255, 0.25);
+    border-top-color: #80FFFF;
+    border-right-color: #FC39CE;
+  }
+}
+
+@keyframes uc-intro-symbol {
+  0% { opacity: 0; transform: scale(0.72) rotate(0deg); }
+  22% { opacity: 1; transform: scale(1) rotate(30deg); }
+  82% { transform: scale(1) rotate(360deg); }
+  100% { opacity: 1; transform: scale(1) rotate(360deg); }
+}
+
+@keyframes uc-intro-ring-spin {
+  to { transform: rotate(360deg); }
+}
+
+@keyframes uc-intro-ring-in {
+  0% { opacity: 0; }
+  20% { opacity: 1; }
+  78% { opacity: 1; }
+  100% { opacity: 0; }
+}
+
+@keyframes uc-intro-out {
+  to { opacity: 0; visibility: hidden; }
+}
+
+/* Cartão do login: surge enquanto a camada some (sem mudar layout); inerte até o fim (atributo inert) */
+.login-card.is-waiting {
+  animation: uc-intro-card-in 0.42s cubic-bezier(0.16, 1, 0.3, 1) 1.2s both;
+}
+
+@keyframes uc-intro-card-in {
+  from { opacity: 0; transform: scale(0.985); }
+  to { opacity: 1; transform: none; }
+}
+
+/* Movimento reduzido: sem rotação nem anel; só um fade curto */
+@media (prefers-reduced-motion: reduce) {
+  .login-intro { animation: uc-intro-out 0.15s ease-out 0s both !important; }
+  .login-intro-symbol { animation: none !important; }
+  .login-intro-ring { display: none; }
+  .login-card.is-waiting { animation: none !important; }
+}

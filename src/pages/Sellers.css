@@ -44,13 +44,13 @@
 }
 
 .sellers-month-arrow:hover:not(:disabled) {
-  background: #ffffff;
+  background: var(--surface-card);
   color: var(--text-dark);
   box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
 }
 
 [data-theme="dark"] .sellers-month-arrow:hover:not(:disabled) {
-  background: #1e293b;
+  background: var(--surface-elevated);
   color: #ffffff;
 }
 
@@ -115,13 +115,13 @@
 }
 
 .seller-tab-btn.active {
-  background: #ffffff;
+  background: var(--surface-card);
   color: var(--text-dark);
   box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
 }
 
 [data-theme="dark"] .seller-tab-btn.active {
-  background: #1e293b;
+  background: var(--surface-elevated);
   color: #ffffff;
   box-shadow: 0 2px 10px rgba(0, 0, 0, 0.4), inset 0 1px 0 rgba(255, 255, 255, 0.1);
 }
@@ -157,12 +157,12 @@
 
 .leader-card.active-leader {
   border-color: var(--primary);
-  background: linear-gradient(135deg, rgba(10, 37, 255, 0.04) 0%, rgba(10, 37, 255, 0.01) 100%);
+  background: linear-gradient(135deg, color-mix(in srgb, var(--primary) 4%, transparent) 0%, color-mix(in srgb, var(--primary) 1%, transparent) 100%);
 }
 
 [data-theme="dark"] .leader-card.active-leader {
-  background: linear-gradient(135deg, rgba(59, 130, 246, 0.12) 0%, rgba(59, 130, 246, 0.02) 100%);
-  border-color: rgba(59, 130, 246, 0.5);
+  background: linear-gradient(135deg, color-mix(in srgb, var(--primary) 12%, transparent) 0%, color-mix(in srgb, var(--primary) 2%, transparent) 100%);
+  border-color: color-mix(in srgb, var(--primary) 50%, transparent);
 }
 
 .leader-icon-badge {
@@ -176,43 +176,43 @@
 }
 
 .leader-icon-badge.iphones {
-  background: rgba(10, 37, 255, 0.1);
-  color: #0a25ff;
+  background: color-mix(in srgb, var(--primary) 10%, transparent);
+  color: var(--accent-text);
 }
 
 [data-theme="dark"] .leader-icon-badge.iphones {
-  background: rgba(59, 130, 246, 0.2);
-  color: #60a5fa;
+  background: color-mix(in srgb, var(--primary) 20%, transparent);
+  color: var(--accent-text);
 }
 
 .leader-icon-badge.accessories {
-  background: rgba(16, 185, 129, 0.1);
-  color: #10b981;
+  background: color-mix(in srgb, var(--success) 10%, transparent);
+  color: var(--success);
 }
 
 [data-theme="dark"] .leader-icon-badge.accessories {
-  background: rgba(16, 185, 129, 0.2);
-  color: #34d399;
+  background: color-mix(in srgb, var(--success) 20%, transparent);
+  color: var(--success);
 }
 
 .leader-icon-badge.total {
-  background: rgba(245, 158, 11, 0.1);
-  color: #f59e0b;
+  background: color-mix(in srgb, var(--warning) 10%, transparent);
+  color: var(--warning);
 }
 
 [data-theme="dark"] .leader-icon-badge.total {
-  background: rgba(245, 158, 11, 0.2);
-  color: #fbbf24;
+  background: color-mix(in srgb, var(--warning) 20%, transparent);
+  color: var(--warning);
 }
 
 .leader-icon-badge.conversion {
-  background: rgba(168, 85, 247, 0.1);
-  color: #a855f7;
+  background: color-mix(in srgb, var(--chart-3) 10%, transparent);
+  color: var(--chart-3);
 }
 
 [data-theme="dark"] .leader-icon-badge.conversion {
-  background: rgba(168, 85, 247, 0.2);
-  color: #c084fc;
+  background: color-mix(in srgb, var(--chart-3) 20%, transparent);
+  color: var(--chart-3);
 }
 
 .leader-info {
@@ -246,7 +246,7 @@
 .leader-score {
   font-size: 13px;
   font-weight: 600;
-  color: var(--primary);
+  color: var(--accent-text);
 }
 
 /* Seller Card Styles */
@@ -274,7 +274,7 @@
 .seller-card:hover {
   transform: translateY(-4px);
   box-shadow: var(--shadow-card);
-  border-color: rgba(59, 130, 246, 0.3);
+  border-color: color-mix(in srgb, var(--primary) 30%, transparent);
 }
 
 .seller-rank-badge {
@@ -291,13 +291,13 @@
 }
 
 .seller-card.rank-1 {
-  border-color: rgba(245, 158, 11, 0.4);
-  box-shadow: 0 4px 20px rgba(245, 158, 11, 0.12);
+  border-color: color-mix(in srgb, var(--warning) 40%, transparent);
+  box-shadow: 0 4px 20px color-mix(in srgb, var(--warning) 12%, transparent);
 }
 
 [data-theme="dark"] .seller-card.rank-1 {
-  border-color: rgba(245, 158, 11, 0.35);
-  box-shadow: 0 4px 24px rgba(245, 158, 11, 0.15);
+  border-color: color-mix(in srgb, var(--warning) 35%, transparent);
+  box-shadow: 0 4px 24px color-mix(in srgb, var(--warning) 15%, transparent);
 }
 
 .seller-card-avatar-wrap {
@@ -356,14 +356,14 @@
 }
 
 .seller-stat-row.highlight-metric {
-  background: rgba(10, 37, 255, 0.08);
+  background: color-mix(in srgb, var(--primary) 8%, transparent);
   padding: 4px 8px;
   border-radius: 6px;
   font-weight: 600;
 }
 
 [data-theme="dark"] .seller-stat-row.highlight-metric {
-  background: rgba(59, 130, 246, 0.15);
+  background: color-mix(in srgb, var(--primary) 15%, transparent);
 }
 
 .seller-stat-label {
@@ -386,7 +386,7 @@
 }
 
 .seller-stat-row.highlight-metric .seller-stat-val {
-  color: var(--primary);
+  color: var(--accent-text);
   font-size: 14px;
 }
 
@@ -456,7 +456,7 @@
   margin-top: 10px;
   font-size: 13px;
   font-weight: 600;
-  color: var(--primary);
+  color: var(--accent-text);
 }
 
 .sellers-profit-link:hover {

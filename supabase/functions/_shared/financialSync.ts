@@ -18,7 +18,7 @@ import {
 export type FetchHistory = (dataInicial: string, dataFinal: string) => Promise<HistoricoFinanceItem[]>;
 
 export const SALE_FINANCE_COLUMNS =
-  'id, external_id, quantity, amount, created_at, item_status, status_reason, revenue, customer_paid, discount, cost, profit_reported, profit, product_type, customer_name, financial_status, financial_note';
+  'id, external_id, quantity, amount, created_at, item_status, status_reason, revenue, customer_paid, discount, cost, profit_reported, profit, product_type, customer_name, financial_status, financial_note, products(name)';
 
 export interface FinancialSyncOptions {
   start: string; // YYYY-MM-DD
@@ -71,7 +71,13 @@ async function loadSales(supabase: any, start: string, end: string): Promise<Sal
       .order('id')
       .range(offset, offset + 999);
     if (error) throw new Error(`listar vendas ${start}..${end}: ${error.message}`);
-    rows.push(...(data ?? []));
+    // Nome do produto (join) vira `product_name`: só leitura, para reconhecer troca de unidade.
+    rows.push(
+      ...((data ?? []) as unknown as (SaleFinanceRow & { products?: { name?: string | null } | null })[]).map(({ products, ...r }) => ({
+        ...r,
+        product_name: products?.name ?? null,
+      }))
+    );
     if ((data ?? []).length < 1000) return rows;
   }
 }

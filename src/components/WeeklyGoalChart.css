@@ -1,0 +1,15 @@
+.wgc { width: 100%; margin: 0 0 16px; }
+.wgc-plot { width: 100%; height: 150px; }
+.wgc-legend { display: flex; justify-content: center; gap: 20px; font-size: 13px; color: var(--text-muted); margin-bottom: 6px; }
+.wgc-legend span { display: inline-flex; align-items: center; gap: 8px; }
+.wgc-key { display: inline-block; width: 18px; height: 0; }
+.wgc-key-solid { height: 3px; border-radius: 2px; }
+.wgc-key-dash { border-top: 2px dashed; }
+.wgc-tip { display: flex; flex-direction: column; gap: 2px; padding: 10px 12px; text-align: left; }
+.wgc-tip strong { margin-bottom: 2px; }
+.wgc-empty {
+  width: 100%; min-height: 96px; margin: 0 0 16px; padding: 16px;
+  display: flex; align-items: center; justify-content: center; text-align: center;
+  font-size: 15px; color: var(--text-muted);
+  border: 1px dashed var(--border-strong); border-radius: var(--radius-md);
+}

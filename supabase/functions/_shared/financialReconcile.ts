@@ -13,6 +13,11 @@
  *   menos vezes do que em `sales` (duplicata criada por edição do pedido ou produto trocado).
  * - Valores só são atribuídos quando a correspondência é única; senão a linha fica `ambiguous`.
  * - Nada é apagado e o vendedor da linha não é alterado aqui (ver itemSellers.ts).
+ * - Troca de UNIDADE no pedido (o MercadoPhone troca o iPhone por outro do mesmo modelo, com outro
+ *   IMEI/produtoId, e a nova unidade não chega por webhook): se no mesmo pedido sobra exatamente uma
+ *   linha sem item e um item sem linha, com o mesmo modelo e a mesma quantidade, a linha continua
+ *   ATIVA com os valores da nova unidade (não vira `removed`). Sem nome do produto ou com mais de um
+ *   candidato, segue a regra anterior.
  */
 
 export interface HistoricoFinanceItem {
@@ -27,6 +32,8 @@ export interface HistoricoFinanceItem {
   statusVenda?: string | null;
   tipoProdutoDescricao?: string | null;
   clienteNome?: string | null;
+  /** "PRODUTO APPLE - IPHONE 12 PRO - IMEI: … - 256GB - …" (usado só para reconhecer troca de unidade). */
+  produtoDescricao?: string | null;
 }
 
 export type ItemStatus = 'active' | 'cancelled' | 'removed';
@@ -50,6 +57,8 @@ export interface SaleFinanceRow {
   customer_name?: string | null;
   financial_status?: FinancialStatus | null;
   financial_note?: string | null;
+  /** Nome do produto no painel (só leitura; usado para reconhecer troca de unidade). */
+  product_name?: string | null;
 }
 
 export interface SaleFinancePatch {
@@ -69,7 +78,7 @@ export interface SaleFinancePatch {
 
 export interface ReconcileIssue {
   orderId: string;
-  kind: 'not_found' | 'ambiguous' | 'mismatch' | 'history_without_row' | 'removed' | 'cancelled' | 'missing_cost';
+  kind: 'not_found' | 'ambiguous' | 'mismatch' | 'history_without_row' | 'removed' | 'cancelled' | 'missing_cost' | 'swapped';
   detail: string;
 }
 
@@ -88,6 +97,8 @@ export interface ReconcileCounts {
   history_items_without_row: number;
   history_orders_without_rows: number;
   rows_to_update: number;
+  /** Linhas mantidas ativas porque a unidade foi trocada no pedido (mesmo modelo). */
+  rows_swapped: number;
 }
 
 export interface ReconcilePlan {
@@ -170,6 +181,22 @@ export function financialFieldsFromHistory(item: HistoricoFinanceItem): Required
   };
 }
 
+const normalizeText = (v: string | null | undefined) =>
+  (v ?? '').normalize('NFD').replace(/[\u0300-\u036f]/g, '').toUpperCase().replace(/\s+/g, ' ').trim();
+
+/** Modelo = primeiro trecho do nome antes de " - " ("IPHONE 17 PRO MAX - 256GB - LARANJA" → "IPHONE 17 PRO MAX"). */
+export function modelKey(name: string | null | undefined): string {
+  return normalizeText(name).split(' - ')[0].trim();
+}
+
+/** Modelo do item do histórico: tira o prefixo do tipo ("PRODUTO APPLE - …"). */
+export function historyModelKey(item: HistoricoFinanceItem): string {
+  let d = normalizeText(item.produtoDescricao);
+  const tipo = normalizeText(item.tipoProdutoDescricao);
+  if (tipo && d.startsWith(`${tipo} - `)) d = d.slice(tipo.length + 3);
+  return modelKey(d);
+}
+
 function signature(item: HistoricoFinanceItem): string {
   return [
     Number(item.quantidade ?? 0),
@@ -210,6 +237,7 @@ function emptyCounts(): ReconcileCounts {
     history_items_without_row: 0,
     history_orders_without_rows: 0,
     rows_to_update: 0,
+    rows_swapped: 0,
   };
 }
 
@@ -278,13 +306,13 @@ export function planFinancialReconcile(history: HistoricoFinanceItem[], sales: S
       rowsByProduct.set(key, list);
     }
 
+    // Itens do histórico sem linha no painel (candidatos a unidade trocada).
+    const unmatchedItems: { productId: string; item: HistoricoFinanceItem }[] = [];
     for (const [productId, items] of historyByProduct) {
       const rowCount = rowsByProduct.get(productId)?.length ?? 0;
-      if (!cancelled && items.length > rowCount) {
-        counts.history_items_without_row += items.length - rowCount;
-        issues.push({ orderId, kind: 'history_without_row', detail: `produto ${productId}: ${items.length} no histórico, ${rowCount} em sales` });
-      }
+      if (items.length > rowCount) for (const item of items.slice(rowCount)) unmatchedItems.push({ productId, item });
     }
+    const staleRows: { productId: string; row: SaleFinanceRow }[] = [];
 
     for (const [productId, rows] of rowsByProduct) {
       const items = [...(historyByProduct.get(productId) ?? [])];
@@ -305,12 +333,7 @@ export function planFinancialReconcile(history: HistoricoFinanceItem[], sales: S
       const kept = ordered.slice(0, items.length);
       const stale = ordered.slice(items.length);
 
-      for (const row of stale) {
-        targets.set(row.id, { item_status: 'removed', status_reason: REMOVED_REASON });
-        if ((row.item_status ?? 'active') !== 'removed') {
-          issues.push({ orderId, kind: 'removed', detail: `${row.external_id} (produto ${productId}) não está na versão atual do pedido` });
-        }
-      }
+      for (const row of stale) staleRows.push({ productId, row });
 
       const remaining = [...items];
       for (const row of kept) {
@@ -335,6 +358,47 @@ export function planFinancialReconcile(history: HistoricoFinanceItem[], sales: S
         const chosen = pool[0];
         remaining.splice(remaining.indexOf(chosen), 1);
         targets.set(row.id, { ...statusPatch, ...financialFieldsFromHistory(chosen) });
+      }
+    }
+
+    // Troca de unidade: par único (linha sobrando × item sem linha) do mesmo modelo e quantidade.
+    const swappedItems = new Set<HistoricoFinanceItem>();
+    if (!cancelled) {
+      for (const stale of staleRows) {
+        const key = modelKey(stale.row.product_name);
+        if (!key) continue;
+        const sameModel = (item: HistoricoFinanceItem) => historyModelKey(item) === key && Number(item.quantidade) === stale.row.quantity;
+        const items = unmatchedItems.filter((u) => !swappedItems.has(u.item) && sameModel(u.item));
+        const rivals = staleRows.filter((o) => o !== stale && modelKey(o.row.product_name) === key && o.row.quantity === stale.row.quantity);
+        if (items.length !== 1 || rivals.length > 0) continue;
+        const { item, productId: newProduct } = items[0];
+        swappedItems.add(item);
+        const fields = financialFieldsFromHistory(item);
+        const note = `Unidade trocada no pedido: produto ${stale.productId} → ${newProduct} (mesmo modelo)`;
+        targets.set(stale.row.id, {
+          item_status: 'active',
+          status_reason: null,
+          ...fields,
+          financial_note: fields.financial_note ? `${note}; ${fields.financial_note}` : note,
+        });
+        counts.rows_swapped += 1;
+        issues.push({ orderId, kind: 'swapped', detail: `${stale.row.external_id}: ${note}` });
+      }
+    }
+    for (const { productId, row } of staleRows) {
+      if (targets.get(row.id)?.item_status === 'active') continue;
+      targets.set(row.id, { item_status: 'removed', status_reason: REMOVED_REASON });
+      if ((row.item_status ?? 'active') !== 'removed') {
+        issues.push({ orderId, kind: 'removed', detail: `${row.external_id} (produto ${productId}) não está na versão atual do pedido` });
+      }
+    }
+    if (!cancelled) {
+      const byProduct = new Map<string, number>();
+      for (const u of unmatchedItems) if (!swappedItems.has(u.item)) byProduct.set(u.productId, (byProduct.get(u.productId) ?? 0) + 1);
+      for (const [productId, missing] of byProduct) {
+        const rowCount = rowsByProduct.get(productId)?.length ?? 0;
+        counts.history_items_without_row += missing;
+        issues.push({ orderId, kind: 'history_without_row', detail: `produto ${productId}: ${missing + rowCount} no histórico, ${rowCount} em sales` });
       }
     }
   }

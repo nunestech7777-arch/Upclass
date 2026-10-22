@@ -1,0 +1,238 @@
+/* ============================================================
+   Cards de indicadores (Vendas e Estoque) — mesmo visual dos cards da aba Vendas
+   ============================================================ */
+.mc-grid {
+  display: grid;
+  grid-template-columns: repeat(5, minmax(0, 1fr));
+  gap: 16px;
+}
+
+.mc-card {
+  background-color: var(--bg-card);
+  border: 1px solid var(--border-color);
+  border-radius: 20px;
+  padding: 20px;
+  box-shadow: var(--shadow-card);
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  text-align: left;
+  font: inherit;
+  color: inherit;
+  transition: transform 0.2s ease, box-shadow 0.2s ease, border-color 0.2s ease;
+}
+.mc-card.is-clickable { cursor: pointer; }
+.mc-card.is-clickable:hover,
+.mc-card.is-clickable:focus-visible {
+  transform: translateY(-2px);
+  border-color: color-mix(in srgb, var(--primary) 40%, transparent);
+  box-shadow: 0 12px 28px -6px rgba(0, 0, 0, 0.12);
+  outline: none;
+}
+[data-theme="dark"] .mc-card.is-clickable:hover { box-shadow: 0 12px 32px -6px rgba(0, 0, 0, 0.5); }
+
+.mc-head { display: flex; align-items: center; justify-content: space-between; gap: 8px; margin-bottom: 14px; }
+.mc-icon { width: 40px; height: 40px; border-radius: 12px; display: flex; align-items: center; justify-content: center; flex-shrink: 0; }
+.mc-badge {
+  font-size: 10px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.5px; padding: 4px 9px;
+  border-radius: var(--radius-full); background-color: rgba(0, 0, 0, 0.04); white-space: nowrap;
+  overflow: hidden; text-overflow: ellipsis; max-width: 60%;
+}
+[data-theme="dark"] .mc-badge { background-color: rgba(255, 255, 255, 0.06); }
+/* Tons decorativos dos cards — só paleta de marca, para não confundir com status (sucesso/alerta). */
+.tone-blue { color: var(--accent-text); } .mc-icon.tone-blue { background-color: var(--action-primary-soft); }
+.tone-green { color: var(--chart-2); } .mc-icon.tone-green { background-color: color-mix(in srgb, var(--chart-2) 14%, transparent); }
+.tone-purple { color: var(--chart-3); } .mc-icon.tone-purple { background-color: color-mix(in srgb, var(--chart-3) 14%, transparent); }
+.tone-amber { color: var(--chart-5); } .mc-icon.tone-amber { background-color: color-mix(in srgb, var(--chart-5) 14%, transparent); }
+.tone-teal { color: var(--chart-4); } .mc-icon.tone-teal { background-color: color-mix(in srgb, var(--chart-4) 14%, transparent); }
+
+.mc-label { font-size: 13px; font-weight: 600; color: var(--text-muted); margin-bottom: 6px; }
+.mc-value {
+  font-size: 22px; font-weight: 800; color: var(--text-dark); line-height: 1.2; margin-bottom: 6px;
+  overflow-wrap: anywhere;
+}
+.mc-caption { font-size: 12px; color: var(--text-muted); font-weight: 500; line-height: 1.4; }
+.mc-partial {
+  margin-top: 8px; display: inline-flex; align-items: flex-start; gap: 5px; font-size: 11px; font-weight: 600;
+  color: var(--warning); line-height: 1.35;
+}
+[data-theme="dark"] .mc-partial { color: var(--warning); }
+.mc-partial svg { flex-shrink: 0; margin-top: 1px; }
+.mc-more { margin-top: auto; padding-top: 10px; display: inline-flex; align-items: center; gap: 2px; font-size: 12px; font-weight: 600; color: var(--accent-text); }
+
+/* ============================================================
+   Barra de filtros fixa (sticky)
+   Desktop: rolagem ocorre dentro de .main-content (top: 0).
+   Mobile / Tablet (<= 1024px): rolagem ocorre na janela, logo abaixo do MobileHeader.
+   ============================================================ */
+.mc-filters-sticky {
+  position: -webkit-sticky;
+  position: sticky;
+  top: 0;
+  z-index: 100;
+  margin-top: -10px;
+  margin-bottom: -4px;
+  margin-left: -36px;
+  margin-right: -36px;
+  padding: 10px 36px 8px 36px;
+  background-color: var(--bg-main);
+  box-sizing: border-box;
+}
+
+.mc-filters-card {
+  background-color: var(--bg-card);
+  border: 1px solid var(--border-color);
+  border-radius: 16px;
+  padding: 14px 18px;
+  box-shadow: 0 4px 16px -2px rgba(0, 0, 0, 0.07), 0 2px 4px -1px rgba(0, 0, 0, 0.03);
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  width: 100%;
+  box-sizing: border-box;
+  transition: box-shadow 0.2s ease, border-color 0.2s ease;
+}
+
+[data-theme="dark"] .mc-filters-card {
+  box-shadow: 0 4px 20px -2px rgba(0, 0, 0, 0.45), 0 2px 6px -1px rgba(0, 0, 0, 0.3);
+}
+
+.mc-filters-summary {
+  font-size: 12px;
+  color: var(--text-muted);
+  line-height: 1.4;
+}
+
+.mc-filters-summary strong {
+  color: var(--text-dark);
+}
+
+/* ============================================================
+   Modal de detalhamento
+   ============================================================ */
+.mc-modal-overlay {
+  position: fixed; inset: 0; z-index: 2000; background: rgba(2, 6, 23, 0.55); backdrop-filter: blur(4px);
+  display: flex; align-items: center; justify-content: center; padding: 20px;
+}
+.mc-modal {
+  width: min(960px, 100%); max-height: min(86vh, 900px); display: flex; flex-direction: column;
+  background: var(--bg-card); border: 1px solid var(--border-color); border-radius: 20px; box-shadow: 0 24px 60px -12px rgba(0, 0, 0, 0.45);
+  overflow: hidden;
+}
+.mc-modal-head { display: flex; justify-content: space-between; align-items: flex-start; gap: 12px; padding: 18px 22px 10px; }
+.mc-modal-head h3 { margin: 0; font-size: 18px; font-weight: 800; color: var(--text-dark); }
+.mc-modal-scope { display: block; margin-top: 4px; font-size: 12px; color: var(--text-muted); }
+.mc-modal-close { border: 1px solid var(--border-color); background: transparent; color: var(--text-muted); border-radius: 10px; width: 34px; height: 34px; display: flex; align-items: center; justify-content: center; cursor: pointer; flex-shrink: 0; }
+.mc-modal-toolbar {
+  padding: 0 22px 12px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.mc-modal-filter-group {
+  display: inline-flex;
+  align-items: center;
+  background-color: rgba(0, 0, 0, 0.05);
+  padding: 3px;
+  border-radius: var(--radius-sm, 8px);
+  border: 1px solid var(--border-color);
+  gap: 3px;
+}
+[data-theme="dark"] .mc-modal-filter-group {
+  background-color: rgba(255, 255, 255, 0.05);
+  border-color: rgba(255, 255, 255, 0.1);
+}
+.mc-modal-filter-btn {
+  padding: 6px 16px;
+  border-radius: 6px;
+  font-size: 13px;
+  font-weight: 500;
+  color: var(--text-muted);
+  background: transparent;
+  border: none;
+  cursor: pointer;
+  transition: all 0.18s cubic-bezier(0.4, 0, 0.2, 1);
+  user-select: none;
+  white-space: nowrap;
+}
+.mc-modal-filter-btn:hover {
+  color: var(--text-dark);
+}
+.mc-modal-filter-btn.active {
+  background-color: var(--bg-card);
+  color: var(--accent-text);
+  font-weight: 600;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1), 0 1px 2px rgba(0, 0, 0, 0.06);
+}
+[data-theme="dark"] .mc-modal-filter-btn.active {
+  background-color: var(--surface-elevated);
+  color: var(--accent-text);
+  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.4);
+}
+.mc-modal-formula { margin: 0 22px 10px; padding: 10px 12px; border-radius: 12px; background: color-mix(in srgb, var(--primary) 8%, transparent); font-size: 13px; color: var(--text-dark); line-height: 1.45; }
+.mc-modal-body { padding: 0 22px 20px; overflow: auto; }
+.mc-modal-table-wrap { overflow-x: auto; -webkit-overflow-scrolling: touch; border: 1px solid var(--border-color); border-radius: 12px; }
+.mc-modal-table { width: 100%; border-collapse: collapse; font-size: 13px; }
+.mc-modal-table th { position: sticky; top: 0; background: var(--bg-card); text-align: left; font-size: 11px; text-transform: uppercase; letter-spacing: 0.04em; color: var(--text-muted); padding: 10px 12px; border-bottom: 1px solid var(--border-color); white-space: nowrap; }
+.mc-modal-table td { padding: 9px 12px; border-bottom: 1px solid var(--border-color); color: var(--text-dark); vertical-align: top; }
+.mc-modal-table .is-right { text-align: right; white-space: nowrap; font-variant-numeric: tabular-nums; }
+.mc-modal-table tfoot td { font-weight: 800; border-bottom: none; }
+.mc-modal-empty { color: var(--text-muted); font-size: 14px; padding: 20px 0; }
+.mc-modal-notes { margin-top: 12px; font-size: 12px; color: var(--text-muted); line-height: 1.5; }
+.mc-muted { color: var(--text-muted); }
+.mc-warn { color: var(--warning); font-weight: 600; }
+[data-theme="dark"] .mc-warn { color: var(--warning); }
+
+/* ============================================================
+   Responsividade
+   ============================================================ */
+@media (max-width: 1280px) {
+  .mc-grid { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+}
+@media (max-width: 1024px) {
+  .mc-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; }
+  /* Página rola na janela; ancara exatamente abaixo do cabeçalho móvel */
+  .mc-filters-sticky {
+    top: var(--mobile-header-height, calc(57px + max(14px, env(safe-area-inset-top, 14px))));
+    margin-top: -8px;
+    margin-bottom: -4px;
+    margin-left: -24px;
+    margin-right: -24px;
+    padding: 8px 24px;
+    z-index: 900;
+  }
+}
+@media (max-width: 640px) {
+  .mc-grid { grid-template-columns: 1fr; }
+  .mc-card { padding: 16px; border-radius: 16px; }
+  .mc-value { font-size: 20px; }
+  .mc-filters-sticky {
+    top: var(--mobile-header-height, calc(57px + max(14px, env(safe-area-inset-top, 14px))));
+    margin-top: -6px;
+    margin-bottom: -4px;
+    margin-left: -14px;
+    margin-right: -14px;
+    padding: 6px 14px;
+    z-index: 900;
+  }
+  .mc-filters-card {
+    padding: 10px 12px;
+    border-radius: 14px;
+    gap: 6px;
+  }
+  /* Resumo compacto em linha única sem quebras no celular */
+  .mc-filters-summary {
+    font-size: 11px;
+    line-height: 1.3;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+  .mc-modal-overlay { padding: 8px; align-items: flex-end; }
+  .mc-modal { max-height: 92vh; border-radius: 16px; }
+  .mc-modal-head, .mc-modal-body { padding-left: 14px; padding-right: 14px; }
+  .mc-modal-toolbar { padding: 0 14px 10px; }
+  .mc-modal-filter-group { width: 100%; display: flex; }
+  .mc-modal-filter-btn { flex: 1; text-align: center; padding: 7px 6px; font-size: 13px; }
+  .mc-modal-formula { margin-left: 14px; margin-right: 14px; }
+}

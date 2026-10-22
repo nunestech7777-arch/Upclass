@@ -51,7 +51,7 @@
   position: absolute;
   right: -4px;
   bottom: -4px;
-  background-color: #0d111c;
+  background-color: var(--surface-page);
   border-radius: 50%;
   display: flex;
   align-items: center;
@@ -139,11 +139,11 @@
 
 /* Rank 2: Silver / Dark Slate */
 .text-rank-2 {
-  color: #94A3B8 !important;
+  color: var(--text-tertiary) !important;
 }
 .bg-rank-2 {
-  background: linear-gradient(180deg, #334155 0%, #1E293B 100%) !important;
-  border: 1px solid rgba(148, 163, 184, 0.2);
+  background: linear-gradient(180deg, var(--surface-elevated) 0%, var(--surface-elevated) 100%) !important;
+  border: 1px solid rgba(142, 166, 255, 0.2);
 }
 
 /* Rank 3: Bronze */
@@ -160,11 +160,11 @@
   background: linear-gradient(180deg, #D97706 0%, #B45309 100%) !important;
 }
 [data-theme="light"] .bg-rank-2 {
-  background: linear-gradient(180deg, #475569 0%, #334155 100%) !important;
+  background: linear-gradient(180deg, var(--surface-muted) 0%, var(--surface-elevated) 100%) !important;
 }
 [data-theme="light"] .bg-rank-3 {
   background: linear-gradient(180deg, #9A3412 0%, #7C2D12 100%) !important;
 }
 [data-theme="light"] .podium-crown-badge {
-  background-color: #ffffff;
+  background-color: var(--surface-card);
 }

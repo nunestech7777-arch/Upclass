@@ -4,9 +4,8 @@
     {
       "name": "vocedeiphone-dev",
       "runtimeExecutable": "npm",
-      "runtimeArgs": ["run", "dev"],
-      "port": 5173,
-      "autoPort": true
+      "runtimeArgs": ["run", "dev", "--", "--port", "5191", "--strictPort"],
+      "port": 5191
     }
   ]
 }

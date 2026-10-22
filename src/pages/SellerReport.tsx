@@ -13,7 +13,7 @@ import {
 import { ConversationSummaryModal, type ConversationData, type ChatMessage } from '../components/ConversationSummaryModal';
 import { SoldProductsModal, type ProductTypeFilter } from '../components/SoldProductsModal';
 import { SellerAvatar } from '../components/SellerAvatar';
-import { useTheme } from '../context/ThemeContext';
+import { tooltipStyle, useChartTheme } from '../lib/chartTheme';
 import {
   fetchSellerById,
   fetchSalesInRange,
@@ -57,8 +57,7 @@ interface ReportData {
 
 export function SellerReport() {
   const { id } = useParams();
-  const { theme } = useTheme();
-  const isDark = theme === 'dark';
+  const chart = useChartTheme();
   const [selectedConversation, setSelectedConversation] = useState<ConversationData | null>(null);
   const [soldProductsCategory, setSoldProductsCategory] = useState<ProductTypeFilter | null>(null);
   const [data, setData] = useState<ReportData | null>(null);
@@ -175,8 +174,8 @@ export function SellerReport() {
     setSelectedConversation(null);
   };
 
-  const chartColor = isDark ? '#3B82F6' : '#0A25FF';
-  const gridColor = isDark ? 'rgba(255, 255, 255, 0.08)' : '#E5E7EB';
+  const chartColor = chart.series[0];
+  const gridColor = chart.grid;
 
   const resolvedConversations = data?.conversations ?? [];
 
@@ -212,7 +211,7 @@ export function SellerReport() {
           onKeyDown={(e) => (e.key === 'Enter' || e.key === ' ') && setSoldProductsCategory('Aparelhos')}
           title="Clique para ver os iPhones vendidos"
         >
-          <Smartphone size={22} className="seller-kpi-icon" style={{ color: 'var(--primary)' }} />
+          <Smartphone size={22} className="seller-kpi-icon" style={{ color: 'var(--accent-text)' }} />
           <span className="seller-kpi-value">{data?.devicesSold ?? 0}</span>
           <span className="seller-kpi-label">IPHONES</span>
           <span className="seller-kpi-hint">Ver detalhes →</span>
@@ -225,7 +224,7 @@ export function SellerReport() {
           onKeyDown={(e) => (e.key === 'Enter' || e.key === ' ') && setSoldProductsCategory('Acessórios')}
           title="Clique para ver os Acessórios vendidos"
         >
-          <Headphones size={22} className="seller-kpi-icon" style={{ color: '#10B981' }} />
+          <Headphones size={22} className="seller-kpi-icon" style={{ color: 'var(--success)' }} />
           <span className="seller-kpi-value">{data?.accessoriesSold ?? 0}</span>
           <span className="seller-kpi-label">ACESSÓRIOS</span>
           <span className="seller-kpi-hint">Ver detalhes →</span>
@@ -283,17 +282,13 @@ export function SellerReport() {
             <ResponsiveContainer width="100%" height="100%">
               <BarChart data={data?.chartData ?? []}>
                 <CartesianGrid strokeDasharray="3 3" vertical={false} stroke={gridColor} />
-                <XAxis dataKey="day" axisLine={false} tickLine={false} tick={{fill: '#9CA3AF', fontSize: 12}} />
-                <YAxis axisLine={false} tickLine={false} tick={{fill: '#9CA3AF', fontSize: 12}} />
+                <XAxis dataKey="day" axisLine={false} tickLine={false} tick={{fill: chart.axis, fontSize: 12}} />
+                <YAxis axisLine={false} tickLine={false} tick={{fill: chart.axis, fontSize: 12}} />
                 <Tooltip
-                  contentStyle={{
-                    backgroundColor: isDark ? '#131926' : '#FFFFFF',
-                    borderColor: isDark ? 'rgba(255,255,255,0.1)' : '#E5E7EB',
-                    borderRadius: '8px'
-                  }}
+                  contentStyle={tooltipStyle(chart)}
                 />
                 <Bar dataKey="respondidas" name="Respondidas" fill={chartColor} radius={[4, 4, 0, 0]} />
-                <Bar dataKey="perdidas" name="Perdidas" fill="#EF4444" radius={[4, 4, 0, 0]} />
+                <Bar dataKey="perdidas" name="Perdidas" fill={chart.danger} radius={[4, 4, 0, 0]} />
               </BarChart>
             </ResponsiveContainer>
           </div>
@@ -306,21 +301,17 @@ export function SellerReport() {
               <AreaChart data={data?.chartData ?? []}>
                 <defs>
                   <linearGradient id="colorConv" x1="0" y1="0" x2="0" y2="1">
-                    <stop offset="5%" stopColor="#10B981" stopOpacity={0.4}/>
-                    <stop offset="95%" stopColor="#10B981" stopOpacity={0}/>
+                    <stop offset="5%" stopColor={chart.series[1]} stopOpacity={0.35}/>
+                    <stop offset="95%" stopColor={chart.series[1]} stopOpacity={0}/>
                   </linearGradient>
                 </defs>
                 <CartesianGrid strokeDasharray="3 3" vertical={false} stroke={gridColor} />
-                <XAxis dataKey="day" axisLine={false} tickLine={false} tick={{fill: '#9CA3AF', fontSize: 12}} />
-                <YAxis axisLine={false} tickLine={false} tick={{fill: '#9CA3AF', fontSize: 12}} unit="%" />
+                <XAxis dataKey="day" axisLine={false} tickLine={false} tick={{fill: chart.axis, fontSize: 12}} />
+                <YAxis axisLine={false} tickLine={false} tick={{fill: chart.axis, fontSize: 12}} unit="%" />
                 <Tooltip
-                  contentStyle={{
-                    backgroundColor: isDark ? '#131926' : '#FFFFFF',
-                    borderColor: isDark ? 'rgba(255,255,255,0.1)' : '#E5E7EB',
-                    borderRadius: '8px'
-                  }}
+                  contentStyle={tooltipStyle(chart)}
                 />
-                <Area type="monotone" dataKey="taxa" name="Taxa de Conversão" stroke="#10B981" strokeWidth={3} fill="url(#colorConv)" />
+                <Area type="monotone" dataKey="taxa" name="Taxa de Conversão" stroke={chart.series[1]} strokeWidth={3} fill="url(#colorConv)" />
               </AreaChart>
             </ResponsiveContainer>
           </div>
@@ -359,8 +350,8 @@ export function SellerReport() {
                       borderRadius: '100px',
                       fontSize: '12px',
                       fontWeight: 600,
-                      backgroundColor: conv.result_type === 'success' ? 'rgba(16, 185, 129, 0.1)' : conv.result_type === 'loss' ? 'rgba(239, 68, 68, 0.1)' : 'rgba(59, 130, 246, 0.1)',
-                      color: conv.result_type === 'success' ? '#10B981' : conv.result_type === 'loss' ? '#EF4444' : '#3B82F6'
+                      backgroundColor: conv.result_type === 'success' ? 'var(--success-soft)' : conv.result_type === 'loss' ? 'var(--danger-soft)' : 'var(--action-primary-soft)',
+                      color: conv.result_type === 'success' ? 'var(--success)' : conv.result_type === 'loss' ? 'var(--danger)' : 'var(--accent-text)'
                     }}>
                       {conv.result ?? (conv.result_type === 'success' ? 'Venda Fechada' : conv.result_type === 'loss' ? 'Perdido' : 'Em andamento')}
                     </span>
@@ -369,7 +360,7 @@ export function SellerReport() {
                     <button
                       onClick={() => handleOpenSummary(conv)}
                       style={{
-                        color: 'var(--primary)',
+                        color: 'var(--accent-text)',
                         fontWeight: 600,
                         display: 'inline-flex',
                         alignItems: 'center',

@@ -156,7 +156,7 @@ export function ConversationSummaryModal({ conversation, onClose }: Conversation
               {/* Executive Summary Card */}
               <div className="summary-box">
                 <div className="summary-box-title flex-center gap-2" style={{justifyContent: 'flex-start'}}>
-                  <FileText size={18} color="var(--primary)" />
+                  <FileText size={18} color="var(--accent-text)" />
                   <h3>Resumo Executivo da Interação</h3>
                 </div>
                 <p className="summary-box-text">{conversation.summary}</p>
@@ -165,7 +165,7 @@ export function ConversationSummaryModal({ conversation, onClose }: Conversation
               {/* Key Conversation Points Section */}
               <div className="key-points-container">
                 <h3 className="section-heading flex-center gap-2" style={{justifyContent: 'flex-start'}}>
-                  <Sparkles size={18} color="var(--primary)" />
+                  <Sparkles size={18} color="var(--accent-text)" />
                   Principais Pontos da Conversa
                 </h3>
                 
@@ -173,7 +173,7 @@ export function ConversationSummaryModal({ conversation, onClose }: Conversation
                   {conversation.keyPoints.map((point, idx) => (
                     <div key={idx} className="key-point-card">
                       <div className="key-point-bullet">
-                        <ArrowRight size={14} color="var(--primary)" />
+                        <ArrowRight size={14} color="var(--accent-text)" />
                       </div>
                       <div 
                         className="key-point-content"
@@ -245,13 +245,13 @@ export function ConversationSummaryModal({ conversation, onClose }: Conversation
                 {/* Strengths Card */}
                 <div className="analysis-card strengths">
                   <div className="analysis-card-header">
-                    <CheckCircle2 size={18} color="#10B981" />
+                    <CheckCircle2 size={18} color="var(--success)" />
                     <h4>Pontos Fortes do Atendimento</h4>
                   </div>
                   <ul>
                     {conversation.aiAnalysis.strengths.map((item, idx) => (
                       <li key={idx}>
-                        <CheckCircle2 size={14} color="#10B981" style={{minWidth: '14px', marginTop: '3px'}} />
+                        <CheckCircle2 size={14} color="var(--success)" style={{minWidth: '14px', marginTop: '3px'}} />
                         <span>{item}</span>
                       </li>
                     ))}
@@ -261,13 +261,13 @@ export function ConversationSummaryModal({ conversation, onClose }: Conversation
                 {/* Opportunities for Improvement */}
                 <div className="analysis-card improvements">
                   <div className="analysis-card-header">
-                    <TrendingUp size={18} color="#F59E0B" />
+                    <TrendingUp size={18} color="var(--warning)" />
                     <h4>Oportunidades de Melhoria</h4>
                   </div>
                   <ul>
                     {conversation.aiAnalysis.improvements.map((item, idx) => (
                       <li key={idx}>
-                        <AlertCircle size={14} color="#F59E0B" style={{minWidth: '14px', marginTop: '3px'}} />
+                        <AlertCircle size={14} color="var(--warning)" style={{minWidth: '14px', marginTop: '3px'}} />
                         <span>{item}</span>
                       </li>
                     ))}

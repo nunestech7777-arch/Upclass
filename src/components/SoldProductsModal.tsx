@@ -519,7 +519,7 @@ export function SoldProductsModal({
         {/* Summary Metric Strip */}
         <div className="sold-summary-grid">
           <div className="sold-summary-card">
-            <div className="summary-card-icon" style={{ backgroundColor: 'rgba(10, 37, 255, 0.1)', color: 'var(--primary)' }}>
+            <div className="summary-card-icon" style={{ backgroundColor: 'var(--action-primary-soft)', color: 'var(--accent-text)' }}>
               <ShoppingBag size={18} />
             </div>
             <div className="summary-card-content">
@@ -532,7 +532,7 @@ export function SoldProductsModal({
           </div>
 
           <div className="sold-summary-card">
-            <div className="summary-card-icon" style={{ backgroundColor: 'rgba(16, 185, 129, 0.1)', color: '#10B981' }}>
+            <div className="summary-card-icon" style={{ backgroundColor: 'var(--success-soft)', color: 'var(--success)' }}>
               <DollarSign size={18} />
             </div>
             <div className="summary-card-content">
@@ -543,7 +543,7 @@ export function SoldProductsModal({
           </div>
 
           <div className="sold-summary-card">
-            <div className="summary-card-icon" style={{ backgroundColor: 'rgba(245, 158, 11, 0.1)', color: '#F59E0B' }}>
+            <div className="summary-card-icon" style={{ backgroundColor: 'color-mix(in srgb, var(--chart-2) 14%, transparent)', color: 'var(--chart-2)' }}>
               <TrendingUp size={18} />
             </div>
             <div className="summary-card-content">
@@ -554,7 +554,7 @@ export function SoldProductsModal({
           </div>
 
           <div className="sold-summary-card">
-            <div className="summary-card-icon" style={{ backgroundColor: 'rgba(139, 92, 246, 0.1)', color: '#8B5CF6' }}>
+            <div className="summary-card-icon" style={{ backgroundColor: 'color-mix(in srgb, var(--chart-3) 14%, transparent)', color: 'var(--chart-3)' }}>
               <CreditCard size={18} />
             </div>
             <div className="summary-card-content">

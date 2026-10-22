@@ -109,6 +109,52 @@ describe('planFinancialReconcile', () => {
     assert.equal(after[1].item_status, 'active');
   });
 
+  it('troca de unidade do mesmo modelo mantém a linha ativa com os valores da nova unidade (caso real 8014437)', () => {
+    const history = [
+      hist({ vendaId: 8014437, produtoId: 149566, tipoProdutoDescricao: 'BRINDES', produtoDescricao: 'BRINDES - CAPA TRANSPARENTE - BND - . - .' }),
+      hist({
+        vendaId: 8014437,
+        produtoId: 11082593,
+        tipoProdutoDescricao: 'PRODUTO APPLE',
+        produtoDescricao: 'PRODUTO APPLE - IPHONE 12 PRO - IMEI: 350510542295112 - SEMI NOVO UPG A - 256GB - GRAFITE',
+        valorCliente: 2640,
+        valorTotal: 2389.2,
+        valorCusto: 2000,
+        lucro: 389.2,
+      }),
+    ];
+    const brinde = row('8014437-149566-4', { product_name: 'CAPA TRANSPARENTE - BND' });
+    const iphone = row('8014437-2005088-4', { amount: 2640, product_name: 'IPHONE 12 PRO' });
+    const plan = planFinancialReconcile(history, [brinde, iphone]);
+    const after = apply([brinde, iphone], plan);
+    assert.equal(after[1].item_status, 'active');
+    assert.equal(after[1].revenue, 2389.2);
+    assert.equal(after[1].financial_status, 'ok');
+    assert.match(after[1].financial_note ?? '', /Unidade trocada no pedido: produto 2005088 → 11082593/);
+    assert.equal(plan.counts.rows_swapped, 1);
+    assert.equal(plan.counts.rows_removed, 0);
+    assert.equal(plan.counts.history_items_without_row, 0);
+  });
+
+  it('troca só com modelo igual: modelo diferente ou sem nome segue removido e sinalizado', () => {
+    const history = [hist({ vendaId: 900, produtoId: 2, tipoProdutoDescricao: 'PRODUTO APPLE', produtoDescricao: 'PRODUTO APPLE - IPHONE 13 - IMEI: 1 - 128GB' })];
+    const other = row('900-1-4', { amount: 3000, product_name: 'IPHONE 14 PRO - 128GB' });
+    const plan = planFinancialReconcile(history, [other]);
+    assert.equal(apply([other], plan)[0].item_status, 'removed');
+    assert.equal(plan.counts.history_items_without_row, 1);
+    const unnamed = row('901-1-4', { amount: 3000 });
+    const plan2 = planFinancialReconcile([{ ...history[0], vendaId: 901 }], [unnamed]);
+    assert.equal(apply([unnamed], plan2)[0].item_status, 'removed');
+  });
+
+  it('linha já marcada como removida volta a ativa quando a unidade nova está no pedido (caso 8277349)', () => {
+    const history = [hist({ vendaId: 8277349, produtoId: 555, tipoProdutoDescricao: 'PRODUTO APPLE', produtoDescricao: 'PRODUTO APPLE - IPHONE 13 - IMEI: 9 - 128GB', valorCliente: 2805, valorTotal: 2805, valorCusto: 2300, lucro: 505 })];
+    const r = row('8277349-11346679-4', { amount: 2805, product_name: 'IPHONE 13', item_status: 'removed', status_reason: 'x' });
+    const after = apply([r], planFinancialReconcile(history, [r]));
+    assert.equal(after[0].item_status, 'active');
+    assert.equal(after[0].status_reason, null);
+  });
+
   it('pedido ausente do histórico não é removido nem cancelado — só sinalizado', () => {
     const sales = [row('999-1-0', { amount: 100 })];
     const plan = planFinancialReconcile([], sales);

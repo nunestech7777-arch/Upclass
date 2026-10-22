@@ -1,6 +1,5 @@
 import React, { useEffect, useState, useRef } from 'react';
 import { 
-  Trophy, 
   Target, 
   TrendingUp, 
   Users, 
@@ -32,6 +31,12 @@ import {
 import type { Sale } from '../lib/database.types';
 import { LeaderboardPodium, type LeaderboardRanking } from '@/components/ui/leaderboard-podium';
 import trophyGold from '../assets/trophy-gold.png';
+import { BrandLogo } from '../components/brand/BrandLogo';
+import { WeeklyGoalChart } from '../components/WeeklyGoalChart';
+import { buildWeeklyEvolution, type WeeklyEvolutionPoint } from '../lib/weeklyEvolution';
+import { storeToday, wallClock } from '../lib/finance/dates';
+import { TopProductsRanking } from '../components/TopProductsRanking';
+import { topByQuantity, type RankedProduct } from '../lib/topProducts';
 import './TVPanel.css';
 
 const MONTH_ABBR = ['JAN', 'FEV', 'MAR', 'ABR', 'MAI', 'JUN', 'JUL', 'AGO', 'SET', 'OUT', 'NOV', 'DEZ'];
@@ -42,13 +47,17 @@ interface TVPanelData {
   metaAtingida: boolean;
   remaining: number;
   percent: number;
-  topSales: SellerPerformance[];
+  topDeviceSellers: SellerPerformance[];
+  topAccessorySellers: SellerPerformance[];
   topProduct: string;
   topProductQty?: number;
   topDevice: string;
   topDeviceQty?: number;
   topAccessory: string;
   topAccessoryQty?: number;
+  weeklyEvolution: WeeklyEvolutionPoint[];
+  topDevices: RankedProduct[];
+  topAccessories: RankedProduct[];
 }
 
 export function TVPanel() {
@@ -83,8 +92,23 @@ export function TVPanel() {
         const weeklyTarget = goals.weekly_devices_target + goals.weekly_accessories_target;
         const weeklySold = sales.filter(checkCountable).reduce((sum, s) => sum + s.quantity, 0);
 
+        const dailyByDate = new Map<string, number>();
+        sales.filter(checkCountable).forEach((s) => {
+          const day = wallClock(s.sold_at).date;
+          dailyByDate.set(day, (dailyByDate.get(day) ?? 0) + s.quantity);
+        });
+        const weeklyEvolution = buildWeeklyEvolution(start, dailyByDate, weeklyTarget, storeToday());
+
         const performance = computeSellerPerformance(sellers, sales, conversations, products);
-        const topSales = [...performance].sort((a, b) => b.sold - a.sold).slice(0, 3);
+        // Um ranking por categoria; quem não vendeu nada na categoria não sobe ao pódio.
+        const topDeviceSellers = performance
+          .filter((p) => p.devicesSold > 0)
+          .sort((a, b) => b.devicesSold - a.devicesSold)
+          .slice(0, 3);
+        const topAccessorySellers = performance
+          .filter((p) => p.accessoriesSold > 0)
+          .sort((a, b) => b.accessoriesSold - a.accessoriesSold)
+          .slice(0, 3);
 
         // 1. Produto Mais Vendido (Geral - Aparelhos e Acessórios agrupados por nome)
         const qtyByProduct = new Map<string, { name: string; qty: number; revenue: number }>();
@@ -146,13 +170,17 @@ export function TVPanel() {
           metaAtingida: weeklyTarget > 0 && weeklySold >= weeklyTarget,
           remaining: Math.max(0, weeklyTarget - weeklySold),
           percent: weeklyTarget > 0 ? Math.min(100, Math.round((weeklySold / weeklyTarget) * 100)) : 0,
-          topSales,
+          topDeviceSellers,
+          topAccessorySellers,
           topProduct: rankedProducts[0]?.name ?? 'Sem vendas',
           topProductQty: rankedProducts[0]?.qty ?? 0,
           topDevice: rankedDevices[0]?.name ?? 'Nenhum aparelho vendido',
           topDeviceQty: rankedDevices[0]?.qty ?? 0,
           topAccessory: rankedAccessories[0]?.name ?? 'Sem vendas de acessórios',
           topAccessoryQty: rankedAccessories[0]?.qty ?? 0,
+          weeklyEvolution,
+          topDevices: topByQuantity(qtyByDevice.values()),
+          topAccessories: topByQuantity(qtyByAccessory.values()),
         });
       })
       .catch((err) => {
@@ -190,16 +218,29 @@ export function TVPanel() {
   return (
     <div className="store-panel-container" ref={containerRef}>
       {/* Top Header */}
-      <div className="store-panel-header">
+      <header className="store-panel-header">
+        <div className="store-panel-title-area">
+          <BrandLogo variant="phone" className="store-panel-logo" />
+          <span className="store-panel-divider" aria-hidden="true" />
+          <div>
+            <h1 className="store-panel-title">Painel da Loja</h1>
+            <p className="store-panel-subtitle">Resultados da equipe Upclass nesta semana</p>
+          </div>
+        </div>
         <div className="store-panel-header-badges">
           <div 
             className={`sleek-theme-switch ${theme === 'dark' ? 'dark-active' : ''}`} 
             onClick={toggleTheme} 
-            title="Alternar Modo Claro/Escuro"
+            title="Alternar tema claro/escuro"
+            aria-label="Alternar tema claro/escuro"
+            aria-pressed={theme === 'dark'}
+            role="button"
+            tabIndex={0}
+            onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); toggleTheme(); } }}
             style={{ cursor: 'pointer' }}
           >
-            <Sun size={13} color="#ffffff" className="switch-icon-sun" />
-            <Moon size={13} color="#ffffff" className="switch-icon-moon" />
+            <Sun size={13} color="#ffffff" className="switch-icon-sun" aria-hidden="true" />
+            <Moon size={13} color="#ffffff" className="switch-icon-moon" aria-hidden="true" />
             <div className="switch-thumb" />
           </div>
 
@@ -209,7 +250,7 @@ export function TVPanel() {
           </div>
 
           <div className="store-panel-date-badge">
-            <Calendar size={16} color="var(--primary)" />
+            <Calendar size={16} color="var(--accent-text)" />
             <span>
               {String(now.getDate()).padStart(2, '0')} {MONTH_ABBR[now.getMonth()]} {now.getFullYear()}
             </span>
@@ -224,13 +265,14 @@ export function TVPanel() {
             <span>{isFullscreen ? 'Janela' : 'Tela Cheia'}</span>
           </button>
         </div>
-      </div>
+      </header>
 
       {loading ? (
         <div className="store-panel-grid">
           <div className="skeleton-card" style={{ minHeight: '480px' }} />
           <div className="store-panel-right-col">
             <div className="store-rankings-row">
+              <div className="skeleton-card" style={{ minHeight: '260px' }} />
               <div className="skeleton-card" style={{ minHeight: '260px' }} />
             </div>
             <div className="store-bottom-row">
@@ -261,7 +303,7 @@ export function TVPanel() {
                   A equipe superou a meta semanal com maestria!
                 </p>
                 <div className="goal-numbers-wrapper">
-                  <span className="goal-current-num" style={{ color: '#10B981' }}>
+                  <span className="goal-current-num" style={{ color: 'var(--success)' }}>
                     {(data?.weeklySold ?? 0).toLocaleString('pt-BR')}
                   </span>
                   <span className="goal-separator">/</span>
@@ -269,15 +311,10 @@ export function TVPanel() {
                     {(data?.weeklyTarget ?? 0).toLocaleString('pt-BR')}
                   </span>
                 </div>
-                <div className="goal-progress-bar-bg">
-                  <div 
-                    className="goal-progress-bar-fill achieved" 
-                    style={{ width: '100%' }} 
-                  />
-                </div>
+                <WeeklyGoalChart points={data?.weeklyEvolution ?? []} />
                 <div className="goal-footer-info">
                   <span>Concluído</span>
-                  <span className="goal-percent-badge" style={{ color: '#10B981' }}>
+                  <span className="goal-percent-badge" style={{ color: 'var(--success)' }}>
                     {data?.percent ?? 100}%
                   </span>
                 </div>
@@ -300,12 +337,7 @@ export function TVPanel() {
                   </span>
                 </div>
 
-                <div className="goal-progress-bar-bg">
-                  <div 
-                    className="goal-progress-bar-fill" 
-                    style={{ width: `${data?.percent ?? 0}%` }} 
-                  />
-                </div>
+                <WeeklyGoalChart points={data?.weeklyEvolution ?? []} />
 
                 <div className="goal-footer-info">
                   <span>Faltam <strong>{(data?.remaining ?? 0).toLocaleString('pt-BR')}</strong> vendas</span>
@@ -318,74 +350,60 @@ export function TVPanel() {
           {/* Lado Direito - Rankings e Produtos */}
           <div className="store-panel-right-col">
             <div className="store-rankings-row">
-              {/* Top 3 Vendas - Pódio */}
-              <div className="store-ranking-card store-podium-card">
-                <div className="store-ranking-header">
-                  <Trophy size={18} color="var(--primary)" />
-                  <h3>Top Vendedores da Semana</h3>
-                </div>
-
-                {(data?.topSales ?? []).length > 0 ? (
-                  <div className="store-podium-wrapper">
-                    <LeaderboardPodium
-                      rankings={(data?.topSales ?? []).map((item, index) => ({
-                        userId: item.seller.id,
-                        userName: item.seller.name,
-                        rank: index + 1,
-                        value: item.sold,
-                        avatarUrl: item.seller.photo_url || null,
-                      }))}
-                      size="default"
-                      medalStyle="classic"
-                      showValue={true}
-                      showAvatar={true}
-                    />
+              {/* Pódios da semana: um de aparelhos e um de acessórios */}
+              {[
+                {
+                  key: 'devices',
+                  title: 'Top Aparelhos da Semana',
+                  icon: <Smartphone size={18} color="var(--accent-text)" />,
+                  sellers: data?.topDeviceSellers ?? [],
+                  value: (item: SellerPerformance) => item.devicesSold,
+                  empty: 'Sem aparelhos vendidos nesta semana.',
+                },
+                {
+                  key: 'accessories',
+                  title: 'Top Acessórios da Semana',
+                  icon: <Headphones size={18} color="var(--chart-3)" />,
+                  sellers: data?.topAccessorySellers ?? [],
+                  value: (item: SellerPerformance) => item.accessoriesSold,
+                  empty: 'Sem acessórios vendidos nesta semana.',
+                },
+              ].map((ranking) => (
+                <div className="store-ranking-card store-podium-card" key={ranking.key}>
+                  <div className="store-ranking-header">
+                    {ranking.icon}
+                    <h3>{ranking.title}</h3>
                   </div>
-                ) : (
-                  <span className="text-muted" style={{ textAlign: 'center', padding: '32px 0' }}>
-                    Sem vendas registradas nesta semana.
-                  </span>
-                )}
-              </div>
+
+                  {ranking.sellers.length > 0 ? (
+                    <div className="store-podium-wrapper">
+                      <LeaderboardPodium
+                        rankings={ranking.sellers.map((item, index) => ({
+                          userId: item.seller.id,
+                          userName: item.seller.name,
+                          rank: index + 1,
+                          value: ranking.value(item),
+                          avatarUrl: item.seller.photo_url || null,
+                        }))}
+                        size="sm"
+                        medalStyle="classic"
+                        showValue={true}
+                        showAvatar={true}
+                      />
+                    </div>
+                  ) : (
+                    <span className="text-muted" style={{ textAlign: 'center', padding: '32px 0' }}>
+                      {ranking.empty}
+                    </span>
+                  )}
+                </div>
+              ))}
             </div>
 
-            {/* Destaques de Aparelhos e Acessórios */}
+            {/* Top 5 por unidades vendidas no período do painel */}
             <div className="store-bottom-row">
-              {/* Card 1: Aparelho Mais Vendido (iPhones) */}
-              <div className="store-stat-pill-card">
-                <div className="store-stat-icon-wrapper device">
-                  <Smartphone size={24} />
-                </div>
-                <div className="store-stat-info">
-                  <span className="store-stat-label">Aparelho Mais Vendido</span>
-                  <span className="store-stat-val" title={data?.topDevice}>
-                    {data?.topDevice ?? 'Nenhum aparelho vendido'}
-                  </span>
-                  {Boolean(data?.topDeviceQty && data.topDeviceQty > 0) && (
-                    <span className="store-stat-subtext">
-                      {data?.topDeviceQty} {data?.topDeviceQty === 1 ? 'unidade vendida' : 'unidades vendidas'}
-                    </span>
-                  )}
-                </div>
-              </div>
-
-              {/* Card 2: Acessório Mais Vendido */}
-              <div className="store-stat-pill-card">
-                <div className="store-stat-icon-wrapper accessory">
-                  <Headphones size={24} />
-                </div>
-                <div className="store-stat-info">
-                  <span className="store-stat-label">Acessório Mais Vendido</span>
-                  <span className="store-stat-val" title={data?.topAccessory}>
-                    {data?.topAccessory ?? '-'}
-                  </span>
-                  {Boolean(data?.topAccessoryQty && data.topAccessoryQty > 0) && (
-                    <span className="store-stat-subtext">
-                      {data?.topAccessoryQty} {data?.topAccessoryQty === 1 ? 'unidade vendida' : 'unidades vendidas'}
-                    </span>
-                  )}
-                </div>
-              </div>
+              <TopProductsRanking kind="devices" title="Top 5 aparelhos mais vendidos" items={data?.topDevices ?? []} emptyText="Nenhum aparelho vendido neste período" />
+              <TopProductsRanking kind="accessories" title="Top 5 acessórios mais vendidos" items={data?.topAccessories ?? []} emptyText="Nenhum acessório vendido neste período" />
             </div>
           </div>
         </div>

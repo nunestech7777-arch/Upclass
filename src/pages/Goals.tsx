@@ -2,6 +2,7 @@ import React, { useEffect, useState } from 'react';
 import { fetchGoals, updateGoals } from '../lib/api';
 import { ProfitGoalsManager } from '../components/finance/ProfitGoalsManager';
 import { DeviceGoalsManager } from '../components/forecast/DeviceGoalsManager';
+import { WeeklyGoalsManager } from '../components/forecast/WeeklyGoalsManager';
 
 const DEFAULTS = {
   weekly_devices_target: 1250,
@@ -104,6 +105,10 @@ export function Goals() {
         <button className="btn-primary" onClick={handleSave} disabled={saving}>
           {saving ? 'Salvando...' : 'Salvar Configurações'}
         </button>
+      </div>
+
+      <div style={{ marginTop: '24px' }}>
+        <WeeklyGoalsManager />
       </div>
 
       <div style={{ marginTop: '24px' }}>

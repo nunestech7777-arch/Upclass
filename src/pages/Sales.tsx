@@ -1,5 +1,6 @@
 import { formatDateBR, wallClock } from '../lib/finance/dates';
 import React, { useEffect, useMemo, useState } from 'react';
+import { EmptyState } from '../components/brand/BrandLogo';
 import {
   Calendar,
   Search,
@@ -7,10 +8,12 @@ import {
   ChevronRight,
   Eye,
   X,
-  Smartphone,
-  Headphones,
   ShoppingBag,
   SlidersHorizontal,
+  Trophy,
+  CircleDollarSign,
+  TrendingUp,
+  Receipt,
 } from 'lucide-react';
 import './Sales.css';
 import {
@@ -24,8 +27,9 @@ import {
   fetchSaleOrderDetails,
 } from '../lib/api';
 import { parseSaleExternalId, summarizeSaleItems } from '../lib/saleDetails';
-import { summarizeUnits, topProduct } from '../lib/finance/dashboard';
-import type { FinanceSale } from '../lib/finance/calc';
+import { computeSalesMetrics, type OrderProfit, type ProductRank } from '../lib/finance/salesMetrics';
+import { normalizeName } from '../lib/finance/appleProducts';
+import { MetricCard, MetricDetailModal, MetricGrid, StickyFilterBar } from '../components/metrics/MetricPanel';
 import type { SaleOrderDetails } from '../lib/saleDetails';
 import type { Sale, Product, Seller } from '../lib/database.types';
 
@@ -320,7 +324,7 @@ function SaleDetailModal({
 
             <div className="sales-detail-item full-width">
               <span className="sales-detail-label">Valor do Item</span>
-              <span className="sales-detail-val" style={{ color: 'var(--primary)', fontSize: '18px' }}>
+              <span className="sales-detail-val" style={{ color: 'var(--accent-text)', fontSize: '18px' }}>
                 {formatCurrency(sale.amount)}
                 {sale.amount === 0 && sale.productCategory === 'Acessórios' && (
                   <span className="text-muted text-sm" style={{ marginLeft: '8px', fontWeight: 400 }}>
@@ -492,6 +496,10 @@ export function Sales() {
 
   // Modal de Detalhes da Venda
   const [detailSale, setDetailSale] = useState<SaleRow | null>(null);
+  // Detalhamento dos cards
+  const [metricDetail, setMetricDetail] = useState<'units' | 'ranking' | 'revenue' | 'profit' | 'avg' | null>(null);
+  // Filtro de categoria no modal de Ranking de Produtos Vendidos
+  const [rankingCategoryFilter, setRankingCategoryFilter] = useState<'all' | 'Aparelhos' | 'Acessórios'>('all');
 
   // Paginação da Tabela
   const [currentPage, setCurrentPage] = useState(1);
@@ -557,30 +565,6 @@ export function Sales() {
   }, [sales, productMap, sellerMap]);
 
   // ============================================================
-  // CÁLCULO DOS 3 CARDS PRINCIPAIS
-  // ============================================================
-  const metrics = useMemo(() => {
-    // Uma linha de `sales` é um ITEM; uma venda pode ter vários itens (ex.: 8613940 tem 2 iPhones e
-    // 4 brindes). Vendas = pedidos distintos; aparelhos/acessórios = soma das quantidades dos itens —
-    // as mesmas regras e funções do Dashboard (aparelho = iPhone; acessório = valor > 0; brinde fora).
-    const names = new Map([...productMap.values()].map((p) => [p.id, p.name]));
-    const rows = sales.map((s) => ({
-      ...s,
-      mp_order_id: s.mp_order_id ?? parseSaleExternalId(s.external_id)?.orderId ?? null,
-    })) as unknown as FinanceSale[];
-    const units = summarizeUnits(rows, names);
-    const topDevice = topProduct(rows, names, 'devices');
-    const topAccessory = topProduct(rows, names, 'accessories');
-
-    return {
-      totalSalesCount: units.orders,
-      units,
-      topDevice: topDevice ? { name: topDevice.name, qty: topDevice.qty } : null,
-      topAccessory: topAccessory ? { name: topAccessory.name, qty: topAccessory.qty } : null,
-    };
-  }, [sales, productMap]);
-
-  // ============================================================
   // FILTRAGEM DA TABELA
   // ============================================================
   const filteredSales = useMemo(() => {
@@ -596,12 +580,127 @@ export function Sales() {
       list = list.filter((r) => r.seller_id === sellerFilter);
     }
     if (search.trim()) {
-      const q = search.trim().toLowerCase();
-      list = list.filter((r) => r.productName.toLowerCase().includes(q));
+      // Sem diferenciar acento/maiúscula ("pelicula" acha "PELÍCULA"), como na aba Estoque.
+      const q = normalizeName(search);
+      list = list.filter((r) => normalizeName(r.productName).includes(q));
     }
 
     return list;
   }, [salesRows, productFilter, categoryFilter, sellerFilter, search]);
+
+  // ============================================================
+  // 5 INDICADORES — sobre as vendas FILTRADAS (período + produto + categoria + vendedor + busca)
+  // ============================================================
+  const metrics = useMemo(() => {
+    // Uma linha de `sales` é um ITEM; uma venda pode ter vários itens. Mesmas regras do Dashboard
+    // (aparelho = iPhone; acessório = valor > 0; brinde fora; faturamento/lucro só conciliados).
+    const names = new Map([...productMap.values()].map((p) => [p.id, p.name]));
+    const rows = filteredSales.map((s) => ({
+      ...(s as unknown as Parameters<typeof computeSalesMetrics>[0][number]),
+      mp_order_id: s.mp_order_id ?? parseSaleExternalId(s.external_id)?.orderId ?? null,
+    }));
+    return computeSalesMetrics(rows, names);
+  }, [filteredSales, productMap]);
+  const topRank = metrics.ranking[0] ?? null;
+  const filterScope = [
+    activeRange.label,
+    productFilter !== 'all' ? productMap.get(productFilter)?.name : null,
+    categoryFilter !== 'all' ? categoryFilter : null,
+    sellerFilter !== 'all' ? sellerNames.get(sellerFilter) : null,
+    search.trim() ? `busca “${search.trim()}”` : null,
+  ]
+    .filter(Boolean)
+    .join(' · ');
+  // Faturamento: só itens pagos pendentes mudam o total. Lucro: brinde pendente também (custo desconhecido).
+  const revenuePendingNote =
+    metrics.pendingPaidItems > 0
+      ? `Parcial: ${metrics.pendingPaidItems} item(ns) pago(s) ainda não conciliado(s) (${formatCurrency(metrics.pendingAmount)}) fora da soma`
+      : null;
+  const pendingNote =
+    metrics.pendingItems > 0 ? `Parcial: ${metrics.pendingItems} item(ns) ainda não conciliado(s) (custo/receita pendentes) fora da soma` : null;
+
+  // Vendas consideradas no modal de Ranking:
+  // Respeita todos os filtros da página (período, produto, vendedor, busca),
+  // enquanto a categoria é controlada dinamicamente pelo seletor interno [ Todos | Aparelhos | Acessórios ]
+  const modalRankingSales = useMemo(() => {
+    let list = salesRows;
+
+    if (productFilter !== 'all') {
+      list = list.filter((r) => r.product_id === productFilter);
+    }
+    if (sellerFilter !== 'all') {
+      list = list.filter((r) => r.seller_id === sellerFilter);
+    }
+    if (search.trim()) {
+      const q = normalizeName(search);
+      list = list.filter((r) => normalizeName(r.productName).includes(q));
+    }
+
+    return list;
+  }, [salesRows, productFilter, sellerFilter, search]);
+
+  const modalRankingMetrics = useMemo(() => {
+    const names = new Map([...productMap.values()].map((p) => [p.id, p.name]));
+    const rows = modalRankingSales.map((s) => ({
+      ...(s as unknown as Parameters<typeof computeSalesMetrics>[0][number]),
+      mp_order_id: s.mp_order_id ?? parseSaleExternalId(s.external_id)?.orderId ?? null,
+    }));
+    return computeSalesMetrics(rows, names);
+  }, [modalRankingSales, productMap]);
+
+  // Linhas filtradas pela categoria selecionada dentro do modal
+  const rankingRows = useMemo(() => {
+    let list = modalRankingMetrics.ranking;
+    if (rankingCategoryFilter !== 'all') {
+      list = list.filter((r) => r.category === rankingCategoryFilter);
+    }
+    return list;
+  }, [modalRankingMetrics.ranking, rankingCategoryFilter]);
+
+  const rankingScope = useMemo(() => {
+    const cat = rankingCategoryFilter === 'all' ? null : rankingCategoryFilter;
+    return [
+      activeRange.label,
+      productFilter !== 'all' ? productMap.get(productFilter)?.name : null,
+      cat,
+      sellerFilter !== 'all' ? sellerNames.get(sellerFilter) : null,
+      search.trim() ? `busca “${search.trim()}”` : null,
+    ]
+      .filter(Boolean)
+      .join(' · ');
+  }, [activeRange.label, productFilter, productMap, rankingCategoryFilter, sellerFilter, sellerNames, search]);
+
+  const rankingToolbar = (
+    <div className="mc-modal-filter-group" role="tablist" aria-label="Filtrar por categoria">
+      <button
+        type="button"
+        role="tab"
+        aria-selected={rankingCategoryFilter === 'all'}
+        className={`mc-modal-filter-btn ${rankingCategoryFilter === 'all' ? 'active' : ''}`}
+        onClick={() => setRankingCategoryFilter('all')}
+      >
+        Todos
+      </button>
+      <button
+        type="button"
+        role="tab"
+        aria-selected={rankingCategoryFilter === 'Aparelhos'}
+        className={`mc-modal-filter-btn ${rankingCategoryFilter === 'Aparelhos' ? 'active' : ''}`}
+        onClick={() => setRankingCategoryFilter('Aparelhos')}
+      >
+        Aparelhos
+      </button>
+      <button
+        type="button"
+        role="tab"
+        aria-selected={rankingCategoryFilter === 'Acessórios'}
+        className={`mc-modal-filter-btn ${rankingCategoryFilter === 'Acessórios' ? 'active' : ''}`}
+        onClick={() => setRankingCategoryFilter('Acessórios')}
+      >
+        Acessórios
+      </button>
+    </div>
+  );
 
   // Paginação
   const totalPages = Math.max(1, Math.ceil(filteredSales.length / PAGE_SIZE));
@@ -633,7 +732,7 @@ export function Sales() {
 
         <div className="sales-date-filter-container">
           <div className="sales-date-filter-label">
-            <Calendar size={16} color="var(--primary)" />
+            <Calendar size={16} color="var(--accent-text)" />
             <span>Período:</span>
           </div>
 
@@ -665,96 +764,14 @@ export function Sales() {
         </div>
       </div>
 
-      {/* 2. Os 3 Cards Principais Repaginados */}
-      <div className="sales-cards-grid">
-        {/* Card 1 — Vendas Realizadas */}
-        <div className="sales-metric-card">
-          <div className="sales-metric-header">
-            <div className="sales-metric-icon-box sales-total">
-              <ShoppingBag size={22} />
-            </div>
-            <span className="sales-metric-badge">Volume</span>
-          </div>
-          <span className="sales-metric-title">Vendas Realizadas</span>
-          <div className="sales-metric-main-value">
-            {isLoading ? '...' : `${metrics.totalSalesCount} ${metrics.totalSalesCount === 1 ? 'venda' : 'vendas'}`}
-          </div>
-          <span className="sales-metric-subtext">
-            {isLoading
-              ? 'no período selecionado'
-              : `${metrics.units.devices} ${metrics.units.devices === 1 ? 'aparelho' : 'aparelhos'} · ${metrics.units.accessories} ${metrics.units.accessories === 1 ? 'acessório' : 'acessórios'} · ${metrics.units.gifts} ${metrics.units.gifts === 1 ? 'brinde' : 'brindes'} · ${metrics.units.items} itens`}
-          </span>
-        </div>
-
-        {/* Card 2 — Aparelho Mais Vendido */}
-        <div className="sales-metric-card">
-          <div className="sales-metric-header">
-            <div className="sales-metric-icon-box device-top">
-              <Smartphone size={22} />
-            </div>
-            <span className="sales-metric-badge" style={{ color: '#10B981' }}>iPhone</span>
-          </div>
-          <span className="sales-metric-title">Aparelho Mais Vendido</span>
-          <div
-            className="sales-metric-main-value"
-            title={metrics.topDevice?.name ?? 'Sem vendas de aparelhos'}
-          >
-            {isLoading
-              ? '...'
-              : metrics.topDevice
-              ? metrics.topDevice.name
-              : 'Sem vendas de aparelhos'}
-          </div>
-          <span className="sales-metric-subtext">
-            {metrics.topDevice ? (
-              <>
-                <strong className="sales-metric-subtext-highlight">
-                  {metrics.topDevice.qty}
-                </strong>{' '}
-                {metrics.topDevice.qty === 1 ? 'unidade vendida' : 'unidades vendidas'}
-              </>
-            ) : (
-              '0 unidades vendidas'
-            )}
-          </span>
-        </div>
-
-        {/* Card 3 — Acessório Mais Vendido */}
-        <div className="sales-metric-card">
-          <div className="sales-metric-header">
-            <div className="sales-metric-icon-box accessory-top">
-              <Headphones size={22} />
-            </div>
-            <span className="sales-metric-badge" style={{ color: '#A855F7' }}>Acessório</span>
-          </div>
-          <span className="sales-metric-title">Acessório Mais Vendido</span>
-          <div
-            className="sales-metric-main-value"
-            title={metrics.topAccessory?.name ?? 'Sem vendas de acessórios'}
-          >
-            {isLoading
-              ? '...'
-              : metrics.topAccessory
-              ? metrics.topAccessory.name
-              : 'Sem vendas de acessórios'}
-          </div>
-          <span className="sales-metric-subtext">
-            {metrics.topAccessory ? (
-              <>
-                <strong className="sales-metric-subtext-highlight">
-                  {metrics.topAccessory.qty}
-                </strong>{' '}
-                {metrics.topAccessory.qty === 1 ? 'unidade vendida' : 'unidades vendidas'}
-              </>
-            ) : (
-              '0 unidades vendidas'
-            )}
-          </span>
-        </div>
-      </div>
-
-      {/* 3. Filtros Secundários da Tabela */}
-      <div className="sales-filters-card">
+      {/* 2. Filtros — fixos no topo durante a rolagem */}
+      <StickyFilterBar
+        summary={
+          <>
+            <strong>{filteredSales.length}</strong> {filteredSales.length === 1 ? 'item' : 'itens'} · {filterScope} · os indicadores e a listagem seguem estes filtros
+          </>
+        }
+      >
         <div className="sales-filters-grid">
           <select
             value={productFilter}
@@ -812,7 +829,70 @@ export function Sales() {
             />
           </div>
         </div>
-      </div>
+      </StickyFilterBar>
+
+      {/* 3. Cinco indicadores — respondem a todos os filtros e abrem o detalhamento */}
+      <MetricGrid>
+        <MetricCard
+          icon={<ShoppingBag size={20} />}
+          tone="blue"
+          badge="Volume"
+          label="Produtos vendidos"
+          value={`${metrics.units.toLocaleString('pt-BR')} ${metrics.units === 1 ? 'unidade' : 'unidades'}`}
+          caption={`${metrics.devices} ${metrics.devices === 1 ? 'aparelho' : 'aparelhos'} · ${metrics.accessories} ${metrics.accessories === 1 ? 'acessório' : 'acessórios'} · ${metrics.orders} ${metrics.orders === 1 ? 'venda' : 'vendas'}${metrics.gifts > 0 ? ` · ${metrics.gifts} brinde(s) fora` : ''}`}
+          loading={isLoading}
+          onOpen={() => {
+            setRankingCategoryFilter('all');
+            setMetricDetail('units');
+          }}
+        />
+        <MetricCard
+          icon={<Trophy size={20} />}
+          tone="green"
+          badge={topRank?.category === 'Acessórios' ? 'Acessório' : 'Ranking'}
+          label="Produto mais vendido"
+          value={topRank ? topRank.name : 'Sem vendas'}
+          caption={topRank ? `${topRank.units} ${topRank.units === 1 ? 'unidade vendida' : 'unidades vendidas'}` : 'Nenhum produto nos filtros'}
+          loading={isLoading}
+          onOpen={() => {
+            setRankingCategoryFilter('all');
+            setMetricDetail('ranking');
+          }}
+        />
+        <MetricCard
+          icon={<CircleDollarSign size={20} />}
+          tone="purple"
+          badge="Faturamento"
+          label="Faturamento"
+          value={formatCurrency(metrics.revenue)}
+          caption="Valor de venda dos itens (valorTotal do Mercado Phone)"
+          partial={revenuePendingNote}
+          loading={isLoading}
+          onOpen={() => setMetricDetail('revenue')}
+        />
+        <MetricCard
+          icon={<TrendingUp size={20} />}
+          tone="teal"
+          badge="Lucro"
+          label="Lucro bruto"
+          value={formatCurrency(metrics.profit)}
+          caption={metrics.revenue > 0 ? `Margem ${((metrics.profit / metrics.revenue) * 100).toLocaleString('pt-BR', { maximumFractionDigits: 1 })}% · faturamento − custo` : 'Faturamento − custo dos produtos'}
+          partial={pendingNote}
+          loading={isLoading}
+          onOpen={() => setMetricDetail('profit')}
+        />
+        <MetricCard
+          icon={<Receipt size={20} />}
+          tone="amber"
+          badge="Média"
+          label="Lucro médio por venda"
+          value={metrics.avgProfitPerOrder != null ? formatCurrency(metrics.avgProfitPerOrder) : '—'}
+          caption={`${metrics.reconciledOrders.length} ${metrics.reconciledOrders.length === 1 ? 'venda conciliada' : 'vendas conciliadas'}`}
+          partial={metrics.pendingOrders > 0 ? `Parcial: ${metrics.pendingOrders} venda(s) com item a conciliar fora da média` : null}
+          loading={isLoading}
+          onOpen={() => setMetricDetail('avg')}
+        />
+      </MetricGrid>
 
       {/* 4. Tabela de Listagem de Vendas */}
       <div className="sales-table-card" style={{ opacity: isLoading ? 0.6 : 1 }}>
@@ -831,8 +911,8 @@ export function Sales() {
             <tbody>
               {!isLoading && paginatedSales.length === 0 && (
                 <tr>
-                  <td colSpan={6} style={{ padding: '36px 20px', textAlign: 'center', color: 'var(--text-muted)' }}>
-                    Nenhuma venda encontrada para o período e filtros selecionados.
+                  <td colSpan={6}>
+                    <EmptyState title="Nenhuma venda encontrada">Ajuste o período ou os filtros selecionados.</EmptyState>
                   </td>
                 </tr>
               )}
@@ -920,6 +1000,116 @@ export function Sales() {
           onClose={() => setIsCustomModalOpen(false)}
         />
       )}
+
+      {/* Detalhamento dos indicadores */}
+      {metricDetail && (metricDetail === 'avg' ? (
+        <MetricDetailModal<OrderProfit>
+          title="Lucro médio por venda"
+          scope={filterScope}
+          formula={<>Lucro médio por venda = lucro bruto ÷ número de vendas (pedidos distintos). Só entram vendas com todos os itens filtrados conciliados; uma venda com vários itens conta uma vez.</>}
+          columns={[
+            { key: 'o', header: 'Venda', render: (o) => <strong>{o.orderId}</strong> },
+            { key: 'd', header: 'Data', render: (o) => formatDate(o.soldAt) },
+            { key: 's', header: 'Vendedor(es)', render: (o) => o.sellerIds.map((id) => sellerNames.get(id) ?? '—').join(', ') },
+            { key: 'i', header: 'Itens', align: 'right', render: (o) => o.items },
+            { key: 'f', header: 'Faturamento', align: 'right', render: (o) => formatCurrency(o.revenue) },
+            { key: 'l', header: 'Lucro bruto', align: 'right', render: (o) => formatCurrency(o.profit) },
+          ]}
+          rows={metrics.reconciledOrders}
+          rowKey={(o) => o.orderId}
+          footer={[`${metrics.reconciledOrders.length} vendas`, '', '', '', '', metrics.avgProfitPerOrder != null ? `média ${formatCurrency(metrics.avgProfitPerOrder)}` : '—']}
+          notes={metrics.pendingOrders > 0 ? `${metrics.pendingOrders} venda(s) com item ainda não conciliado ficaram fora (entram após a sincronização financeira).` : undefined}
+          onClose={() => setMetricDetail(null)}
+        />
+      ) : (
+        <MetricDetailModal<ProductRank>
+          title={
+            metricDetail === 'units'
+              ? 'Produtos vendidos'
+              : metricDetail === 'ranking'
+                ? 'Ranking de produtos vendidos'
+                : metricDetail === 'revenue'
+                  ? 'Composição do faturamento'
+                  : 'Composição do lucro bruto'
+          }
+          scope={metricDetail === 'ranking' || metricDetail === 'units' ? rankingScope : filterScope}
+          toolbar={metricDetail === 'ranking' || metricDetail === 'units' ? rankingToolbar : undefined}
+          formula={
+            metricDetail === 'units' || metricDetail === 'ranking' ? (
+              <>Unidades = soma das quantidades de cada item (aparelhos = iPhones; acessórios = pagos). Brindes (valor R$ 0) e vendas canceladas não entram. iPhones agrupados por modelo.</>
+            ) : metricDetail === 'revenue' ? (
+              <>Faturamento = soma do valor de venda de cada item (valorTotal do Mercado Phone), atribuído ao vendedor do item. Itens ainda não conciliados ficam fora até a sincronização. Não é lucro.</>
+            ) : (
+              <>Lucro bruto = faturamento − custo histórico dos produtos (Mercado Phone). Não desconta despesas, impostos ou comissões. O custo dos brindes entra no total da venda (não aparece por produto).</>
+            )
+          }
+          columns={
+            metricDetail === 'units' || metricDetail === 'ranking'
+              ? [
+                  { key: 'i', header: '#', render: (r) => String(rankingRows.indexOf(r) + 1).padStart(2, '0') },
+                  { key: 'n', header: 'Produto', render: (r) => <strong>{r.name}</strong> },
+                  { key: 'c', header: 'Categoria', render: (r) => r.category },
+                  { key: 'u', header: 'Unidades', align: 'right', render: (r) => r.units },
+                  { key: 'f', header: 'Faturamento', align: 'right', render: (r) => formatCurrency(r.revenue) },
+                ]
+              : metricDetail === 'revenue'
+                ? [
+                    { key: 'n', header: 'Produto', render: (r) => <strong>{r.name}</strong> },
+                    { key: 'u', header: 'Unidades', align: 'right', render: (r) => r.units },
+                    { key: 'f', header: 'Faturamento', align: 'right', render: (r) => formatCurrency(r.revenue) },
+                    { key: 'p', header: 'A conciliar', align: 'right', render: (r) => (r.pendingItems > 0 ? `${r.pendingItems} item(ns)` : '—') },
+                  ]
+                : [
+                    { key: 'n', header: 'Produto', render: (r) => <strong>{r.name}</strong> },
+                    { key: 'u', header: 'Unidades', align: 'right', render: (r) => r.units },
+                    { key: 'f', header: 'Faturamento', align: 'right', render: (r) => formatCurrency(r.revenue) },
+                    { key: 'c', header: 'Custo', align: 'right', render: (r) => formatCurrency(r.cost) },
+                    { key: 'l', header: 'Lucro bruto', align: 'right', render: (r) => formatCurrency(r.profit) },
+                  ]
+          }
+          rows={
+            metricDetail === 'revenue'
+              ? [...metrics.ranking].sort((a, b) => b.revenue - a.revenue)
+              : metricDetail === 'profit'
+                ? [...metrics.ranking].sort((a, b) => b.profit - a.profit)
+                : rankingRows
+          }
+          rowKey={(r) => `${r.category}|${r.name}`}
+          footer={
+            metricDetail === 'units' || metricDetail === 'ranking'
+              ? [
+                  '',
+                  'Total',
+                  '',
+                  rankingRows.reduce((a, r) => a + r.units, 0),
+                  formatCurrency(rankingRows.reduce((a, r) => a + r.revenue, 0)),
+                ]
+              : metricDetail === 'revenue'
+                ? (() => {
+                    // Soma das linhas (produtos vendidos; brindes não aparecem por produto).
+                    const pending = metrics.ranking.reduce((a, r) => a + r.pendingItems, 0);
+                    return ['Total', metrics.units, formatCurrency(metrics.revenue), pending > 0 ? `${pending} item(ns)` : '—'];
+                  })()
+                : [
+                    'Total (inclui custo dos brindes)',
+                    metrics.units,
+                    formatCurrency(metrics.revenue),
+                    formatCurrency(metrics.cost),
+                    formatCurrency(metrics.profit),
+                  ]
+          }
+          emptyText={
+            (metricDetail === 'ranking' || metricDetail === 'units') && rankingCategoryFilter !== 'all'
+              ? `Nenhum produto da categoria ${rankingCategoryFilter.toLowerCase()} vendido com os filtros atuais.`
+              : undefined
+          }
+          notes={metricDetail === 'units' && metrics.gifts > 0 ? `${metrics.gifts} brinde(s) entregues nas vendas filtradas não contam como produto vendido.` : pendingNote ?? undefined}
+          onClose={() => {
+            setMetricDetail(null);
+            setRankingCategoryFilter('all');
+          }}
+        />
+      ))}
 
       {/* Modal de Detalhes da Venda */}
       {detailSale && (

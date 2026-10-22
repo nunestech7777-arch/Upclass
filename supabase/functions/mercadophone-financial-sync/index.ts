@@ -1,4 +1,5 @@
 import { createClient } from 'jsr:@supabase/supabase-js@2';
+import { getCaller, isActiveAdmin } from '../_shared/access.ts';
 import { fetchHistoricoVendas } from '../_shared/mercadophone.ts';
 import { runFinancialSync } from '../_shared/financialSync.ts';
 
@@ -26,10 +27,17 @@ Deno.serve(async (req) => {
 
   const supabase = createClient(Deno.env.get('SUPABASE_URL')!, Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!);
 
-  // Só usuários logados no painel (o mesmo acesso gerencial das demais telas).
-  const token = req.headers.get('Authorization')?.replace(/^Bearer\s+/i, '') ?? '';
-  const { data: auth } = token ? await supabase.auth.getUser(token) : { data: { user: null } };
-  if (!auth?.user) return json({ ok: false, error: 'não autenticado' }, 401);
+  // Só administradores (custos e lucro; conta de vendedor não concilia nada).
+  let caller;
+  try {
+    caller = await getCaller(supabase, req);
+  } catch (err) {
+    console.error('financial sync: papel do usuário', err);
+    return json({ ok: false, error: 'falha ao verificar o acesso' }, 500);
+  }
+  if (!caller) return json({ ok: false, error: 'não autenticado' }, 401);
+  if (!isActiveAdmin(caller)) return json({ ok: false, error: 'acesso não autorizado' }, 403);
+  const auth = { user: caller.user };
 
   let body: { start?: string; end?: string; mode?: string };
   try {

@@ -26,13 +26,14 @@ export function getSellerInitials(name: string): string {
 /** Gera uma cor de gradiente consistente baseada no nome */
 function getAvatarGradient(name: string): string {
   const gradients = [
-    'linear-gradient(135deg, #3B82F6 0%, #1D4ED8 100%)',
-    'linear-gradient(135deg, #8B5CF6 0%, #6D28D9 100%)',
-    'linear-gradient(135deg, #EC4899 0%, #BE185D 100%)',
-    'linear-gradient(135deg, #10B981 0%, #047857 100%)',
-    'linear-gradient(135deg, #F59E0B 0%, #B45309 100%)',
-    'linear-gradient(135deg, #06B6D4 0%, #0E7490 100%)',
-    'linear-gradient(135deg, #6366F1 0%, #4338CA 100%)',
+    // Combinações da paleta Upclass (texto branco legível em todas)
+    'linear-gradient(135deg, #063FF1 0%, #02007C 100%)',
+    'linear-gradient(135deg, #D92B82 0%, #8A1A55 100%)',
+    'linear-gradient(135deg, #FC39CE 0%, #063FF1 100%)',
+    'linear-gradient(135deg, #0E7490 0%, #02007C 100%)',
+    'linear-gradient(135deg, #4D3BD6 0%, #02007C 100%)',
+    'linear-gradient(135deg, #063FF1 0%, #0E7490 100%)',
+    'linear-gradient(135deg, #B0226A 0%, #02007C 100%)',
   ];
   let hash = 0;
   for (let i = 0; i < (name || '').length; i++) {

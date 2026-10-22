@@ -5,6 +5,8 @@ export type Seller = {
   active: boolean;
   show_in_ranking: boolean;
   kommo_user_id: string | null;
+  /** Id do vendedor no MercadoPhone (vendedorId) — chave da sincronização (migração 0002). */
+  external_id?: string | null;
   created_at: string;
 };
 
@@ -75,6 +77,9 @@ export type SellerDeviceGoal = {
   device_target: number | null;
   /** Migração 0015. */
   accessory_target?: number | null;
+  /** Migração 0016 (R$). */
+  device_revenue_target?: number | null;
+  accessory_revenue_target?: number | null;
   updated_by: string | null;
   updated_by_email: string | null;
   created_at: string;
@@ -177,6 +182,80 @@ export type PanelSettings = {
   updated_at: string;
 };
 
+/** Papel e vínculo de cada conta (migração 0017). Gravado só pela function seller-access. */
+export type UserAccess = {
+  user_id: string;
+  role: 'admin' | 'seller';
+  seller_id: string | null;
+  enabled: boolean;
+  email: string | null;
+  created_by: string | null;
+  created_by_email: string | null;
+  created_at: string;
+  updated_by: string | null;
+  updated_by_email: string | null;
+  updated_at: string;
+  disabled_at: string | null;
+};
+
+/** Meta semanal de aparelhos por vendedor (`week_start` = segunda-feira). */
+export type SellerWeeklyGoal = {
+  id: string;
+  seller_id: string;
+  week_start: string;
+  device_target: number;
+  created_by: string | null;
+  created_by_email: string | null;
+  created_at: string;
+  updated_by: string | null;
+  updated_by_email: string | null;
+  updated_at: string;
+};
+
+export type AdminAuditLog = {
+  id: number;
+  occurred_at: string;
+  actor_id: string | null;
+  actor_email: string | null;
+  action: string;
+  seller_id: string | null;
+  target_user_id: string | null;
+  details: Record<string, unknown> | null;
+};
+
+export type MyAccessRow = {
+  role: 'admin' | 'seller';
+  enabled: boolean;
+  seller_id: string | null;
+  seller_name: string | null;
+  seller_photo_url: string | null;
+  mp_seller_id: string | null;
+};
+
+export type SellerPortalSaleRow = {
+  id: string;
+  sold_at: string;
+  sold_date: string;
+  mp_order_id: string | null;
+  product_name: string | null;
+  quantity: number;
+  amount: number;
+  item_status: string;
+};
+
+/** Leituras do estoque para o giro (migração 0018); gravadas só pela sincronização. */
+export type StockMovementRow = {
+  id: number;
+  product_external_id: string;
+  detected_at: string;
+  kind: 'baseline' | 'entry' | 'exit' | 'return';
+  quantity: number;
+  quantity_after: number;
+  entry_date: string | null;
+  name: string | null;
+  product_type: string | null;
+};
+
 export type Database = {
   public: {
     Tables: {
@@ -192,8 +271,16 @@ export type Database = {
       seller_profit_goals: { Row: SellerProfitGoal; Insert: Partial<SellerProfitGoal>; Update: Partial<SellerProfitGoal>; Relationships: [] };
       seller_device_goals: { Row: SellerDeviceGoal; Insert: Partial<SellerDeviceGoal>; Update: Partial<SellerDeviceGoal>; Relationships: [] };
       financial_sync_runs: { Row: FinancialSyncRunRow; Insert: Partial<FinancialSyncRunRow>; Update: Partial<FinancialSyncRunRow>; Relationships: [] };
+      user_access: { Row: UserAccess; Insert: Partial<UserAccess>; Update: Partial<UserAccess>; Relationships: [] };
+      seller_weekly_goals: { Row: SellerWeeklyGoal; Insert: Partial<SellerWeeklyGoal>; Update: Partial<SellerWeeklyGoal>; Relationships: [] };
+      stock_movements: { Row: StockMovementRow; Insert: Partial<StockMovementRow>; Update: Partial<StockMovementRow>; Relationships: [] };
+      admin_audit_log: { Row: AdminAuditLog; Insert: Partial<AdminAuditLog>; Update: Partial<AdminAuditLog>; Relationships: [] };
     };
     Views: Record<string, never>;
-    Functions: Record<string, never>;
+    Functions: {
+      my_access: { Args: Record<string, never>; Returns: MyAccessRow[] };
+      seller_portal_sales: { Args: { p_from: string; p_to: string }; Returns: SellerPortalSaleRow[] };
+      seller_portal_weekly_goals: { Args: { p_from: string; p_to: string }; Returns: { week_start: string; device_target: number }[] };
+    };
   };
 };

@@ -16,6 +16,19 @@ import {
   sortUnitRows,
   summarizeTeam,
   type UnitSale,
+  DEFAULT_METRIC,
+  formatMoneyPace,
+  goalFor,
+  measureBySeller,
+  moneyPerDay,
+  parseMoneyTarget,
+  accessoryAttendancesBySeller,
+  buildRatioRow,
+  summarizeRatio,
+  sortRatioRows,
+  ratioSortLabels,
+  formatPA,
+  VIEW_OPTIONS,
 } from './forecast.ts';
 
 const names = new Map([
@@ -330,12 +343,13 @@ describe('categoria acessórios (mesmo componente, regras próprias)', () => {
   ]);
   const mk = (seller: string, product: string, o: Partial<UnitSale> = {}): UnitSale => ({ seller_id: seller, product_id: product, quantity: 1, amount: 100, sold_date: '2026-10-05', ...o });
 
-  it('conta películas, capas, Apple Watch e AirPods pagos; iPhone não; brinde (R$ 0) não', () => {
+  // Desde a aba Produtos Apple: Apple Watch e AirPods originais saem de Acessórios (só no Forecast).
+  it('conta películas e capas pagas; iPhone, produtos Apple e brinde (R$ 0) não', () => {
     const c = countUnitsBySeller(
       [mk('a', 'pel', { amount: 70 }), mk('a', 'capa', { quantity: 2, amount: 120 }), mk('a', 'watch', { amount: 2500 }), mk('a', 'airpods', { amount: 1500 }), mk('a', 'iphone', { amount: 4000 }), mk('a', 'bnd', { amount: 0, quantity: 5 })],
       nm, oct, 'accessories'
     );
-    assert.equal(c.get('a')?.sold, 5); // 1 + 2 + 1 + 1
+    assert.equal(c.get('a')?.sold, 3); // película 1 + capas 2
   });
   it('película paga conta 1; a mesma película como brinde não conta', () => {
     assert.equal(countUnitsBySeller([mk('a', 'pel', { amount: 70 })], nm, oct, 'accessories').get('a')?.sold, 1);
@@ -410,5 +424,282 @@ describe('categoria acessórios (mesmo componente, regras próprias)', () => {
     const rows = [mk('a', 'iphone', { amount: 4000, quantity: 3 }), mk('a', 'watch', { amount: 2500 })];
     assert.deepEqual(countDevicesBySeller(rows, nm, oct), countUnitsBySeller(rows, nm, oct, 'devices'));
     assert.equal(countDevicesBySeller(rows, nm, oct).get('a')?.sold, 3);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Categoria × métrica (quantidade / faturamento)
+// ---------------------------------------------------------------------------
+
+describe('Forecast por quantidade e faturamento', () => {
+  const ok = { financial_status: 'ok', profit: 0 } as const;
+  // Pedido 1001: Caroline vendeu o iPhone (R$ 4.700), Graciane a película (R$ 70), brinde de Caroline.
+  const mixed: UnitSale[] = [
+    sale({ seller_id: 'caroline', product_id: 'iphone', sold_date: '2026-10-05', amount: 4950, revenue: 4700, ...ok }),
+    sale({ seller_id: 'graciane', product_id: 'pelicula', sold_date: '2026-10-05', amount: 70, revenue: 70, ...ok }),
+    sale({ seller_id: 'caroline', product_id: 'brinde', sold_date: '2026-10-05', amount: 0, revenue: 0, ...ok }),
+    // Cancelada e removida nunca contam (nem unidade nem R$).
+    sale({ seller_id: 'caroline', product_id: 'iphone', sold_date: '2026-10-06', amount: 5000, revenue: 5000, item_status: 'cancelled', ...ok }),
+    sale({ seller_id: 'graciane', product_id: 'capa', sold_date: '2026-10-06', amount: 90, revenue: 90, item_status: 'removed', ...ok }),
+    // Acessório de hoje ainda não conciliado: conta como unidade, fica fora do faturamento.
+    sale({ seller_id: 'graciane', product_id: 'capa', sold_date: '2026-10-14', amount: 120, revenue: null, financial_status: 'pending' }),
+  ];
+
+  it('Aparelhos + Quantidade: unidades de iPhone do vendedor do item', () => {
+    const m = measureBySeller(mixed, names, ctx, 'devices', 'units');
+    assert.equal(m.get('caroline')?.sold, 1);
+    assert.equal(m.get('graciane'), undefined);
+  });
+
+  it('Aparelhos + Faturamento: só o valorTotal da linha do iPhone (não o total do pedido)', () => {
+    const m = measureBySeller(mixed, names, ctx, 'devices', 'revenue');
+    assert.equal(m.get('caroline')?.sold, 4700);
+    assert.equal(m.get('graciane'), undefined);
+  });
+
+  it('Acessórios + Quantidade: brinde e canceladas fora; pendente conta como unidade', () => {
+    const m = measureBySeller(mixed, names, ctx, 'accessories', 'units');
+    assert.equal(m.get('graciane')?.sold, 2);
+    assert.equal(m.get('caroline'), undefined); // brinde R$ 0 não é acessório vendido
+  });
+
+  it('Acessórios + Faturamento: R$ 70 para Graciane; pendente fora da soma e informado', () => {
+    const m = measureBySeller(mixed, names, ctx, 'accessories', 'revenue');
+    const g = m.get('graciane')!;
+    assert.equal(g.sold, 70);
+    assert.equal(g.pending, 1);
+    assert.equal(g.pendingAmount, 120);
+    assert.equal(g.today, 0);
+    assert.equal(m.get('caroline'), undefined);
+  });
+
+  it('sem faturamento duplicado: soma por vendedor = soma das linhas válidas', () => {
+    const all = [...measureBySeller(mixed, names, ctx, 'devices', 'revenue').values(), ...measureBySeller(mixed, names, ctx, 'accessories', 'revenue').values()];
+    assert.equal(all.reduce((a, c) => a + c.sold, 0), 4770);
+  });
+
+  it('soma em centavos (sem resíduo de ponto flutuante)', () => {
+    const rows = [0.1, 0.2, 0.7].map((v, i) => sale({ seller_id: 'x', product_id: 'capa', sold_date: `2026-10-0${i + 1}`, amount: v, revenue: v, ...ok }));
+    assert.equal(measureBySeller(rows, names, ctx, 'accessories', 'revenue').get('x')?.sold, 1);
+  });
+
+  it('projeção financeira = faturado até ontem ÷ dias completos × dias do mês', () => {
+    const rows = [
+      sale({ seller_id: 'x', product_id: 'capa', sold_date: '2026-10-02', amount: 1300, revenue: 1300, ...ok }),
+      sale({ seller_id: 'x', product_id: 'capa', sold_date: '2026-10-14', amount: 500, revenue: 500, ...ok }), // hoje: entra no realizado, não no ritmo
+    ];
+    const c = measureBySeller(rows, names, ctx, 'accessories', 'revenue').get('x')!;
+    assert.equal(c.sold, 1800);
+    assert.equal(c.today, 500);
+    const row = buildSellerRow('x', c, 5000, ctx, 'revenue');
+    assert.equal(row.projection, (1300 / 13) * 31);
+    assert.equal(row.remaining, 3200);
+    // 3200 / 18 dias = 177,777… → teto no centavo
+    assert.equal(row.neededPerDay, 177.78);
+    assert.ok(row.neededPerDay! * 18 >= row.remaining!);
+  });
+
+  it('ritmo em R$ arredonda para cima no centavo e formata em reais', () => {
+    assert.equal(moneyPerDay(100, 3), 33.34);
+    assert.equal(moneyPerDay(300, 3), 100);
+    assert.equal(formatMoneyPace(3200, 18).replace(/\s/g, ' '), 'R$ 177,78/dia');
+    assert.equal(formatMoneyPace(0, 18), '—');
+  });
+
+  it('meta financeira: atingida, sem meta e mês encerrado', () => {
+    const c = { sold: 5000, untilCutoff: 5000, today: 0 };
+    assert.equal(buildSellerRow('x', c, 5000, ctx, 'revenue').goalReached, true);
+    assert.equal(buildSellerRow('x', c, null, ctx, 'revenue').target, null);
+    const past = buildContext('2026-09', '2026-10-14');
+    const team = summarizeTeam([buildSellerRow('x', { sold: 1000, untilCutoff: 1000, today: 0 }, 1500.5, past, 'revenue')], 'revenue');
+    assert.equal(team.remaining, 500.5);
+    assert.equal(teamPace(team, past, 'accessories', 'revenue').value, 'Meta não atingida');
+    assert.equal(teamPace({ target: null, remaining: null }, ctx, 'accessories', 'revenue').value, 'Sem meta');
+    assert.equal(teamPace({ target: 100, remaining: 0 }, ctx, 'accessories', 'revenue').value, 'Meta atingida');
+  });
+
+  it('ritmo em unidades mantém o padrão ap/ac', () => {
+    assert.equal(teamPace({ target: 120, remaining: 36 }, ctx, 'devices', 'units').value, '2 ap/dia');
+    assert.equal(teamPace({ target: 30, remaining: 6 }, ctx, 'accessories', 'units').value, '1 ac/3 dias');
+  });
+
+  it('metas independentes: cada combinação lê a própria coluna, sem conversão', () => {
+    const caroline = { device_target: 20, device_revenue_target: 100000, accessory_target: 30, accessory_revenue_target: 5000 };
+    assert.equal(goalFor(caroline, 'devices', 'units'), 20);
+    assert.equal(goalFor(caroline, 'devices', 'revenue'), 100000);
+    assert.equal(goalFor(caroline, 'accessories', 'units'), 30);
+    assert.equal(goalFor(caroline, 'accessories', 'revenue'), 5000);
+    // Só meta em unidades cadastrada → meta financeira é "Sem meta" (nunca derivada).
+    assert.equal(goalFor({ device_target: 20 }, 'devices', 'revenue'), null);
+    assert.equal(goalFor(undefined, 'devices', 'units'), null);
+  });
+
+  it('métrica padrão por categoria', () => {
+    assert.equal(DEFAULT_METRIC.devices, 'units');
+    assert.equal(DEFAULT_METRIC.accessories, 'revenue');
+  });
+
+  it('ranking por faturamento: maior, menor e % da meta; rótulos por categoria e métrica', () => {
+    const rows = [
+      { ...buildSellerRow('a', { sold: 900, untilCutoff: 900, today: 0 }, 1000, ctx, 'revenue'), name: 'A' },
+      { ...buildSellerRow('b', { sold: 1500, untilCutoff: 1500, today: 0 }, 3000, ctx, 'revenue'), name: 'B' },
+      { ...buildSellerRow('c', { sold: 200, untilCutoff: 200, today: 0 }, null, ctx, 'revenue'), name: 'C' },
+    ];
+    assert.deepEqual(sortUnitRows(rows, 'sold').map((r) => r.name), ['B', 'A', 'C']);
+    assert.deepEqual(sortUnitRows(rows, 'soldAsc').map((r) => r.name), ['C', 'A', 'B']);
+    assert.deepEqual(sortUnitRows(rows, 'pct').map((r) => r.name), ['A', 'B', 'C']);
+    assert.equal(forecastSortLabels('devices', 'units').sold, 'Mais aparelhos vendidos');
+    assert.equal(forecastSortLabels('accessories', 'units').sold, 'Mais acessórios vendidos');
+    assert.equal(forecastSortLabels('devices', 'revenue').sold, 'Maior faturamento de aparelhos');
+    assert.equal(forecastSortLabels('accessories', 'revenue').sold, 'Maior faturamento de acessórios');
+    assert.equal(forecastSortLabels('accessories', 'revenue').soldAsc, 'Menor faturamento de acessórios');
+    assert.equal(forecastSortLabels('devices', 'units').soldAsc, 'Menos aparelhos vendidos');
+  });
+
+  it('mês futuro: sem projeção; mês encerrado: projeção = realizado', () => {
+    const fut = buildContext('2026-11', '2026-10-14');
+    assert.equal(buildSellerRow('x', { sold: 0, untilCutoff: 0, today: 0 }, 1000, fut, 'revenue').projection, null);
+    const past = buildContext('2026-09', '2026-10-14');
+    assert.equal(buildSellerRow('x', { sold: 1234.56, untilCutoff: 1234.56, today: 0 }, 1000, past, 'revenue').projection, 1234.56);
+  });
+
+  it('parseMoneyTarget aceita formatos brasileiros e rejeita inválidos', () => {
+    assert.equal(parseMoneyTarget(''), null);
+    assert.equal(parseMoneyTarget('5000'), 5000);
+    assert.equal(parseMoneyTarget('5.000'), 5000);
+    assert.equal(parseMoneyTarget('5.000,50'), 5000.5);
+    assert.equal(parseMoneyTarget('R$ 100.000,00'), 100000);
+    assert.equal(parseMoneyTarget('5000,5'), 5000.5);
+    assert.equal(parseMoneyTarget('5000.25'), 5000.25);
+    assert.ok(Number.isNaN(parseMoneyTarget('-10')));
+    assert.ok(Number.isNaN(parseMoneyTarget('abc')));
+    assert.ok(Number.isNaN(parseMoneyTarget('5,000.00')));
+    assert.equal(parseMoneyTarget('9999999999,99'), 9999999999.99);
+    assert.ok(Number.isNaN(parseMoneyTarget('10000000000')));
+  });
+});
+
+describe('Acessórios: ticket médio e PA', () => {
+  const ok = { financial_status: 'ok', profit: 0 } as const;
+  const line = (seller: string, order: string, product: string, quantity: number, amount: number, extra: Partial<UnitSale> = {}): UnitSale =>
+    sale({ seller_id: seller, product_id: product, sold_date: '2026-10-05', mp_order_id: order, quantity, amount, revenue: amount, ...ok, ...extra });
+
+  const sales: UnitSale[] = [
+    // Pedido 1: July vende 3 películas numa linha + 1 capa → 1 atendimento, 4 peças, R$ 250.
+    line('july', '1', 'pelicula', 3, 150),
+    line('july', '1', 'capa', 1, 100),
+    // Pedido 2: Caroline vende o iPhone (não é acessório) e Graciane a película → atendimento só de Graciane.
+    line('caroline', '2', 'iphone', 1, 4700),
+    line('graciane', '2', 'pelicula', 1, 70),
+    // Pedido 3: acessórios de dois vendedores → 1 atendimento para cada.
+    line('july', '3', 'capa', 1, 90),
+    line('graciane', '3', 'pelicula', 2, 140),
+    // Pedido 4: só brindes → não é atendimento.
+    line('july', '4', 'brinde', 2, 0),
+    // Pedido 5: cancelado → não conta.
+    line('july', '5', 'capa', 1, 100, { item_status: 'cancelled' }),
+    // Pedido 6: brinde + acessório pago de July → atendimento com 1 peça (brinde não é peça).
+    line('july', '6', 'brinde', 1, 0),
+    line('july', '6', 'pelicula', 1, 60),
+    // Pedido 7: acessório de Graciane ainda não conciliado → conta no PA, fora do ticket.
+    line('graciane', '7', 'capa', 1, 120, { revenue: null, financial_status: 'pending', profit: null }),
+  ];
+  const stats = accessoryAttendancesBySeller(sales, names);
+
+  it('atendimento = pedido distinto por vendedor com acessório pago', () => {
+    assert.equal(stats.get('july')!.attendances, 3); // pedidos 1, 3, 6
+    assert.equal(stats.get('graciane')!.attendances, 3); // pedidos 2, 3, 7
+    assert.equal(stats.get('caroline'), undefined); // só iPhone
+  });
+
+  it('peças somam a quantidade de cada item (3 películas numa linha = 3)', () => {
+    assert.equal(stats.get('july')!.units, 6); // 3 + 1 + 1 + 1
+    assert.equal(stats.get('graciane')!.units, 4); // 1 + 2 + 1
+    assert.equal(stats.get('july')!.multiPiece, 1);
+  });
+
+  it('PA = peças ÷ atendimentos, duas casas', () => {
+    const r = buildRatioRow('july', stats.get('july'));
+    assert.equal(r.pa, 2);
+    assert.equal(formatPA(buildRatioRow('graciane', stats.get('graciane')).pa!), '1,33');
+  });
+
+  it('ticket = faturamento ÷ atendimentos conciliados; pendente fica fora dos dois lados', () => {
+    const july = buildRatioRow('july', stats.get('july'));
+    assert.equal(july.revenue, 400); // 250 + 90 + 60
+    assert.equal(july.ticket, 400 / 3);
+    const g = buildRatioRow('graciane', stats.get('graciane'));
+    assert.equal(g.revenue, 210);
+    assert.equal(g.revenueAttendances, 2);
+    assert.equal(g.pendingAttendances, 1);
+    assert.equal(g.ticket, 105);
+    assert.equal(g.pa, 4 / 3); // PA usa os 3 atendimentos
+  });
+
+  it('equipe = total ÷ total (não soma nem média dos indicadores individuais)', () => {
+    const team = summarizeRatio([buildRatioRow('july', stats.get('july')), buildRatioRow('graciane', stats.get('graciane'))]);
+    assert.equal(team.attendances, 6);
+    assert.equal(team.units, 10);
+    assert.equal(team.pa, 10 / 6);
+    assert.equal(team.ticket, 610 / 5);
+    // média simples dos tickets seria (133,33 + 105) / 2 = 119,17 ≠ 122
+    assert.notEqual(team.ticket, (400 / 3 + 105) / 2);
+  });
+
+  it('pedido parcialmente conciliado sai inteiro do ticket e continua no PA', () => {
+    const s3 = accessoryAttendancesBySeller(
+      [
+        line('x', '10', 'capa', 1, 100),
+        line('x', '10', 'pelicula', 1, 50, { revenue: null, financial_status: 'pending', profit: null }),
+        line('x', '11', 'capa', 2, 200),
+      ],
+      names
+    );
+    const r = buildRatioRow('x', s3.get('x'));
+    assert.equal(r.attendances, 2);
+    assert.equal(r.revenueAttendances, 1);
+    assert.equal(r.pendingAttendances, 1);
+    assert.equal(r.revenue, 200); // a capa conciliada do pedido 10 não entra sozinha
+    assert.equal(r.ticket, 200);
+    assert.equal(r.pa, 2); // 4 peças ÷ 2 atendimentos
+  });
+
+  it('peças do PA = acessórios do modo Quantidade no mesmo mês', () => {
+    const units = [...measureBySeller(sales, names, ctx, 'accessories', 'units').values()].reduce((a, c) => a + c.sold, 0);
+    const pieces = [...stats.values()].reduce((a, st) => a + st.units, 0);
+    assert.equal(pieces, units);
+  });
+
+  it('sem mp_order_id usa o pedido do external_id; sem nada, cada linha é um pedido', () => {
+    const s2 = accessoryAttendancesBySeller(
+      [
+        line('x', '', 'capa', 1, 10, { mp_order_id: null, external_id: '900-1-0' }),
+        line('x', '', 'pelicula', 1, 10, { mp_order_id: null, external_id: '900-2-0' }),
+        line('x', '', 'capa', 1, 10, { mp_order_id: null, external_id: null, id: 'a' }),
+        line('x', '', 'capa', 1, 10, { mp_order_id: null, external_id: null, id: 'b' }),
+      ],
+      names
+    );
+    assert.equal(s2.get('x')!.attendances, 3);
+  });
+
+  it('ranking por PA e por ticket, invertível; sem atendimento no fim', () => {
+    const rows = [
+      { ...buildRatioRow('a', { attendances: 20, units: 47, revenue: 3000, revenueAttendances: 20, pendingAttendances: 0, multiPiece: 10 }), name: 'JULY' },
+      { ...buildRatioRow('b', { attendances: 10, units: 21, revenue: 2500, revenueAttendances: 10, pendingAttendances: 0, multiPiece: 5 }), name: 'GRACIANE' },
+      { ...buildRatioRow('c', undefined), name: 'CAROLINE' },
+    ];
+    assert.equal(formatPA(rows[0].pa!), '2,35');
+    assert.deepEqual(sortRatioRows(rows, 'pa', 'value').map((r) => r.name), ['JULY', 'GRACIANE', 'CAROLINE']);
+    assert.deepEqual(sortRatioRows(rows, 'pa', 'valueAsc').map((r) => r.name), ['GRACIANE', 'JULY', 'CAROLINE']);
+    assert.deepEqual(sortRatioRows(rows, 'ticket', 'value').map((r) => r.name), ['GRACIANE', 'JULY', 'CAROLINE']);
+    assert.deepEqual(sortRatioRows(rows, 'ticket', 'attendances').map((r) => r.name), ['JULY', 'GRACIANE', 'CAROLINE']);
+    assert.equal(ratioSortLabels('pa').value, 'Maior PA');
+    assert.equal(ratioSortLabels('ticket').valueAsc, 'Menor ticket médio');
+  });
+
+  it('opções do filtro: acessórios têm 4 métricas com faturamento como padrão; aparelhos só 2', () => {
+    assert.deepEqual(VIEW_OPTIONS.accessories, ['revenue', 'units', 'ticket', 'pa']);
+    assert.deepEqual(VIEW_OPTIONS.devices, ['units', 'revenue']);
   });
 });

@@ -1,0 +1,41 @@
+.tpr {
+  --tpr-accent: var(--chart-1);
+  display: flex; flex-direction: column; gap: 12px; min-width: 0;
+  padding: 18px 20px; border-radius: 20px;
+  background: var(--bg-card); border: 1px solid var(--border-color); box-shadow: var(--shadow-card);
+}
+.tpr-accessories { --tpr-accent: var(--chart-3); }
+.tpr-devices { --tpr-accent: var(--chart-2); }
+.tpr-head { display: flex; align-items: center; gap: 12px; }
+.tpr-icon {
+  width: 40px; height: 40px; border-radius: 12px; flex-shrink: 0;
+  display: flex; align-items: center; justify-content: center;
+  color: var(--tpr-accent); background: color-mix(in srgb, var(--tpr-accent) 16%, transparent);
+}
+.tpr-title { font-size: clamp(18px, 1.4vw, 24px); font-weight: 800; letter-spacing: -0.01em; color: var(--text-dark); }
+.tpr-list { list-style: none; display: flex; flex-direction: column; gap: 8px; }
+.tpr-item {
+  display: grid; grid-template-columns: 38px minmax(0, 1fr) auto; align-items: center; gap: 4px 12px;
+  padding: 8px 12px; border-radius: 12px;
+  background: var(--surface-subtle); border: 1px solid var(--border-color);
+}
+.tpr-item.is-first {
+  padding: 12px 14px;
+  background: color-mix(in srgb, var(--tpr-accent) 12%, var(--surface-subtle));
+  border-color: color-mix(in srgb, var(--tpr-accent) 55%, transparent);
+}
+.tpr-pos { font-size: 18px; font-weight: 800; color: var(--tpr-accent); font-variant-numeric: tabular-nums; }
+.tpr-item.is-first .tpr-pos { font-size: 24px; }
+.tpr-name { font-size: clamp(13px, 0.95vw, 17px); font-weight: 600; color: var(--text-dark); overflow-wrap: anywhere; }
+.tpr-item.is-first .tpr-name { font-size: clamp(15px, 1.15vw, 21px); font-weight: 800; }
+.tpr-qty { font-size: 14px; color: var(--text-muted); white-space: nowrap; text-align: right; }
+.tpr-qty b { font-size: clamp(20px, 1.8vw, 30px); font-weight: 800; color: var(--text-dark); font-variant-numeric: tabular-nums; }
+.tpr-item.is-first .tpr-qty b { font-size: clamp(26px, 2.4vw, 40px); }
+.tpr-bar { grid-column: 2 / -1; height: 6px; border-radius: 999px; background: var(--surface-muted); overflow: hidden; }
+.tpr-bar span { display: block; height: 100%; border-radius: 999px; background: var(--tpr-accent); }
+.tpr-empty { padding: 28px 12px; text-align: center; font-size: 16px; color: var(--text-muted); border: 1px dashed var(--border-strong); border-radius: 14px; }
+@media (max-width: 640px) {
+  .tpr { padding: 18px 14px; }
+  .tpr-item { grid-template-columns: 36px minmax(0, 1fr); }
+  .tpr-qty { grid-column: 2; text-align: left; }
+}

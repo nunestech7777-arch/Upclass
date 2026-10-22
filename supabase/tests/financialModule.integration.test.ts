@@ -20,6 +20,7 @@ before(async () => {
   await db.exec(`
     create role anon; create role authenticated; create role service_role;
     create schema auth;
+    create table auth.users (id uuid primary key, email text);
     create function auth.role() returns text language sql as $$ select 'service_role'::text $$;
     create function auth.uid() returns uuid language sql as $$ select null::uuid $$;
   `);
@@ -117,4 +118,23 @@ test('migração 0015: meta de acessórios é coluna nova, nula nas linhas exist
     `select device_target, accessory_target from seller_device_goals where month = '2026-11-01'`
   );
   assert.deepEqual(onlyAccessory.rows[0], { device_target: null, accessory_target: 15 });
+});
+
+test('migração 0016: metas de faturamento são colunas novas, nulas nas metas existentes e independentes das metas em unidades', async () => {
+  type Row = { device_target: number | null; accessory_target: number | null; device_revenue_target: string | null; accessory_revenue_target: string | null };
+  const cols = `select device_target, accessory_target, device_revenue_target::text, accessory_revenue_target::text from seller_device_goals`;
+  // Metas cadastradas antes da 0016 ficam intactas e sem meta financeira (nada é convertido).
+  const legacy = await db.query<Row>(`${cols} where month = '2026-10-01'`);
+  assert.deepEqual(legacy.rows[0], { device_target: 20, accessory_target: 30, device_revenue_target: null, accessory_revenue_target: null });
+
+  await db.query(`update seller_device_goals set device_revenue_target = 100000, accessory_revenue_target = 5000.5 where month = '2026-10-01'`);
+  const all = await db.query<Row>(`${cols} where month = '2026-10-01'`);
+  assert.deepEqual(all.rows[0], { device_target: 20, accessory_target: 30, device_revenue_target: '100000.00', accessory_revenue_target: '5000.50' });
+
+  await assert.rejects(db.query(`update seller_device_goals set device_revenue_target = -1`));
+  await assert.rejects(db.query(`update seller_device_goals set accessory_revenue_target = -0.01`));
+  // Meta financeira pode existir sozinha.
+  await db.query(`insert into seller_device_goals (seller_id, month, accessory_revenue_target) values ($1, '2026-12-01', 1200)`, [SELLER]);
+  const only = await db.query<Row>(`${cols} where month = '2026-12-01'`);
+  assert.deepEqual(only.rows[0], { device_target: null, accessory_target: null, device_revenue_target: null, accessory_revenue_target: '1200.00' });
 });

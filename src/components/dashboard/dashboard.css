@@ -51,7 +51,7 @@
 .dv-tabs::-webkit-scrollbar { display: none; }
 .dv-tabs button { padding: 8px 14px; font-size: 13px; font-weight: 600; color: var(--fin-muted); white-space: nowrap; flex-shrink: 0; }
 .dv-device-notice { margin: 4px 0 0; }
-.dv-tabs button.is-active { background: var(--fin-selected); color: var(--fin-profit); }
+.dv-tabs button.is-active { background: var(--fin-selected); color: var(--fin-accent, var(--accent-text)); }
 .dv-sort { width: fit-content; padding-left: 12px; font-size: 13px; }
 .dv-rank-table .fin-pct-cell { min-width: 130px; }
 .dv-rank-table thead th { white-space: normal; line-height: 1.25; vertical-align: bottom; }

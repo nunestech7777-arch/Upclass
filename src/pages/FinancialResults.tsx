@@ -109,7 +109,7 @@ export function FinancialResults() {
       <header className="fin-page-head">
         <SectionEyebrow icon={<TrendingUp size={14} />}>Painel de resultados</SectionEyebrow>
         <h1 className="fin-title">Ranking de lucro por vendedor</h1>
-        <p className="fin-lead">Resultados da equipe Você de iPhone, metas e evolução do mês.</p>
+        <p className="fin-lead">Resultados da equipe Upclass, metas e evolução do mês.</p>
       </header>
 
       <div className="fin-filters">

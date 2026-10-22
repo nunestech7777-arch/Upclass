@@ -1,0 +1,123 @@
+/* Giro do estoque — cores das categorias validadas (dataviz validate_palette: claro e escuro). */
+.turn-root {
+  --turn-iphones: #2a78d6;
+  --turn-acessorios: #eb6834;
+  --turn-peliculas: #1baf7a;
+  --turn-outros: #eda100;
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  margin-top: 8px;
+}
+[data-theme='dark'] .turn-root {
+  --turn-iphones: #3987e5;
+  --turn-acessorios: #d95926;
+  --turn-peliculas: #199e70;
+  --turn-outros: #c98500;
+}
+
+.turn-title { margin: 0; font-size: 20px; font-weight: 800; color: var(--text-dark); }
+.turn-sub { margin: 4px 0 0; font-size: 14px; color: var(--text-muted); }
+
+.turn-filters { display: flex; flex-wrap: wrap; gap: 10px; align-items: center; }
+.turn-seg {
+  display: inline-flex;
+  flex-wrap: wrap;
+  gap: 4px;
+  padding: 4px;
+  border-radius: var(--radius-md);
+  background: var(--bg-card);
+  border: 1px solid var(--border-color);
+}
+.turn-seg button {
+  border: none;
+  background: transparent;
+  color: var(--text-muted);
+  font-size: 13px;
+  font-weight: 600;
+  padding: 8px 12px;
+  min-height: 38px;
+  border-radius: var(--radius-sm);
+  cursor: pointer;
+  white-space: nowrap;
+}
+.turn-seg button.is-active { background: var(--primary); color: #fff; }
+.turn-dates { display: flex; gap: 8px; flex-wrap: wrap; }
+.turn-dates label { display: flex; align-items: center; gap: 6px; font-size: 13px; color: var(--text-muted); }
+.turn-dates input,
+.turn-min input {
+  min-height: 38px;
+  padding: 6px 10px;
+  border-radius: var(--radius-sm);
+  border: 1px solid var(--border-color);
+  background: var(--bg-card);
+  color: var(--text-dark);
+}
+
+.turn-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 16px; }
+
+.turn-trend { font-weight: 600; }
+.turn-trend.is-faster { color: var(--success); }
+.turn-trend.is-slower { color: var(--danger); }
+[data-theme='dark'] .turn-trend.is-faster { color: var(--success); }
+[data-theme='dark'] .turn-trend.is-slower { color: var(--danger); }
+
+.turn-alert { margin: 0; padding: 10px 14px; border-radius: var(--radius-md); background: color-mix(in srgb, var(--danger) 10%, transparent); color: var(--danger); font-size: 14px; }
+.turn-alert.is-soft { background: color-mix(in srgb, var(--warning) 12%, transparent); color: var(--warning); }
+[data-theme='dark'] .turn-alert.is-soft { color: var(--warning); }
+
+.turn-modal { width: min(1100px, 100%); }
+.turn-modal-body { overflow-y: auto; padding: 4px 22px 22px; display: flex; flex-direction: column; gap: 22px; }
+.turn-modal-body h4 { margin: 0 0 4px; font-size: 15px; font-weight: 800; color: var(--text-dark); }
+.turn-note { margin: 0 0 10px; font-size: 13px; color: var(--text-muted); line-height: 1.5; }
+.turn-muted { color: var(--text-muted); font-size: 12px; }
+.turn-section-head { display: flex; justify-content: space-between; align-items: center; gap: 12px; flex-wrap: wrap; margin-bottom: 8px; }
+.turn-min { display: flex; align-items: center; gap: 8px; font-size: 13px; color: var(--text-muted); }
+.turn-min input { width: 72px; }
+
+.turn-table-wrap { overflow-x: auto; -webkit-overflow-scrolling: touch; border: 1px solid var(--border-color); border-radius: 12px; }
+.turn-table { width: 100%; border-collapse: collapse; font-size: 13px; color: var(--text-dark); }
+.turn-table th { text-align: left; font-size: 11px; text-transform: uppercase; letter-spacing: 0.03em; color: var(--text-muted); padding: 10px 12px; border-bottom: 1px solid var(--border-color); white-space: nowrap; }
+.turn-table td { padding: 10px 12px; border-bottom: 1px solid var(--border-color); vertical-align: top; }
+.turn-table tbody tr:last-child td { border-bottom: none; }
+.turn-table tfoot td { border-top: 1px solid var(--border-color); border-bottom: none; font-weight: 700; }
+.turn-table .is-right { text-align: right; white-space: nowrap; }
+.turn-table tr.is-dim td { opacity: 0.45; }
+.turn-product { font-weight: 600; overflow-wrap: anywhere; }
+.turn-swatch { display: inline-block; width: 10px; height: 10px; border-radius: 3px; margin-right: 6px; vertical-align: middle; }
+.turn-swatch.is-iphones { background: var(--turn-iphones); }
+.turn-swatch.is-acessorios { background: var(--turn-acessorios); }
+.turn-swatch.is-peliculas { background: var(--turn-peliculas); }
+.turn-swatch.is-outros { background: var(--turn-outros); }
+
+.turn-exits { display: flex; flex-wrap: wrap; gap: 8px 16px; margin-top: 10px; font-size: 13px; color: var(--text-muted); }
+.turn-exits strong { color: var(--text-dark); font-weight: 600; }
+
+.turn-chart { width: 100%; min-width: 0; }
+
+.turn-limits { display: flex; gap: 10px; padding: 14px; border-radius: 12px; background: var(--bg-main); border: 1px solid var(--border-color); color: var(--text-dark); font-size: 13px; }
+.turn-limits ul { margin: 6px 0 0; padding-left: 18px; color: var(--text-muted); line-height: 1.5; }
+
+@media (max-width: 900px) {
+  .turn-grid { grid-template-columns: 1fr; }
+}
+
+@media (max-width: 640px) {
+  .turn-seg { width: 100%; }
+  .turn-seg button { flex: 1 1 auto; padding: 8px 6px; font-size: 12.5px; }
+  .turn-modal-body { padding: 4px 14px 18px; }
+  .mc-modal-overlay:has(.turn-modal) { padding: 0; align-items: flex-end; }
+  .turn-modal { max-height: 94dvh; border-radius: 20px 20px 0 0; }
+  /* Tabelas de produtos viram cartões no celular. */
+  .turn-table-wrap:has(td[data-label]) { border: none; overflow-x: visible; }
+  .turn-table-wrap:has(td[data-label]) thead { display: none; }
+  .turn-table-wrap:has(td[data-label]) table,
+  .turn-table-wrap:has(td[data-label]) tbody,
+  .turn-table-wrap:has(td[data-label]) tr,
+  .turn-table-wrap:has(td[data-label]) td { display: block; width: 100%; }
+  .turn-table-wrap:has(td[data-label]) tr { border: 1px solid var(--border-color); border-radius: 12px; padding: 8px 12px; margin-bottom: 8px; }
+  .turn-table-wrap:has(td[data-label]) td { border: none; padding: 3px 0; display: flex; justify-content: space-between; gap: 12px; text-align: right; }
+  .turn-table-wrap:has(td[data-label]) td::before { content: attr(data-label); color: var(--text-muted); font-size: 12px; font-weight: 600; text-align: left; }
+  .turn-table-wrap:has(td[data-label]) td.turn-product { display: block; text-align: left; }
+  .turn-table-wrap:has(td[data-label]) td.turn-product::before { display: block; }
+}

@@ -6,7 +6,7 @@
   left: 0;
   right: 0;
   bottom: 0;
-  background-color: rgba(15, 23, 42, 0.65);
+  background-color: rgba(0, 2, 41, 0.65);
   backdrop-filter: blur(8px);
   z-index: 9999;
   display: flex;
@@ -22,7 +22,7 @@
 }
 
 .sold-modal-container {
-  background-color: var(--bg-card, #FFFFFF);
+  background-color: var(--bg-card, var(--surface-card));
   border-radius: 20px;
   width: 100%;
   max-width: 1140px;
@@ -33,7 +33,7 @@
   box-shadow: 0 25px 60px -15px rgba(0, 0, 0, 0.35);
   animation: soldSlideUp 0.25s cubic-bezier(0.16, 1, 0.3, 1);
   overflow: hidden;
-  border: 1px solid var(--border-color, #E5E7EB);
+  border: 1px solid var(--border-color, var(--border-subtle));
 }
 
 @keyframes soldSlideUp {
@@ -53,8 +53,8 @@
   display: flex;
   align-items: center;
   justify-content: space-between;
-  border-bottom: 1px solid var(--border-color, #E5E7EB);
-  background-color: var(--bg-card, #FFFFFF);
+  border-bottom: 1px solid var(--border-color, var(--border-subtle));
+  background-color: var(--bg-card, var(--surface-card));
   gap: 16px;
 }
 
@@ -71,19 +71,19 @@
   display: flex;
   align-items: center;
   justify-content: center;
-  background: rgba(10, 37, 255, 0.08);
-  color: var(--primary, #0A25FF);
+  background: color-mix(in srgb, var(--primary) 8%, transparent);
+  color: var(--primary, var(--accent-text));
   flex-shrink: 0;
 }
 
 .sold-modal-icon-badge.Aparelhos {
-  background: rgba(10, 37, 255, 0.1);
-  color: var(--primary, #0A25FF);
+  background: color-mix(in srgb, var(--primary) 10%, transparent);
+  color: var(--primary, var(--accent-text));
 }
 
 .sold-modal-icon-badge.Acessórios {
-  background: rgba(16, 185, 129, 0.1);
-  color: #10B981;
+  background: color-mix(in srgb, var(--success) 10%, transparent);
+  color: var(--success);
 }
 
 .sold-modal-header-top {
@@ -95,7 +95,7 @@
 .sold-modal-title {
   font-size: 20px;
   font-weight: 700;
-  color: var(--text-dark, #111827);
+  color: var(--text-dark, var(--text-primary));
   margin: 0;
 }
 
@@ -104,13 +104,13 @@
   font-weight: 600;
   padding: 3px 8px;
   border-radius: 9999px;
-  background-color: rgba(10, 37, 255, 0.08);
-  color: var(--primary, #0A25FF);
+  background-color: color-mix(in srgb, var(--primary) 8%, transparent);
+  color: var(--primary, var(--accent-text));
 }
 
 .sold-modal-subtitle {
   font-size: 13px;
-  color: var(--text-muted, #6B7280);
+  color: var(--text-muted, var(--text-secondary));
   margin-top: 2px;
 }
 
@@ -126,9 +126,9 @@
   gap: 6px;
   padding: 8px 14px;
   border-radius: 10px;
-  border: 1px solid var(--border-color, #E5E7EB);
+  border: 1px solid var(--border-color, var(--border-subtle));
   background-color: transparent;
-  color: var(--text-dark, #374151);
+  color: var(--text-dark, var(--text-primary));
   font-size: 13px;
   font-weight: 600;
   cursor: pointer;
@@ -152,7 +152,7 @@
   display: flex;
   align-items: center;
   justify-content: center;
-  color: var(--text-muted, #6B7280);
+  color: var(--text-muted, var(--text-secondary));
   background: transparent;
   cursor: pointer;
   transition: all 0.15s ease;
@@ -160,7 +160,7 @@
 
 .sold-modal-close-btn:hover {
   background-color: rgba(0, 0, 0, 0.06);
-  color: var(--text-dark, #111827);
+  color: var(--text-dark, var(--text-primary));
 }
 
 /* Category Tabs */
@@ -169,8 +169,8 @@
   align-items: center;
   gap: 8px;
   padding: 12px 28px;
-  background-color: var(--bg-main, #F5F6FA);
-  border-bottom: 1px solid var(--border-color, #E5E7EB);
+  background-color: var(--bg-main, var(--surface-subtle));
+  border-bottom: 1px solid var(--border-color, var(--border-subtle));
   overflow-x: auto;
 }
 
@@ -182,7 +182,7 @@
   border-radius: 10px;
   font-size: 13px;
   font-weight: 600;
-  color: var(--text-muted, #6B7280);
+  color: var(--text-muted, var(--text-secondary));
   background-color: transparent;
   border: 1px solid transparent;
   cursor: pointer;
@@ -191,23 +191,23 @@
 }
 
 .sold-modal-tab:hover {
-  color: var(--text-dark, #111827);
+  color: var(--text-dark, var(--text-primary));
   background-color: rgba(0, 0, 0, 0.03);
 }
 
 .sold-modal-tab.active {
-  background-color: var(--bg-card, #FFFFFF);
-  color: var(--primary, #0A25FF);
-  border-color: var(--border-color, #E5E7EB);
+  background-color: var(--bg-card, var(--surface-card));
+  color: var(--primary, var(--accent-text));
+  border-color: var(--border-color, var(--border-subtle));
   box-shadow: var(--shadow-sm, 0 1px 2px rgba(0, 0, 0, 0.05));
 }
 
 .sold-modal-tab.iphones.active {
-  color: var(--primary, #0A25FF);
+  color: var(--primary, var(--accent-text));
 }
 
 .sold-modal-tab.acessorios.active {
-  color: #10B981;
+  color: var(--success);
 }
 
 .tab-count {
@@ -227,8 +227,8 @@
   grid-template-columns: repeat(4, 1fr);
   gap: 12px;
   padding: 16px 28px;
-  background-color: var(--bg-card, #FFFFFF);
-  border-bottom: 1px solid var(--border-color, #E5E7EB);
+  background-color: var(--bg-card, var(--surface-card));
+  border-bottom: 1px solid var(--border-color, var(--border-subtle));
 }
 
 .sold-summary-card {
@@ -236,8 +236,8 @@
   align-items: center;
   gap: 12px;
   padding: 12px 16px;
-  background: var(--bg-main, #F5F6FA);
-  border: 1px solid var(--border-color, #E5E7EB);
+  background: var(--bg-main, var(--surface-subtle));
+  border: 1px solid var(--border-color, var(--border-subtle));
   border-radius: 12px;
 }
 
@@ -262,20 +262,20 @@
   font-weight: 600;
   text-transform: uppercase;
   letter-spacing: 0.04em;
-  color: var(--text-muted, #6B7280);
+  color: var(--text-muted, var(--text-secondary));
 }
 
 .summary-card-value {
   font-size: 17px;
   font-weight: 700;
-  color: var(--text-dark, #111827);
+  color: var(--text-dark, var(--text-primary));
   line-height: 1.2;
   margin-top: 2px;
 }
 
 .summary-card-sub {
   font-size: 11px;
-  color: var(--text-muted, #9CA3AF);
+  color: var(--text-muted, var(--text-tertiary));
   margin-top: 2px;
   white-space: nowrap;
   overflow: hidden;
@@ -283,7 +283,7 @@
 }
 
 .summary-card-sub.positive {
-  color: #10B981;
+  color: var(--success);
 }
 
 /* Filters Section */
@@ -293,8 +293,8 @@
   justify-content: space-between;
   gap: 12px;
   padding: 14px 28px;
-  background-color: var(--bg-card, #FFFFFF);
-  border-bottom: 1px solid var(--border-color, #E5E7EB);
+  background-color: var(--bg-card, var(--surface-card));
+  border-bottom: 1px solid var(--border-color, var(--border-subtle));
   flex-wrap: wrap;
 }
 
@@ -311,31 +311,31 @@
   height: 38px;
   padding: 8px 32px 8px 36px;
   border-radius: 10px;
-  border: 1px solid var(--border-color, #E5E7EB);
-  background-color: var(--bg-main, #F5F6FA);
-  color: var(--text-dark, #111827);
+  border: 1px solid var(--border-color, var(--border-subtle));
+  background-color: var(--bg-main, var(--surface-subtle));
+  color: var(--text-dark, var(--text-primary));
   font-size: 13px;
   outline: none;
   transition: all 0.15s ease;
 }
 
 .sold-search-box input:focus {
-  border-color: var(--primary, #0A25FF);
-  background-color: var(--bg-card, #FFFFFF);
-  box-shadow: 0 0 0 3px rgba(10, 37, 255, 0.1);
+  border-color: var(--primary, var(--primary));
+  background-color: var(--bg-card, var(--surface-card));
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--primary) 10%, transparent);
 }
 
 .search-icon {
   position: absolute;
   left: 12px;
-  color: var(--text-muted, #9CA3AF);
+  color: var(--text-muted, var(--text-tertiary));
   pointer-events: none;
 }
 
 .search-clear-btn {
   position: absolute;
   right: 10px;
-  color: var(--text-muted, #9CA3AF);
+  color: var(--text-muted, var(--text-tertiary));
   cursor: pointer;
   background: none;
   border: none;
@@ -365,9 +365,9 @@
   height: 38px;
   padding: 8px 30px 8px 36px !important;
   border-radius: 10px;
-  border: 1px solid var(--border-color, #E5E7EB);
-  background-color: var(--bg-main, #F5F6FA);
-  color: var(--text-dark, #111827);
+  border: 1px solid var(--border-color, var(--border-subtle));
+  background-color: var(--bg-main, var(--surface-subtle));
+  color: var(--text-dark, var(--text-primary));
   font-size: 13px;
   font-weight: 500;
   cursor: pointer;
@@ -383,13 +383,13 @@
 }
 
 .filter-select-wrapper select:focus {
-  border-color: var(--primary, #0A25FF);
-  box-shadow: 0 0 0 3px rgba(10, 37, 255, 0.1);
+  border-color: var(--primary, var(--primary));
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--primary) 10%, transparent);
 }
 
 [data-theme="dark"] .filter-select-wrapper select {
-  background-color: #1a2234;
-  color: #f3f4f6;
+  background-color: var(--surface-elevated);
+  color: var(--text-primary);
   border-color: rgba(255, 255, 255, 0.12);
   background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 24 24' fill='none' stroke='%239CA3AF' stroke-width='2.5' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='m6 9 6 6 6-6'/%3E%3C/svg%3E");
 }
@@ -397,7 +397,7 @@
 .select-icon {
   position: absolute;
   left: 12px;
-  color: var(--text-muted, #9CA3AF);
+  color: var(--text-muted, var(--text-tertiary));
   pointer-events: none;
   z-index: 2;
 }
@@ -408,14 +408,14 @@
   align-items: center;
   gap: 16px;
   padding: 10px 28px;
-  background-color: rgba(10, 37, 255, 0.04);
-  border-bottom: 1px solid var(--border-color, #E5E7EB);
+  background-color: color-mix(in srgb, var(--primary) 4%, transparent);
+  border-bottom: 1px solid var(--border-color, var(--border-subtle));
   font-size: 13px;
 }
 
 .custom-date-label {
   font-weight: 600;
-  color: var(--text-dark, #111827);
+  color: var(--text-dark, var(--text-primary));
 }
 
 .date-input-group {
@@ -428,8 +428,8 @@
   height: 32px;
   padding: 4px 10px;
   border-radius: 8px;
-  border: 1px solid var(--border-color, #E5E7EB);
-  background: var(--bg-card, #FFFFFF);
+  border: 1px solid var(--border-color, var(--border-subtle));
+  background: var(--bg-card, var(--surface-card));
   color: var(--text-dark);
   font-size: 12px;
 }
@@ -439,7 +439,7 @@
   flex: 1;
   overflow-y: auto;
   padding: 0;
-  background-color: var(--bg-card, #FFFFFF);
+  background-color: var(--bg-card, var(--surface-card));
 }
 
 .sold-table-container {
@@ -455,31 +455,31 @@
 .sold-table th {
   position: sticky;
   top: 0;
-  background-color: var(--bg-main, #F5F6FA);
+  background-color: var(--bg-main, var(--surface-subtle));
   padding: 12px 20px;
   font-size: 11px;
   font-weight: 700;
-  color: var(--text-muted, #6B7280);
+  color: var(--text-muted, var(--text-secondary));
   letter-spacing: 0.05em;
   text-transform: uppercase;
-  border-bottom: 1px solid var(--border-color, #E5E7EB);
+  border-bottom: 1px solid var(--border-color, var(--border-subtle));
   z-index: 2;
   white-space: nowrap;
 }
 
 .sold-table-row {
-  border-bottom: 1px solid var(--border-color, #E5E7EB);
+  border-bottom: 1px solid var(--border-color, var(--border-subtle));
   transition: background-color 0.15s ease;
 }
 
 .sold-table-row:hover {
-  background-color: rgba(10, 37, 255, 0.02);
+  background-color: color-mix(in srgb, var(--primary) 2%, transparent);
 }
 
 .sold-table td {
   padding: 14px 20px;
   font-size: 13px;
-  color: var(--text-dark, #111827);
+  color: var(--text-dark, var(--text-primary));
   vertical-align: middle;
 }
 
@@ -502,13 +502,13 @@
 }
 
 .product-cell-icon.Aparelhos {
-  background: rgba(10, 37, 255, 0.08);
-  color: var(--primary, #0A25FF);
+  background: color-mix(in srgb, var(--primary) 8%, transparent);
+  color: var(--primary, var(--accent-text));
 }
 
 .product-cell-icon.Acessórios {
-  background: rgba(16, 185, 129, 0.08);
-  color: #10B981;
+  background: color-mix(in srgb, var(--success) 8%, transparent);
+  color: var(--success);
 }
 
 .product-cell-text {
@@ -519,13 +519,13 @@
 
 .product-title-text {
   font-weight: 600;
-  color: var(--text-dark, #111827);
+  color: var(--text-dark, var(--text-primary));
   line-height: 1.3;
 }
 
 .product-code-sub {
   font-size: 11px;
-  color: var(--text-muted, #9CA3AF);
+  color: var(--text-muted, var(--text-tertiary));
   margin-top: 2px;
 }
 
@@ -548,18 +548,18 @@
 }
 
 .spec-badge.capacity {
-  background-color: rgba(10, 37, 255, 0.08);
-  color: var(--primary, #0A25FF);
+  background-color: color-mix(in srgb, var(--primary) 8%, transparent);
+  color: var(--primary, var(--accent-text));
 }
 
 .spec-badge.color {
-  background-color: rgba(100, 116, 139, 0.12);
-  color: var(--text-dark, #334155);
+  background-color: rgba(111, 119, 170, 0.12);
+  color: var(--text-dark, var(--text-primary));
 }
 
 .spec-badge.grade {
-  background-color: rgba(16, 185, 129, 0.1);
-  color: #10B981;
+  background-color: color-mix(in srgb, var(--success) 10%, transparent);
+  color: var(--success);
 }
 
 .imei-badge {
@@ -570,9 +570,9 @@
   font-size: 11px;
   padding: 2px 6px;
   border-radius: 6px;
-  background-color: var(--bg-main, #F5F6FA);
-  color: var(--text-dark, #374151);
-  border: 1px solid var(--border-color, #E5E7EB);
+  background-color: var(--bg-main, var(--surface-subtle));
+  color: var(--text-dark, var(--text-primary));
+  border: 1px solid var(--border-color, var(--border-subtle));
 }
 
 .category-tag {
@@ -586,21 +586,21 @@
 }
 
 .category-tag.aparelho {
-  background-color: rgba(10, 37, 255, 0.08);
-  color: var(--primary, #0A25FF);
+  background-color: color-mix(in srgb, var(--primary) 8%, transparent);
+  color: var(--primary, var(--accent-text));
 }
 
 .category-tag.acessorio {
-  background-color: rgba(16, 185, 129, 0.08);
-  color: #10B981;
+  background-color: color-mix(in srgb, var(--success) 8%, transparent);
+  color: var(--success);
 }
 
 .qty-tag {
   font-weight: 700;
   font-size: 12px;
-  color: var(--text-dark, #111827);
+  color: var(--text-dark, var(--text-primary));
   padding: 2px 8px;
-  background-color: var(--bg-main, #F5F6FA);
+  background-color: var(--bg-main, var(--surface-subtle));
   border-radius: 6px;
 }
 
@@ -614,22 +614,22 @@
   width: 24px;
   height: 24px;
   border-radius: 50%;
-  background: var(--bg-main, #F5F6FA);
-  color: var(--text-muted, #6B7280);
+  background: var(--bg-main, var(--surface-subtle));
+  color: var(--text-muted, var(--text-secondary));
   display: flex;
   align-items: center;
   justify-content: center;
-  border: 1px solid var(--border-color, #E5E7EB);
+  border: 1px solid var(--border-color, var(--border-subtle));
 }
 
 .customer-name-text {
   font-weight: 500;
-  color: var(--text-dark, #111827);
+  color: var(--text-dark, var(--text-primary));
 }
 
 .seller-name-text {
   font-weight: 500;
-  color: var(--text-dark, #374151);
+  color: var(--text-dark, var(--text-primary));
 }
 
 .amount-cell {
@@ -639,12 +639,12 @@
 
 .amount-main {
   font-weight: 700;
-  color: var(--text-dark, #111827);
+  color: var(--text-dark, var(--text-primary));
 }
 
 .amount-unit-sub {
   font-size: 11px;
-  color: var(--text-muted, #9CA3AF);
+  color: var(--text-muted, var(--text-tertiary));
 }
 
 .payment-badge {
@@ -658,18 +658,18 @@
 }
 
 .payment-badge.pago {
-  background-color: rgba(16, 185, 129, 0.12);
-  color: #10B981;
+  background-color: color-mix(in srgb, var(--success) 12%, transparent);
+  color: var(--success);
 }
 
 .payment-badge.parcial {
-  background-color: rgba(245, 158, 11, 0.12);
-  color: #F59E0B;
+  background-color: color-mix(in srgb, var(--warning) 12%, transparent);
+  color: var(--warning);
 }
 
 .payment-badge.pendente {
-  background-color: rgba(239, 68, 68, 0.12);
-  color: #EF4444;
+  background-color: color-mix(in srgb, var(--danger) 12%, transparent);
+  color: var(--danger);
 }
 
 .date-cell {
@@ -679,12 +679,12 @@
 
 .date-main {
   font-weight: 500;
-  color: var(--text-dark, #111827);
+  color: var(--text-dark, var(--text-primary));
 }
 
 .date-time-sub {
   font-size: 11px;
-  color: var(--text-muted, #9CA3AF);
+  color: var(--text-muted, var(--text-tertiary));
 }
 
 /* Loading & Empty States */
@@ -701,8 +701,8 @@
 .sold-spinner {
   width: 36px;
   height: 36px;
-  border: 3px solid rgba(10, 37, 255, 0.15);
-  border-top-color: var(--primary, #0A25FF);
+  border: 3px solid color-mix(in srgb, var(--primary) 15%, transparent);
+  border-top-color: var(--primary, var(--primary));
   border-radius: 50%;
   animation: soldSpin 0.8s linear infinite;
   margin-bottom: 16px;
@@ -716,24 +716,24 @@
   width: 64px;
   height: 64px;
   border-radius: 50%;
-  background: var(--bg-main, #F5F6FA);
+  background: var(--bg-main, var(--surface-subtle));
   display: flex;
   align-items: center;
   justify-content: center;
-  color: var(--text-muted, #9CA3AF);
+  color: var(--text-muted, var(--text-tertiary));
   margin-bottom: 16px;
 }
 
 .sold-empty-state h3 {
   font-size: 16px;
   font-weight: 600;
-  color: var(--text-dark, #111827);
+  color: var(--text-dark, var(--text-primary));
   margin-bottom: 6px;
 }
 
 .sold-empty-state p {
   font-size: 13px;
-  color: var(--text-muted, #6B7280);
+  color: var(--text-muted, var(--text-secondary));
   max-width: 320px;
   margin-bottom: 16px;
 }
@@ -750,13 +750,13 @@
   display: flex;
   align-items: center;
   justify-content: space-between;
-  border-top: 1px solid var(--border-color, #E5E7EB);
-  background-color: var(--bg-card, #FFFFFF);
+  border-top: 1px solid var(--border-color, var(--border-subtle));
+  background-color: var(--bg-card, var(--surface-card));
 }
 
 .footer-left-info {
   font-size: 13px;
-  color: var(--text-muted, #6B7280);
+  color: var(--text-muted, var(--text-secondary));
 }
 
 /* Visibility helpers */
@@ -818,8 +818,8 @@
   }
 
   .sold-mobile-card {
-    background: var(--bg-card, #FFFFFF);
-    border: 1px solid var(--border-color, #E5E7EB);
+    background: var(--bg-card, var(--surface-card));
+    border: 1px solid var(--border-color, var(--border-subtle));
     border-radius: 14px;
     padding: 16px;
     display: flex;
@@ -844,19 +844,19 @@
   .mobile-product-title {
     font-size: 14px;
     font-weight: 600;
-    color: var(--text-dark, #111827);
+    color: var(--text-dark, var(--text-primary));
     margin: 0;
   }
 
   .mobile-date-text {
     font-size: 11px;
-    color: var(--text-muted, #9CA3AF);
+    color: var(--text-muted, var(--text-tertiary));
   }
 
   .mobile-amount-badge {
     font-size: 14px;
     font-weight: 700;
-    color: var(--primary, #0A25FF);
+    color: var(--primary, var(--accent-text));
   }
 
   .mobile-card-specs {
@@ -882,7 +882,7 @@
     display: flex;
     align-items: center;
     justify-content: space-between;
-    border-top: 1px solid var(--border-color, #E5E7EB);
+    border-top: 1px solid var(--border-color, var(--border-subtle));
     padding-top: 8px;
     margin-top: 4px;
   }
@@ -895,11 +895,11 @@
   }
 
   .mobile-label {
-    color: var(--text-muted, #6B7280);
+    color: var(--text-muted, var(--text-secondary));
   }
 
   .mobile-val {
     font-weight: 600;
-    color: var(--text-dark, #111827);
+    color: var(--text-dark, var(--text-primary));
   }
 }

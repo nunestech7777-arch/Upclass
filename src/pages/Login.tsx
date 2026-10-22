@@ -1,9 +1,9 @@
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { Navigate, useLocation } from 'react-router-dom';
 import { supabase, isSupabaseConfigured } from '../lib/supabaseClient';
 import { useAuth } from '../context/AuthContext';
-import { ShaderBackground } from '../components/ShaderBackground';
-import logoImg from '../assets/logo.png';
+import { AuthShell } from '../components/brand/AuthShell';
+import { LoginIntro } from '../components/brand/LoginIntro';
 import './Login.css';
 
 export function Login() {
@@ -13,6 +13,13 @@ export function Login() {
   const [password, setPassword] = useState('');
   const [error, setError] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
+  // Entrada da marca: roda uma vez por montagem da rota (erros e novas tentativas não a repetem).
+  const [introDone, setIntroDone] = useState(false);
+  // Fim da entrada: devolve o foco ao e-mail no desktop (no celular não abre o teclado sozinho).
+  useEffect(() => {
+    if (!introDone || window.matchMedia?.('(pointer: coarse)').matches) return;
+    document.getElementById('email')?.focus({ preventScroll: true });
+  }, [introDone]);
 
   if (!loading && session) {
     const from = (location.state as { from?: Location })?.from?.pathname || '/';
@@ -30,6 +37,8 @@ export function Login() {
       if (error) {
         if (error.message.includes('Invalid login credentials')) {
           setError('Email ou senha incorretos. Verifique se digitou corretamente.');
+        } else if (/banned/i.test(error.message)) {
+          setError('Acesso desativado. Fale com a gestão da loja.');
         } else if (error.message.includes('Email not confirmed')) {
           setError('Email não confirmado no Supabase. Habilite "Auto Confirm" no painel.');
         } else {
@@ -43,10 +52,16 @@ export function Login() {
   };
 
   return (
-    <div className="login-page">
-      <ShaderBackground className="login-shader" />
-      <div className="login-card">
-        <img src={logoImg} alt="Você de iPhone" className="login-logo" />
+    <>
+    {!introDone && (
+      <LoginIntro
+        onDone={() => setIntroDone(true)}
+      />
+    )}
+    <AuthShell animatedBackdrop cardState={introDone ? undefined : 'waiting'}>
+        <div className="access-screen">
+          <h1 className="access-screen-title">Acesse o sistema</h1>
+        </div>
         <form className="login-form" onSubmit={handleSubmit}>
           {!isSupabaseConfigured && (
             <div className="login-error">
@@ -54,7 +69,7 @@ export function Login() {
               variáveis de ambiente (na Vercel: Settings → Environment Variables) e faça um novo deploy.
             </div>
           )}
-          {error && <div className="login-error">{error}</div>}
+          {error && <div className="login-error" role="alert">{error}</div>}
           <div className="login-field">
             <label htmlFor="email">Email</label>
             <input
@@ -83,8 +98,8 @@ export function Login() {
             {submitting ? 'Entrando...' : 'Entrar'}
           </button>
         </form>
-      </div>
-    </div>
+    </AuthShell>
+    </>
   );
 }
 

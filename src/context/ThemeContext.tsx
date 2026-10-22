@@ -12,12 +12,15 @@ const ThemeContext = createContext<ThemeContextType | undefined>(undefined);
 
 export function ThemeProvider({ children }: { children: React.ReactNode }) {
   const [theme, setThemeState] = useState<Theme>(() => {
-    const saved = localStorage.getItem('theme');
-    return (saved === 'light' || saved === 'dark') ? saved : 'light';
+    // Escuro é o padrão da marca Upclass; quem já escolheu um tema mantém a preferência salva.
+    let saved: string | null = null;
+    try { saved = localStorage.getItem('theme'); } catch { /* armazenamento indisponível */ }
+    return (saved === 'light' || saved === 'dark') ? saved : 'dark';
   });
 
   useEffect(() => {
-    localStorage.setItem('theme', theme);
+    try { localStorage.setItem('theme', theme); } catch { /* armazenamento indisponível */ }
+    document.querySelector('meta[name="theme-color"]')?.setAttribute('content', theme === 'dark' ? '#000229' : '#F3F4FA');
     document.documentElement.setAttribute('data-theme', theme);
     if (theme === 'dark') {
       document.body.classList.add('dark-theme');

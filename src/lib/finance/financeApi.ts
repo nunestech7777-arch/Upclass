@@ -51,6 +51,9 @@ export interface DeviceGoal {
   device_target: number | null;
   /** Meta mensal de acessórios (migração 0015); null = sem meta. Independente da meta de aparelhos. */
   accessory_target: number | null;
+  /** Metas de faturamento em R$ (migração 0016); null = sem meta. Independentes das metas em unidades. */
+  device_revenue_target: number | null;
+  accessory_revenue_target: number | null;
   updated_at?: string | null;
   updated_by_email?: string | null;
 }
@@ -60,6 +63,9 @@ export interface DeviceGoalInput {
   device_target: number | null;
   /** undefined = não enviar a coluna (migração 0015 ausente ou meta de acessórios intocada). */
   accessory_target?: number | null;
+  /** undefined = não enviar (migração 0016 ausente). */
+  device_revenue_target?: number | null;
+  accessory_revenue_target?: number | null;
 }
 
 /** Dados da página Forecast de um mês. */
@@ -73,6 +79,8 @@ export interface ForecastData {
   deviceGoalsAvailable: boolean;
   /** Falso quando a migração 0015 ainda não foi aplicada (meta de acessórios por vendedor indisponível). */
   accessoryGoalsAvailable: boolean;
+  /** Falso quando a migração 0016 ainda não foi aplicada (metas de faturamento indisponíveis). */
+  revenueGoalsAvailable: boolean;
   /** Metas globais em unidades da tela Metas (configuração única, sem mês). */
   globalTargets: { devices: number; accessories: number };
   loadedAt: string;
@@ -115,6 +123,8 @@ export interface FinanceSource {
   loadDeviceGoals(month: string): Promise<DeviceGoal[]>;
   /** A coluna de meta de acessórios existe no banco (migração 0015). */
   accessoryGoalsAvailable(): Promise<boolean>;
+  /** As colunas de meta de faturamento existem no banco (migração 0016). */
+  revenueGoalsAvailable(): Promise<boolean>;
   saveDeviceGoals(month: string, rows: DeviceGoalInput[]): Promise<void>;
   deleteDeviceGoal(month: string, sellerId: string): Promise<void>;
   runSync(start: string, end: string, mode: 'preview' | 'apply'): Promise<FinancialSyncResponse>;
@@ -293,7 +303,9 @@ export const supabaseFinanceSource: FinanceSource = {
       if (!(err instanceof MigrationPendingError)) throw err;
       deviceGoalsAvailable = false;
     }
-    const accessoryGoalsAvailable = deviceGoalsAvailable && (await supabaseFinanceSource.accessoryGoalsAvailable());
+    const [accessoryGoalsAvailable, revenueGoalsAvailable] = deviceGoalsAvailable
+      ? await Promise.all([supabaseFinanceSource.accessoryGoalsAvailable(), supabaseFinanceSource.revenueGoalsAvailable()])
+      : [false, false];
     return {
       month,
       sellers: sellers.map(toFinanceSeller),
@@ -302,6 +314,7 @@ export const supabaseFinanceSource: FinanceSource = {
       deviceGoals,
       deviceGoalsAvailable,
       accessoryGoalsAvailable,
+      revenueGoalsAvailable,
       globalTargets: { devices: goals.monthly_devices_target, accessories: goals.monthly_accessories_target },
       loadedAt: new Date().toISOString(),
     };
@@ -342,6 +355,8 @@ export const supabaseFinanceSource: FinanceSource = {
       month: String(row.month).slice(0, 7),
       device_target: num(row.device_target),
       accessory_target: num(row.accessory_target),
+      device_revenue_target: num(row.device_revenue_target),
+      accessory_revenue_target: num(row.accessory_revenue_target),
       updated_at: (row.updated_at as string) ?? null,
       updated_by_email: (row.updated_by_email as string) ?? null,
     }));
@@ -357,6 +372,8 @@ export const supabaseFinanceSource: FinanceSource = {
         month: firstDay(month),
         device_target: r.device_target,
         ...(r.accessory_target !== undefined ? { accessory_target: r.accessory_target } : {}),
+        ...(r.device_revenue_target !== undefined ? { device_revenue_target: r.device_revenue_target } : {}),
+        ...(r.accessory_revenue_target !== undefined ? { accessory_revenue_target: r.accessory_revenue_target } : {}),
         updated_at: now,
         updated_by: auth.user?.id ?? null,
         updated_by_email: auth.user?.email ?? null,
@@ -366,12 +383,21 @@ export const supabaseFinanceSource: FinanceSource = {
     if (error && /accessory_target/.test(error.message)) {
       throw new Error('Aplique a migração 0015_seller_accessory_goals.sql para salvar metas de acessórios.');
     }
+    if (error && /revenue_target/.test(error.message)) {
+      throw new Error('Aplique a migração 0016_seller_revenue_goals.sql para salvar metas de faturamento.');
+    }
     raise(error);
   },
 
   async accessoryGoalsAvailable() {
     // Sonda leve: a coluna só existe depois da migração 0015.
     const { error } = await supabase.from('seller_device_goals').select('accessory_target').limit(1);
+    return !error;
+  },
+
+  async revenueGoalsAvailable() {
+    // Sonda leve: as colunas só existem depois da migração 0016.
+    const { error } = await supabase.from('seller_device_goals').select('device_revenue_target, accessory_revenue_target').limit(1);
     return !error;
   },
 

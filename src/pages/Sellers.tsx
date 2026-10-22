@@ -1,4 +1,5 @@
 import React, { useEffect, useState, useMemo } from 'react';
+import { EmptyState } from '../components/brand/BrandLogo';
 import { Link } from 'react-router-dom';
 import {
   Smartphone,
@@ -115,16 +116,16 @@ export function Sellers() {
     if (rank === 1) {
       return { 
         text: `1º Lugar ${labelSuffix}`, 
-        color: isDark ? '#fbbf24' : '#b45309', 
-        bg: isDark ? 'rgba(245, 158, 11, 0.15)' : 'rgba(245, 158, 11, 0.12)',
-        border: isDark ? '1px solid rgba(245, 158, 11, 0.3)' : '1px solid rgba(245, 158, 11, 0.2)'
+        color: 'var(--gold)', 
+        bg: 'color-mix(in srgb, var(--gold) 14%, transparent)',
+        border: '1px solid color-mix(in srgb, var(--gold) 30%, transparent)'
       };
     }
     if (rank === 2) {
       return { 
         text: `2º Lugar`, 
-        color: isDark ? '#e2e8f0' : '#475569', 
-        bg: isDark ? 'rgba(255, 255, 255, 0.08)' : '#f1f5f9',
+        color: 'var(--text-primary)', 
+        bg: 'var(--surface-muted)',
         border: '1px solid var(--border-color)'
       };
     }
@@ -139,7 +140,7 @@ export function Sellers() {
     return { 
       text: `${rank}º Lugar`, 
       color: 'var(--text-muted)', 
-      bg: isDark ? 'rgba(255, 255, 255, 0.03)' : 'var(--bg-main)',
+      bg: 'var(--surface-subtle)',
       border: '1px solid var(--border-color)'
     };
   };
@@ -150,7 +151,7 @@ export function Sellers() {
       <div className="sellers-header-row">
         <div>
           <h1 className="h1 flex-center gap-2" style={{ justifyContent: 'flex-start' }}>
-            <Trophy size={26} color="var(--primary)" />
+            <Trophy size={26} color="var(--accent-text)" />
             Ranking de Vendedores
           </h1>
           <p className="text-muted" style={{ marginTop: '4px' }}>
@@ -274,7 +275,7 @@ export function Sellers() {
           <div className="leader-info">
             <span className="leader-label">Líder em Acessórios</span>
             <span className="leader-name">{leaderAccessories ? leaderAccessories.seller.name : '—'}</span>
-            <span className="leader-score" style={{ color: '#10b981' }}>
+            <span className="leader-score" style={{ color: 'var(--chart-2)' }}>
               {leaderAccessories ? `${leaderAccessories.accessoriesSold} un.` : '0'}
             </span>
           </div>
@@ -299,7 +300,7 @@ export function Sellers() {
           <div className="leader-info">
             <span className="leader-label">Maior Volume Total</span>
             <span className="leader-name">{leaderTotal ? leaderTotal.seller.name : '—'}</span>
-            <span className="leader-score" style={{ color: '#f59e0b' }}>
+            <span className="leader-score" style={{ color: 'var(--accent-text)' }}>
               {leaderTotal ? `${leaderTotal.sold} produtos` : '0'}
             </span>
           </div>
@@ -324,7 +325,7 @@ export function Sellers() {
           <div className="leader-info">
             <span className="leader-label">Maior Conversão</span>
             <span className="leader-name">{leaderConversion ? leaderConversion.seller.name : '—'}</span>
-            <span className="leader-score" style={{ color: '#a855f7' }}>
+            <span className="leader-score" style={{ color: 'var(--chart-3)' }}>
               {leaderConversion ? `${leaderConversion.conversion}% taxa` : '0%'}
             </span>
           </div>
@@ -332,8 +333,8 @@ export function Sellers() {
       </div>
 
       {!loading && rankedSellers.length === 0 && (
-        <div className="card text-muted" style={{ textAlign: 'center', padding: '40px' }}>
-          Nenhum vendedor cadastrado ainda.
+        <div className="card">
+          <EmptyState title="Nenhum vendedor cadastrado ainda">Os vendedores aparecem aqui após a sincronização com o Mercado Phone.</EmptyState>
         </div>
       )}
 
@@ -407,7 +408,7 @@ export function Sellers() {
                     <TrendingUp size={14} />
                     Taxa de Conversão
                   </span>
-                  <span className="seller-stat-val" style={{ color: 'var(--primary)' }}>
+                  <span className="seller-stat-val" style={{ color: 'var(--accent-text)' }}>
                     {conversion}%
                   </span>
                 </div>
