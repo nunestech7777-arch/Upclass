@@ -132,7 +132,8 @@ export function buildPortalSummary(range: DateRange, today: string, sales: Porta
     projection = {
       value: Math.max(sold, (untilCutoff / ctx.elapsedDays) * 7),
       kind: 'estimate',
-      note: `Estimativa: ritmo de ${ctx.elapsedDays} dia(s) completo(s) × 7 dias. Não é resultado garantido.`,
+      // Sem texto no card: o selo "Estimativa" e o "≈" no valor já indicam que é projeção.
+      note: '',
     };
 
   const remainingValue = goal == null ? null : Math.max(0, goal - sold);

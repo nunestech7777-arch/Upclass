@@ -177,7 +177,7 @@ export function SellerPortal() {
                   ? units(summary.projection.value)
                   : `≈ ${units(Math.round(summary.projection.value))}`
             }
-            caption={summary.projection.note}
+            caption={summary.projection.note || undefined}
           />
           <MetricCard
             icon={<Flag size={18} />}
