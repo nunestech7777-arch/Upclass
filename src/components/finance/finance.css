@@ -332,7 +332,7 @@
   --fin-surface: var(--bg-card); --fin-surface-2: var(--surface-subtle); --fin-row-hover: var(--surface-subtle); --fin-border: var(--border-color);
   --fin-muted: var(--text-muted); --fin-text: var(--text-dark); --fin-highlight-border: color-mix(in srgb, var(--accent-text) 45%, transparent);
   position: absolute; left: 50%; top: 50%; transform: translate(-50%, -50%); width: min(720px, calc(100vw - 32px));
-  max-height: calc(100vh - 48px); overflow-y: auto; background: var(--fin-surface); color: var(--fin-text);
+  max-height: calc(100vh - 48px); max-height: calc(100dvh - 48px); overflow-y: auto; background: var(--fin-surface); color: var(--fin-text);
   border: 1px solid var(--fin-border); border-radius: 16px; padding: 18px 20px; display: flex; flex-direction: column; gap: 12px;
   box-shadow: 0 30px 60px rgba(0, 0, 0, 0.35);
 }
@@ -417,6 +417,11 @@
   /* Filtros empilhados ocupam a largura toda, sem ultrapassar a tela. */
   .fc-filters > .fin-sort { flex: 1 1 100%; min-width: 0; }
   .fc-filters > .fin-sort select { flex: 1; min-width: 0; text-overflow: ellipsis; }
+  /* iPhone: a barra de filtros ocupa a largura do cabeçalho e encolhe com ele (antes passava da tela). */
+  .fc-team-head { flex-wrap: wrap; }
+  .fc-team-head > .fc-filters { flex: 1 1 100%; min-width: 0; width: 100%; }
+  .fc-filters > .category-tabs { flex: 1 1 100%; min-width: 0; }
+  .fc-kind-tabs .category-tab { flex: 1 1 0; padding: 10px 8px; }
 }
 @media (max-width: 480px) {
   .fc-card dl { grid-template-columns: 1fr; }

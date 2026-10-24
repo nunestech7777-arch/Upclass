@@ -12,6 +12,7 @@
   flex-direction: column;
   padding: 28px 16px 20px;
   height: 100vh;
+  height: 100dvh;
   box-sizing: border-box;
   position: sticky;
   top: 0;

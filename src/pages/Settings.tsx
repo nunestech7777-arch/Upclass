@@ -92,6 +92,7 @@ export function Settings() {
               <p className="text-muted text-sm">Mostra o ranking de vendedores no dashboard principal.</p>
             </div>
             <button
+              className="ios-hit"
               onClick={() => toggle('show_ranking')}
               style={{
                 width: '44px', height: '24px', borderRadius: '12px',
@@ -114,6 +115,7 @@ export function Settings() {
               <p className="text-muted text-sm">Mostra os cards de meta da semana e do mês.</p>
             </div>
             <button
+              className="ios-hit"
               onClick={() => toggle('show_goals')}
               style={{
                 width: '44px', height: '24px', borderRadius: '12px',
@@ -136,6 +138,7 @@ export function Settings() {
               <p className="text-muted text-sm">Mostra os produtos mais vendidos e estoque crítico.</p>
             </div>
             <button
+              className="ios-hit"
               onClick={() => toggle('show_products')}
               style={{
                 width: '44px', height: '24px', borderRadius: '12px',
@@ -158,6 +161,7 @@ export function Settings() {
               <p className="text-muted text-sm">Habilita a visualização do botão para o modo apresentação.</p>
             </div>
             <button
+              className="ios-hit"
               onClick={() => toggle('show_tv_panel')}
               style={{
                 width: '44px', height: '24px', borderRadius: '12px',
@@ -209,7 +213,7 @@ export function Settings() {
                   <button
                     type="button"
                     onClick={() => setEditingPhotoSeller(seller)}
-                    className="text-muted"
+                    className="text-muted ios-hit"
                     style={{
                       fontSize: '12px',
                       background: 'none',
@@ -240,6 +244,7 @@ export function Settings() {
                   {seller.show_in_ranking ? 'No ranking' : 'Oculto'}
                 </span>
                 <button
+                  className="ios-hit"
                   onClick={() => toggleSellerRanking(seller)}
                   style={{
                     width: '44px', height: '24px', borderRadius: '12px',

@@ -1,6 +1,6 @@
 // Service worker do PWA. Só trata GET do próprio domínio: chamadas ao Supabase passam direto.
-// Versão do cache: incrementada no rebranding Upclass para renovar ícones e manifest.
-const CACHE = 'vdi-v2';
+// Versão do cache: incrementada a cada troca de ícones/manifest (v3: ícone dos raios neon).
+const CACHE = 'vdi-v3';
 const SHELL = ['/', '/manifest.webmanifest', '/pwa-192.png', '/pwa-512.png', '/apple-touch-icon.png', '/pwa-maskable-512.png'];
 
 self.addEventListener('install', (event) => {

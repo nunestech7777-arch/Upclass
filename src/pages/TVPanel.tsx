@@ -195,7 +195,11 @@ export function TVPanel() {
     };
   }, []);
 
+  // iPhone (Safari) não tem tela cheia para páginas: o botão some onde o recurso não existe.
+  const canFullscreen = typeof document !== 'undefined' && document.fullscreenEnabled === true && typeof document.documentElement.requestFullscreen === 'function';
+
   const toggleFullscreen = () => {
+    if (!canFullscreen) return;
     if (!document.fullscreenElement) {
       containerRef.current?.requestFullscreen().catch(() => {});
       setIsFullscreen(true);
@@ -256,14 +260,16 @@ export function TVPanel() {
             </span>
           </div>
 
-          <button 
-            className="btn-fullscreen" 
-            onClick={toggleFullscreen}
-            title={isFullscreen ? "Sair da tela cheia" : "Modo tela cheia"}
-          >
-            {isFullscreen ? <Minimize2 size={16} /> : <Maximize2 size={16} />}
-            <span>{isFullscreen ? 'Janela' : 'Tela Cheia'}</span>
-          </button>
+          {canFullscreen && (
+            <button
+              className="btn-fullscreen"
+              onClick={toggleFullscreen}
+              title={isFullscreen ? "Sair da tela cheia" : "Modo tela cheia"}
+            >
+              {isFullscreen ? <Minimize2 size={16} /> : <Maximize2 size={16} />}
+              <span>{isFullscreen ? 'Janela' : 'Tela Cheia'}</span>
+            </button>
+          )}
         </div>
       </header>
 
