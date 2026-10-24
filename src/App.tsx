@@ -6,6 +6,7 @@ import { RequireAuth } from './components/RequireAuth';
 import { RequireAdmin, RequireSeller } from './components/RequireRole';
 import { SellerPortal } from './pages/SellerPortal';
 import { SetPassword } from './pages/SetPassword';
+import { InstallPrompt } from './components/InstallPrompt';
 import { Layout } from './components/Layout';
 import { Login } from './pages/Login';
 import { Dashboard } from './pages/Dashboard';
@@ -53,6 +54,7 @@ export default function App() {
             <Route path="*" element={<Navigate to="/" replace />} />
           </Routes>
         </AuthProvider>
+        <InstallPrompt />
       </BrowserRouter>
     </ThemeProvider>
   );
