@@ -100,12 +100,24 @@ export function parseBracketForm(body: string): Record<string, unknown> {
   return root;
 }
 
-/** Extrai message[add] do payload; o parse de colchetes pode gerar arrays esparsos, então filtra buracos. */
-export function extractWebhookMessages(payload: unknown): KommoWebhookMessage[] {
-  const add = ((payload as Record<string, unknown> | null)?.message as Record<string, unknown> | undefined)?.add;
-  if (!add) return [];
+function extractAdd(payload: unknown, group: string): KommoWebhookMessage[] {
+  const add = ((payload as Record<string, unknown> | null)?.[group] as Record<string, unknown> | undefined)?.add;
+  if (!add || typeof add !== 'object') return [];
   const list = Array.isArray(add) ? add : Object.values(add as Record<string, unknown>);
   return list.filter((m): m is KommoWebhookMessage => !!m && typeof m === 'object');
+}
+
+/** Extrai message[add] do payload; o parse de colchetes pode gerar arrays esparsos, então filtra buracos. */
+export function extractWebhookMessages(payload: unknown): KommoWebhookMessage[] {
+  return extractAdd(payload, 'message');
+}
+
+/**
+ * Extrai outgoing_message[add] — webhook add_outgoing_message (mensagens enviadas pelo Kommo por
+ * vendedor ou Salesbot). Mesmos campos do message[add] mais author.user_id, message_type e attachment.
+ */
+export function extractOutgoingWebhookMessages(payload: unknown): KommoWebhookMessage[] {
+  return extractAdd(payload, 'outgoing_message');
 }
 
 /** Janela plausível para uma mensagem real: de 2015 (Kommo/amoCRM chats) até 1 dia no futuro. */

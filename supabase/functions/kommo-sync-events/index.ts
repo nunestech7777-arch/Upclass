@@ -1,6 +1,7 @@
 import { createClient } from 'jsr:@supabase/supabase-js@2';
 import { fetchLeadChatMessageEvents, fetchRecentChatEvents, fetchTalk } from '../_shared/kommo.ts';
 import { collectUnknownTalks, isChatEventOfLead, planPlaceholders } from '../_shared/kommoMessage.ts';
+import { newTalkHistoryState, syncTalkHistory, talksOfEvents, type TalkHistoryState } from '../_shared/kommoTalkSync.ts';
 
 /**
  * Completa as transcrições com as mensagens que o webhook do Kommo não entrega (as enviadas pelo
@@ -16,6 +17,12 @@ import { collectUnknownTalks, isChatEventOfLead, planPlaceholders } from '../_sh
  * a resposta traz o resumo só da primeira página.
  *   body { "lead_id": "123" }                → um lead específico
  *   body { "global": true, "hours": 2 }      → eventos da conta toda na janela; só os leads com atividade (cron)
+ *
+ * Histórico oficial (GET /talks/{id}/messages, escopo "External chat history"): para cada talk com
+ * eventos na janela, busca as mensagens das duas direções COM texto e autor, preenchendo os marcadores
+ * (mesmo id) e gravando as que faltam. Mensagens reais já gravadas não são reescritas. Se a API negar
+ * acesso (401/402/403) o histórico é suspenso na invocação e os marcadores continuam como fallback.
+ * Desligado por padrão: ligar com o secret KOMMO_TALK_HISTORY=on depois de validar no kommo-talk-probe.
  */
 
 const CONCURRENCY = 3; // a API do Kommo limita a ~7 req/s por conta
@@ -42,6 +49,7 @@ async function syncLead(
   supabase: Supa,
   leadId: string,
   userNames: Map<string, string>,
+  history: TalkHistoryState,
   sinceUnix?: number,
   // deno-lint-ignore no-explicit-any
   prefetchedEvents?: any[]
@@ -84,6 +92,17 @@ async function syncLead(
 
   // Talks sem mensagem gravada: resolve o chat pela API e casa com a conversa do mesmo chat e lead.
   const chatToConversation = new Map(convs.filter((c) => c.kommo_chat_id).map((c) => [c.kommo_chat_id!, c.id]));
+
+  // Histórico oficial primeiro: o que ele gravar com texto não vira marcador. Falha aqui não pode
+  // impedir os marcadores (fallback) deste lead.
+  try {
+    const written = await syncTalkHistory(supabase, history, leadId, talksOfEvents(events), talkToConversation, chatToConversation, sinceUnix);
+    for (const id of written) existingMessageIds.add(id);
+  } catch (err) {
+    history.totals.errors += 1;
+    console.error(`kommo-sync-events: histórico do lead ${leadId} falhou`, String(err).slice(0, 200));
+  }
+
   const talkChatConversation = new Map<string, string>();
   for (const talkId of collectUnknownTalks(events, existingMessageIds, talkToConversation)) {
     const talk = await fetchTalk(talkId);
@@ -143,6 +162,7 @@ Deno.serve(async (req) => {
 
     const { data: users } = await supabase.from('kommo_users').select('id, name');
     const userNames = new Map<string, string>((users ?? []).map((u: { id: string; name: string }) => [u.id, u.name]));
+    const history = newTalkHistoryState();
 
     // Janela: só eventos recentes (1h de margem) — evita baixar o histórico inteiro a cada ciclo.
     const sinceUnix = (all || typeof body.lead_id === 'string') && body.global !== true ? undefined : Date.now() / 1000 - hours * 3600 - 3600;
@@ -184,7 +204,7 @@ Deno.serve(async (req) => {
         await Promise.all(
           leadIds.slice(i, i + CONCURRENCY).map(async (leadId) => {
             try {
-              const r = await syncLead(supabase, leadId, userNames, undefined, byLead.get(leadId));
+              const r = await syncLead(supabase, leadId, userNames, history, sinceUnix, byLead.get(leadId));
               totals.synced += 1;
               totals.inserted += r.inserted;
               totals.exists += r.exists;
@@ -201,19 +221,19 @@ Deno.serve(async (req) => {
       }
       totals.skipped = totals.leads - totals.synced - totals.errors;
       // Cobertura incompleta vira erro no log, para ser visível no painel de logs.
-      if (totals.truncated || totals.skipped > 0 || totals.errors > 0 || totals.failed > 0) {
-        console.error(JSON.stringify({ kommo_sync_events_global_incompleto: totals, errors }));
+      if (totals.truncated || totals.skipped > 0 || totals.errors > 0 || totals.failed > 0 || history.blocked || history.totals.errors > 0) {
+        console.error(JSON.stringify({ kommo_sync_events_global_incompleto: totals, errors, talk_history: { blocked: history.blocked, ...history.totals } }));
       } else {
-        console.log(JSON.stringify({ kommo_sync_events_global: totals }));
+        console.log(JSON.stringify({ kommo_sync_events_global: totals, talk_history: history.totals }));
       }
-      return new Response(JSON.stringify({ ok: true, mode: 'global', ...totals, error_details: errors }), {
+      return new Response(JSON.stringify({ ok: true, mode: 'global', ...totals, error_details: errors, talk_history: { blocked: history.blocked, ...history.totals } }), {
         headers: { 'Content-Type': 'application/json' },
       });
     }
 
     if (typeof body.lead_id === 'string') {
-      const r = await syncLead(supabase, body.lead_id, userNames, all ? undefined : sinceUnix);
-      return new Response(JSON.stringify({ ok: true, lead_id: body.lead_id, ...r }), {
+      const r = await syncLead(supabase, body.lead_id, userNames, history, all ? undefined : sinceUnix);
+      return new Response(JSON.stringify({ ok: true, lead_id: body.lead_id, ...r, talk_history: { blocked: history.blocked, ...history.totals } }), {
         headers: { 'Content-Type': 'application/json' },
       });
     }
@@ -243,7 +263,7 @@ Deno.serve(async (req) => {
       await Promise.all(
         leads.slice(i, i + CONCURRENCY).map(async (leadId) => {
           try {
-            const r = await syncLead(supabase, leadId, userNames, sinceUnix);
+            const r = await syncLead(supabase, leadId, userNames, history, sinceUnix);
             totals.leads += 1;
             totals.inserted += r.inserted;
             totals.exists += r.exists;
@@ -278,7 +298,7 @@ Deno.serve(async (req) => {
     }
 
     console.log(JSON.stringify({ kommo_sync_events: totals }));
-    return new Response(JSON.stringify({ ok: true, hop, ...totals, error_details: errors, next }), {
+    return new Response(JSON.stringify({ ok: true, hop, ...totals, error_details: errors, next, talk_history: { blocked: history.blocked, ...history.totals } }), {
       headers: { 'Content-Type': 'application/json' },
     });
   } catch (err) {

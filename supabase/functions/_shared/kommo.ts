@@ -22,6 +22,17 @@ async function throttle() {
   if (wait > 0) await new Promise((r) => setTimeout(r, wait));
 }
 
+/** Erro HTTP da API do Kommo — `status` permite distinguir 401/402/403/404 (ver kommoTalkMessages.ts). */
+export class KommoApiError extends Error {
+  readonly status: number;
+  readonly path: string;
+  constructor(status: number, path: string, body: string) {
+    super(`Kommo API ${path} failed: ${status} ${body.slice(0, 300)}`);
+    this.status = status;
+    this.path = path;
+  }
+}
+
 async function call(path: string): Promise<Record<string, unknown>> {
   const url = `https://${getSubdomain()}.kommo.com/api/v4/${path}`;
   for (let attempt = 0; ; attempt++) {
@@ -40,10 +51,28 @@ async function call(path: string): Promise<Record<string, unknown>> {
       continue;
     }
     if (!res.ok) {
-      throw new Error(`Kommo API ${path} failed: ${res.status} ${await res.text()}`);
+      throw new KommoApiError(res.status, path, await res.text());
     }
     return res.json();
   }
+}
+
+/** Webhooks da conta (GET /webhooks, só leitura) — destino e eventos assinados. */
+export async function fetchWebhooks(destination?: string): Promise<Array<{ destination?: string; settings?: string[]; disabled?: boolean }>> {
+  const data = await call(destination ? `webhooks?filter[destination]=${encodeURIComponent(destination)}` : 'webhooks');
+  return ((data._embedded as Record<string, unknown> | undefined)?.webhooks as Array<Record<string, unknown>>) ?? [];
+}
+
+/** Cria (POST) ou remove (DELETE) a assinatura de webhook de um destino. Só administrador da conta. */
+export async function setWebhook(method: 'POST' | 'DELETE', destination: string, settings: string[] = []): Promise<unknown> {
+  await throttle();
+  const res = await fetch(`https://${getSubdomain()}.kommo.com/api/v4/webhooks`, {
+    method,
+    headers: { Authorization: `Bearer ${getToken()}`, 'Content-Type': 'application/json' },
+    body: JSON.stringify(method === 'POST' ? { destination, settings } : { destination }),
+  });
+  if (!res.ok) throw new KommoApiError(res.status, 'webhooks', await res.text());
+  return res.status === 204 ? {} : res.json();
 }
 
 export interface KommoUser {
@@ -179,4 +208,42 @@ export function fetchEntityEventsRaw(entity: 'lead' | 'contact', id: string | nu
 // deno-lint-ignore no-explicit-any
 export function fetchEntityNotesRaw(entity: 'leads' | 'contacts', id: string | number): Promise<any> {
   return call(`${entity}/${encodeURIComponent(String(id))}/notes?limit=250`);
+}
+
+/**
+ * Histórico completo de um talk (GET /api/v4/talks/{talk_id}/messages) — as duas direções, com texto,
+ * autor (author.type internal/external/bot e author.user_id) e anexos. Exige o escopo
+ * "External chat history" e plano Pro/Enterprise; erros sobem como KommoApiError (402/403/404).
+ * A API não documenta _links.next: pagina até uma página vir com menos que `limit` itens (ou 204).
+ */
+export async function fetchTalkMessages(
+  talkId: string | number,
+  opts: { fromUnix?: number; toUnix?: number; maxPages?: number } = {}
+  // deno-lint-ignore no-explicit-any
+): Promise<{ messages: any[]; pages: number; truncated: boolean }> {
+  const limit = 250;
+  const maxPages = opts.maxPages ?? 40;
+  // deno-lint-ignore no-explicit-any
+  const messages: any[] = [];
+  let firstIdOfLastPage: unknown;
+  for (let page = 1; page <= maxPages; page++) {
+    const query = [
+      `page=${page}`,
+      `limit=${limit}`,
+      ...(opts.fromUnix ? [`filter[created_at][from]=${Math.floor(opts.fromUnix)}`] : []),
+      ...(opts.toUnix ? [`filter[created_at][to]=${Math.floor(opts.toUnix)}`] : []),
+    ].join('&');
+    const res = await call(`talks/${encodeURIComponent(String(talkId))}/messages?${query}`);
+    const embedded = res?._embedded as Record<string, unknown> | undefined;
+    // deno-lint-ignore no-explicit-any
+    const pageMessages = (embedded?.messages ?? []) as any[];
+    // Servidor ignorando `page` (mesma página de novo): para em vez de repetir até maxPages.
+    if (page > 1 && pageMessages.length && String(pageMessages[0]?.id) === String(firstIdOfLastPage)) {
+      return { messages, pages: page - 1, truncated: false };
+    }
+    firstIdOfLastPage = pageMessages[0]?.id;
+    messages.push(...pageMessages);
+    if (pageMessages.length < limit) return { messages, pages: page, truncated: false };
+  }
+  return { messages, pages: maxPages, truncated: true };
 }

@@ -1,10 +1,12 @@
 import { fetchLead } from './kommo.ts';
 import {
   conversationKey,
+  extractOutgoingWebhookMessages,
   extractWebhookMessages,
   normalizeKommoMessage,
   type NormalizedMessage,
 } from './kommoMessage.ts';
+import { normalizeOutgoingWebhookMessage, talkMessageAuthorIdentified } from './kommoTalkMessages.ts';
 
 /**
  * Logs de diagnóstico da transcrição (TEMPORÁRIOS). Ligue com o secret KOMMO_DEBUG=true e
@@ -106,8 +108,41 @@ async function ingestNormalized(ctx: IngestContext, m: NormalizedMessage, eventI
 }
 
 /**
- * Processa todas as mensagens de um payload de webhook. Cada mensagem é isolada:
- * um erro numa não impede as demais de serem gravadas.
+ * Mensagem enviada (add_outgoing_message). Na conversa que já existe, grava por kommo_fill_talk_messages
+ * (0019): preenche o marcador da events API (mesmo id), nunca reescreve mensagem real e só troca o
+ * vendedor do marcador quando o Kommo identifica o autor. Sem conversa, segue o caminho do webhook de
+ * entrada (kommo_ingest_message cria a conversa).
+ */
+async function ingestOutgoing(
+  ctx: IngestContext,
+  m: NormalizedMessage,
+  authorIdentified: boolean,
+  eventId: string | null
+): Promise<MessageOutcome> {
+  const key = conversationKey(m);
+  const { data: conv, error } = await ctx.supabase.from('conversations').select('id').eq('external_id', key).maybeSingle();
+  if (error) throw new Error(`conversa ${key}: ${error.message}`);
+  if (!conv) return ingestNormalized(ctx, m, eventId);
+
+  // A função grava timestamp_valid = true: sem horário do Kommo o marcador fica como está.
+  if (!m.timestamp_valid) {
+    return { message_id: m.kommo_message_id, status: 'skipped', reason: 'invalid_timestamp', conversation_key: key, sender_type: m.sender_type };
+  }
+  const { data, error: rpcError } = await ctx.supabase.rpc('kommo_fill_talk_messages', {
+    p_conversation_id: conv.id,
+    p_messages: [{ ...m, author_identified: authorIdentified }],
+  });
+  if (rpcError || data?.error || data?.failed) {
+    throw new Error(`kommo_fill_talk_messages: ${rpcError?.message ?? data?.error ?? 'item falhou'}`);
+  }
+  const status: MessageOutcome['status'] = data?.inserted ? 'inserted' : data?.filled ? 'updated' : 'duplicate_ignored';
+  debugLog('outgoing', { event_id: eventId, message_id: m.kommo_message_id, conversation_key: key, sender_type: m.sender_type, status });
+  return { message_id: m.kommo_message_id, status, conversation_key: key, sender_type: m.sender_type };
+}
+
+/**
+ * Processa todas as mensagens de um payload de webhook (message[add] e outgoing_message[add]).
+ * Cada mensagem é isolada: um erro numa não impede as demais de serem gravadas.
  */
 export async function ingestWebhookPayload(
   ctx: IngestContext,
@@ -130,6 +165,21 @@ export async function ingestWebhookPayload(
       outcomes.push(await ingestNormalized(ctx, normalized.value, eventId));
     } catch (err) {
       console.error(`failed to ingest kommo message ${normalized.value.kommo_message_id}`, err);
+      outcomes.push({ message_id: normalized.value.kommo_message_id, status: 'error', reason: String(err) });
+    }
+  }
+
+  for (const msg of extractOutgoingWebhookMessages(payload)) {
+    const normalized = normalizeOutgoingWebhookMessage(msg, receivedAt);
+    if (!normalized.ok) {
+      outcomes.push({ message_id: msg.id ?? null, status: 'skipped', reason: normalized.reason });
+      debugLog('skipped', { event_id: eventId, message_id: msg.id ?? null, reason: normalized.reason });
+      continue;
+    }
+    try {
+      outcomes.push(await ingestOutgoing(ctx, normalized.value, talkMessageAuthorIdentified(msg), eventId));
+    } catch (err) {
+      console.error(`failed to ingest kommo outgoing message ${normalized.value.kommo_message_id}`, String(err).slice(0, 300));
       outcomes.push({ message_id: normalized.value.kommo_message_id, status: 'error', reason: String(err) });
     }
   }

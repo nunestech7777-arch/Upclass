@@ -20,3 +20,12 @@ verify_jwt = false
 
 [functions.mercadophone-sync]
 verify_jwt = false
+
+# Diagnóstico do histórico oficial (GET /talks/{id}/messages): só com a service role (JWT verificado no gateway).
+[functions.kommo-talk-probe]
+verify_jwt = true
+
+# Teste do webhook add_outgoing_message: o Kommo chama sem JWT (protegido por KOMMO_OUTGOING_PROBE_SECRET);
+# as ações de admin (?action=) checam role service_role no próprio código.
+[functions.kommo-outgoing-probe]
+verify_jwt = false
