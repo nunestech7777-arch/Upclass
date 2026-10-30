@@ -1,5 +1,6 @@
 import { createClient } from 'jsr:@supabase/supabase-js@2';
-import { fetchLeadChatMessageEvents, fetchRecentChatEvents, fetchTalk } from '../_shared/kommo.ts';
+import { fetchAllUsers, fetchLeadChatMessageEvents, fetchRecentChatEvents, fetchTalk } from '../_shared/kommo.ts';
+import { syncKommoUsers, usersAreStale } from '../_shared/kommoUsers.ts';
 import { collectUnknownTalks, isChatEventOfLead, planPlaceholders } from '../_shared/kommoMessage.ts';
 import { newTalkHistoryState, syncTalkHistory, talksOfEvents, type TalkHistoryState } from '../_shared/kommoTalkSync.ts';
 
@@ -159,6 +160,18 @@ Deno.serve(async (req) => {
     // do cliente, e occurred_at só reflete mensagens reais (as do cliente).
     const hours = Number(body.hours) > 0 ? Number(body.hours) : body.global === true ? 1 : 72;
     const conversationDays = Number(body.conversation_days) > 0 ? Number(body.conversation_days) : hours / 24;
+
+    // Usuários novos no Kommo (ex.: vendedora contratada depois) só entravam com o kommo-sync manual.
+    // Aqui a lista é renovada quando fica velha; falha nunca interrompe a sincronização de eventos.
+    try {
+      const { data: last } = await supabase.from('kommo_users').select('synced_at').order('synced_at', { ascending: false }).limit(1);
+      if (usersAreStale(last?.[0]?.synced_at, new Date())) {
+        const { users: n } = await syncKommoUsers(supabase, fetchAllUsers);
+        console.log(JSON.stringify({ kommo_sync_events: 'users_refreshed', users: n }));
+      }
+    } catch (err) {
+      console.error('kommo-sync-events: falha ao atualizar usuários do Kommo', String(err).slice(0, 200));
+    }
 
     const { data: users } = await supabase.from('kommo_users').select('id, name');
     const userNames = new Map<string, string>((users ?? []).map((u: { id: string; name: string }) => [u.id, u.name]));

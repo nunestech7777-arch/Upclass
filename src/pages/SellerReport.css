@@ -270,3 +270,20 @@
     padding: 16px;
   }
 }
+
+/* Link para o Meu Supervisor (conversas do Kommo saíram deste relatório). */
+.seller-supervisor-link {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  color: var(--text-dark);
+  transition: border-color 0.15s ease, transform 0.15s ease;
+}
+.seller-supervisor-link:hover { border-color: var(--accent-text); transform: translateY(-1px); }
+.seller-supervisor-link:focus-visible { outline: 2px solid var(--accent-text); outline-offset: 2px; }
+.seller-supervisor-icon {
+  width: 40px; height: 40px; border-radius: 12px; flex-shrink: 0;
+  display: inline-flex; align-items: center; justify-content: center;
+  color: #fff; background: var(--gradient-brand);
+}
+.seller-supervisor-text { display: flex; flex-direction: column; gap: 2px; flex: 1; min-width: 0; }

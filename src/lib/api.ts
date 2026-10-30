@@ -24,7 +24,7 @@ type PageResult<T> = { data: T[] | null; error: { message: string } | null };
  * A 1ª página vai sozinha (a maioria das consultas cabe nela); se vier cheia, as
  * seguintes são buscadas em paralelo, em lotes, em vez de uma por vez.
  */
-async function fetchAllRows<T>(queryPage: (from: number, to: number) => PromiseLike<PageResult<T>>): Promise<T[]> {
+export async function fetchAllRows<T>(queryPage: (from: number, to: number) => PromiseLike<PageResult<T>>): Promise<T[]> {
   const fetchPage = async (page: number): Promise<T[]> => {
     const from = page * PAGE_SIZE;
     const { data, error } = await queryPage(from, from + PAGE_SIZE - 1);

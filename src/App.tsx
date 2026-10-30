@@ -20,6 +20,13 @@ import { TVPanel } from './pages/TVPanel';
 import { Settings } from './pages/Settings';
 import { FinancialResults } from './pages/FinancialResults';
 import { DailyResults } from './pages/DailyResults';
+import { SupervisorLayout, SupervisorRedirect } from './pages/supervisor/SupervisorLayout';
+import { SupervisorOverview } from './pages/supervisor/SupervisorOverview';
+import { SupervisorConversations } from './pages/supervisor/SupervisorConversations';
+import { SupervisorAiAnalysis } from './pages/supervisor/SupervisorAiAnalysis';
+import { SupervisorPerformance } from './pages/supervisor/SupervisorPerformance';
+import { SupervisorReports } from './pages/supervisor/SupervisorReports';
+import { SupervisorSettings } from './pages/supervisor/SupervisorSettings';
 
 export default function App() {
   return (
@@ -48,6 +55,17 @@ export default function App() {
                 <Route path="estoque" element={<Inventory />} />
                 <Route path="metas" element={<Goals />} />
                 <Route path="configuracoes" element={<Settings />} />
+                <Route path="supervisor" element={<SupervisorLayout />}>
+                  <Route index element={<SupervisorOverview />} />
+                  <Route path="conversas" element={<SupervisorConversations />} />
+                  <Route path="conversas/:conversationId" element={<SupervisorConversations />} />
+                  <Route path="analise-ia" element={<SupervisorAiAnalysis />} />
+                  <Route path="vendedores" element={<SupervisorPerformance />} />
+                  <Route path="relatorios" element={<SupervisorReports />} />
+                  <Route path="configuracoes" element={<SupervisorSettings />} />
+                  <Route path="*" element={<Navigate to="/supervisor" replace />} />
+                </Route>
+                <Route path="meu-supervisor" element={<SupervisorRedirect />} />
               </Route>
               </Route>
             </Route>

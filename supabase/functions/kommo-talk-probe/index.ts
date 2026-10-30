@@ -1,5 +1,5 @@
 import { createClient } from 'jsr:@supabase/supabase-js@2';
-import { fetchTalkMessages, fetchWebhooks, KommoApiError } from '../_shared/kommo.ts';
+import { fetchChatEventsBetween, fetchTalkMessages, fetchWebhooks, KommoApiError } from '../_shared/kommo.ts';
 import { summarizeTalkProbe } from '../_shared/kommoTalkMessages.ts';
 
 /**
@@ -11,6 +11,8 @@ import { summarizeTalkProbe } from '../_shared/kommoTalkMessages.ts';
  * GET ?talk_id=123
  * GET ?token_info=1  → integração, escopos e validade do token (sem o token)
  * GET ?webhooks=1    → webhooks da conta e eventos assinados (destino sem a query string)
+ * GET ?chat_events_day=AAAA-MM-DD[&type=incoming|outgoing] → eventos de mensagem do dia (fuso da loja,
+ *     UTC−3) no Kommo × conversation_messages: contagens e só os ids/horários das que faltam no banco.
  */
 
 function json(body: unknown, status = 200) {
@@ -66,6 +68,77 @@ Deno.serve(async (req) => {
       return json({ ok: false, http_status: err instanceof KommoApiError ? err.status : null, error: String(err).slice(0, 300) });
     }
   }
+  const day = new URL(req.url).searchParams.get('chat_events_day');
+  if (day) {
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(day)) return json({ ok: false, error: 'chat_events_day = AAAA-MM-DD' }, 400);
+    const type = new URL(req.url).searchParams.get('type') === 'outgoing' ? 'outgoing_chat_message' : 'incoming_chat_message';
+    const fromUnix = Date.parse(`${day}T00:00:00-03:00`) / 1000;
+    try {
+      const { events, truncated } = await fetchChatEventsBetween(fromUnix, fromUnix + 86400 - 1, [type]);
+      const found: Array<{ message_id: string; talk_id: string | null; created_at: number; entity_type: string | null; entity_id: string | null; event_id: string }> = [];
+      for (const ev of events) {
+        for (const v of Array.isArray(ev?.value_after) ? ev.value_after : []) {
+          const id = v?.message?.id ? String(v.message.id) : null;
+          if (!id) continue;
+          found.push({
+            message_id: id,
+            talk_id: v?.message?.talk_id ? String(v.message.talk_id) : null,
+            created_at: Number(ev?.created_at ?? 0),
+            entity_type: ev?.entity_type ?? null,
+            entity_id: ev?.entity_id != null ? String(ev.entity_id) : null,
+            event_id: String(ev?.id ?? ''),
+          });
+        }
+      }
+      const ids = [...new Set(found.map((f) => f.message_id))];
+      const supabase = createClient(Deno.env.get('SUPABASE_URL')!, Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!);
+      const stored = new Set<string>();
+      for (let i = 0; i < ids.length; i += 200) {
+        const { data } = await supabase.from('conversation_messages').select('external_id').in('external_id', ids.slice(i, i + 200));
+        for (const r of data ?? []) stored.add(String(r.external_id));
+      }
+      const missing = found.filter((f) => !stored.has(f.message_id));
+      // Mesma mensagem em mais de um evento: o painel do Kommo conta eventos, o banco conta mensagens.
+      const byId = new Map<string, typeof found>();
+      for (const f of found) byId.set(f.message_id, [...(byId.get(f.message_id) ?? []), f]);
+      const repeated = [...byId.values()].filter((list) => list.length > 1);
+      const repeatedIds = repeated.map((list) => list[0].message_id);
+      const repeatedOrigin = new Map<string, { origin: string | null; sent_at: string | null; conversation_id: string | null }>();
+      if (repeatedIds.length) {
+        const { data } = await supabase.from('conversation_messages').select('external_id, sent_at, conversation_id, origin:raw_payload->>origin').in('external_id', repeatedIds);
+        for (const r of data ?? []) repeatedOrigin.set(String(r.external_id), { origin: r.origin ?? null, sent_at: r.sent_at ?? null, conversation_id: r.conversation_id ?? null });
+      }
+      // Para cada ausente: o talk existe no banco? Em qual canal (origin da conversa)?
+      const talks = [...new Set(missing.map((f) => f.talk_id).filter((t): t is string => !!t))];
+      const talkInfo = new Map<string, { conversation_id: string; origin: string | null }>();
+      if (talks.length) {
+        const { data } = await supabase.from('conversation_messages').select('kommo_talk_id, conversation_id').in('kommo_talk_id', talks).limit(1000);
+        const convIds = [...new Set((data ?? []).map((r) => String(r.conversation_id)))];
+        const { data: convs } = convIds.length
+          ? await supabase.from('conversations').select('id, origin:raw_payload->>origin').in('id', convIds)
+          : { data: [] };
+        const originOf = new Map((convs ?? []).map((c: { id: string; origin: string | null }) => [c.id, c.origin]));
+        for (const r of data ?? []) talkInfo.set(String(r.kommo_talk_id), { conversation_id: String(r.conversation_id), origin: originOf.get(String(r.conversation_id)) ?? null });
+      }
+      return json({
+        ok: true,
+        type,
+        truncated,
+        events: events.length,
+        message_ids: ids.length,
+        stored: ids.length - new Set(missing.map((f) => f.message_id)).size,
+        repeated_in_events: repeated.map((list) => ({
+          message_id: list[0].message_id,
+          events: list.map((f) => ({ event_id: f.event_id, created_at_iso: new Date(f.created_at * 1000).toISOString(), entity_type: f.entity_type, entity_id: f.entity_id, talk_id: f.talk_id })),
+          in_db: repeatedOrigin.get(list[0].message_id) ?? null,
+        })),
+        missing: missing.map((f) => ({ ...f, created_at_iso: new Date(f.created_at * 1000).toISOString(), talk_in_db: f.talk_id ? talkInfo.get(f.talk_id) ?? null : null })),
+      });
+    } catch (err) {
+      return json({ ok: false, http_status: err instanceof KommoApiError ? err.status : null, error: String(err).replace(/events\?[^:]*/g, 'events?…').slice(0, 300) });
+    }
+  }
+
   const talkId = new URL(req.url).searchParams.get('talk_id');
   if (!talkId || !/^\d+$/.test(talkId)) return json({ ok: false, error: 'informe talk_id numérico' }, 400);
 

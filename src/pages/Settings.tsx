@@ -1,5 +1,6 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
-import { Camera, KeyRound } from 'lucide-react';
+import { ArrowRight, Camera, KeyRound } from 'lucide-react';
+import { Link } from 'react-router-dom';
 import { SellerAvatar } from '../components/SellerAvatar';
 import { SellerPhotoModal } from '../components/SellerPhotoModal';
 import { AccessBadge, SellerAccessModal } from '../components/SellerAccessModal';
@@ -9,10 +10,8 @@ import {
   updatePanelSettings,
   fetchSellers,
   updateSellerRankingVisibility,
-  fetchKommoUsers,
-  updateSellerKommoMapping,
 } from '../lib/api';
-import type { Seller, KommoUser } from '../lib/database.types';
+import type { Seller } from '../lib/database.types';
 
 const DEFAULTS = {
   show_ranking: true,
@@ -25,7 +24,6 @@ export function Settings() {
   const [settings, setSettings] = useState(DEFAULTS);
   const [loading, setLoading] = useState(true);
   const [sellers, setSellers] = useState<Seller[]>([]);
-  const [kommoUsers, setKommoUsers] = useState<KommoUser[]>([]);
   const [editingPhotoSeller, setEditingPhotoSeller] = useState<Seller | null>(null);
   const [accessSellerId, setAccessSellerId] = useState<string | null>(null);
   const [logins, setLogins] = useState<SellerLogin[]>([]);
@@ -56,7 +54,6 @@ export function Settings() {
       }))
       .finally(() => setLoading(false));
     fetchSellers().then(setSellers);
-    fetchKommoUsers().then(setKommoUsers);
     loadLogins();
   }, [loadLogins]);
 
@@ -72,11 +69,6 @@ export function Settings() {
     updateSellerRankingVisibility(seller.id, nextValue);
   };
 
-  const changeSellerKommoMapping = (seller: Seller, kommoUserId: string) => {
-    const nextValue = kommoUserId || null;
-    setSellers((prev) => prev.map((s) => (s.id === seller.id ? { ...s, kommo_user_id: nextValue } : s)));
-    updateSellerKommoMapping(seller.id, nextValue);
-  };
 
   return (
     <div className="flex-col gap-6" style={{ width: '100%' }}>
@@ -266,54 +258,20 @@ export function Settings() {
         </div>
       </div>
 
-      <div className="card" style={{maxWidth: '600px', width: '100%'}}>
-        <div style={{marginBottom: '16px'}}>
+      <Link
+        to="/supervisor/configuracoes"
+        className="card"
+        style={{maxWidth: '600px', width: '100%', display: 'flex', alignItems: 'center', gap: '16px', color: 'var(--text-dark)'}}
+      >
+        <div style={{flex: 1, minWidth: 0}}>
           <h3 style={{fontWeight: 600, marginBottom: '4px'}}>Integração Kommo</h3>
-          <p className="text-muted text-sm">
-            Vincule cada vendedor ao usuário correspondente no Kommo para que as conversas
-            sincronizadas apareçam no relatório certo. A lista abaixo é preenchida pela
-            sincronização automática de usuários do Kommo.
-          </p>
+          <span className="text-muted text-sm">
+            O vínculo dos vendedores com os usuários do Kommo, o status dos webhooks e o histórico de erros
+            agora ficam em Meu Supervisor → Configurações.
+          </span>
         </div>
-
-        <div className="flex-col gap-4">
-          {sellers.length === 0 && (
-            <span className="text-muted text-sm">Nenhum vendedor cadastrado ainda.</span>
-          )}
-          {kommoUsers.length === 0 && sellers.length > 0 && (
-            <span className="text-muted text-sm">
-              Nenhum usuário Kommo sincronizado ainda. Configure a integração e rode a sincronização primeiro.
-            </span>
-          )}
-          {sellers.length > 0 && kommoUsers.length > 0 && sellers.map((seller) => (
-            <div
-              key={seller.id}
-              className="flex-between"
-              style={{paddingBottom: '12px', borderBottom: '1px solid var(--border-color)', gap: '12px', flexWrap: 'wrap'}}
-            >
-              <span>{seller.name}</span>
-              <select
-                value={seller.kommo_user_id ?? ''}
-                onChange={(e) => changeSellerKommoMapping(seller, e.target.value)}
-                style={{
-                  padding: '6px 10px',
-                  borderRadius: '6px',
-                  border: '1px solid var(--border-color)',
-                  backgroundColor: 'var(--bg-card)',
-                  color: 'var(--text-dark)',
-                  maxWidth: '220px',
-                  width: '100%'
-                }}
-              >
-                <option value="">Não vinculado</option>
-                {kommoUsers.map((ku) => (
-                  <option key={ku.id} value={ku.id}>{ku.name}</option>
-                ))}
-              </select>
-            </div>
-          ))}
-        </div>
-      </div>
+        <ArrowRight size={18} aria-hidden="true" />
+      </Link>
 
       {accessSellerId && sellers.some((s) => s.id === accessSellerId) && (
         <SellerAccessModal

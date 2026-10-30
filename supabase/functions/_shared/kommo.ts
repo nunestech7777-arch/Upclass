@@ -111,6 +111,22 @@ export async function fetchLead(id: string | number): Promise<KommoLead> {
 }
 
 /**
+ * Responsável atual de vários leads de uma vez (GET /leads?filter[id][]=…, até 250 por página).
+ * Lead apagado no Kommo simplesmente não volta na resposta.
+ */
+export async function fetchLeadResponsibles(ids: Array<string | number>): Promise<Map<string, string>> {
+  const out = new Map<string, string>();
+  for (let i = 0; i < ids.length; i += 250) {
+    const chunk = ids.slice(i, i + 250);
+    const query = ['limit=250', ...chunk.map((id) => `filter[id][]=${encodeURIComponent(String(id))}`)].join('&');
+    const res = await call(`leads?${query}`);
+    const leads = ((res?._embedded as Record<string, unknown> | undefined)?.leads ?? []) as Array<{ id: number; responsible_user_id?: number }>;
+    for (const l of leads) if (l.responsible_user_id) out.set(String(l.id), String(l.responsible_user_id));
+  }
+  return out;
+}
+
+/**
  * Eventos de mensagem de chat de um lead (incoming_chat_message / outgoing_chat_message).
  * O Kommo indexa esses eventos pelo CONTATO (filtrar por lead não retorna nada); cada evento
  * traz entity_type/entity_id do lead ao qual o talk estava vinculado. Só entram eventos
@@ -148,6 +164,38 @@ export async function fetchLeadChatMessageEvents(
     }
   }
   return events;
+}
+
+/**
+ * Eventos de mensagem de chat (incoming/outgoing) entre dois instantes — só leitura, para
+ * diagnóstico (kommo-talk-probe ?chat_events_day=). A API v4 não traz o texto, só ids e autor.
+ */
+export async function fetchChatEventsBetween(
+  fromUnix: number,
+  toUnix: number,
+  types: Array<'incoming_chat_message' | 'outgoing_chat_message'>,
+  maxPages = 60
+  // deno-lint-ignore no-explicit-any
+): Promise<{ events: any[]; truncated: boolean }> {
+  // deno-lint-ignore no-explicit-any
+  const events: any[] = [];
+  for (let page = 1; page <= maxPages; page++) {
+    const query = [
+      `page=${page}`,
+      'limit=100',
+      ...types.map((t) => `filter[type][]=${t}`),
+      `filter[created_at][from]=${Math.floor(fromUnix)}`,
+      `filter[created_at][to]=${Math.floor(toUnix)}`,
+    ].join('&');
+    const res = await call(`events?${query}`);
+    const embedded = res?._embedded as Record<string, unknown> | undefined;
+    // deno-lint-ignore no-explicit-any
+    const pageEvents = (embedded?.events ?? []) as any[];
+    events.push(...pageEvents);
+    const links = res?._links as Record<string, unknown> | undefined;
+    if (!links?.next || pageEvents.length === 0) return { events, truncated: false };
+  }
+  return { events, truncated: true };
 }
 
 /**

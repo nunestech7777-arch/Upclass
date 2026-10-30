@@ -29,3 +29,15 @@ verify_jwt = true
 # as ações de admin (?action=) checam role service_role no próprio código.
 [functions.kommo-outgoing-probe]
 verify_jwt = false
+
+# Sincronização de usuários do Kommo: JWT verificado no gateway; o código só aceita service role
+# ou administrador ativo (botão em Meu Supervisor → Configurações).
+[functions.kommo-sync]
+verify_jwt = true
+
+# Preenche o vendedor de conversas sem vendedor (simulação por padrão); só service role.
+[functions.kommo-seller-backfill]
+verify_jwt = true
+
+[functions.kommo-lead-responsibles]
+verify_jwt = true

@@ -2,6 +2,7 @@ import React, { useEffect } from 'react';
 import { NavLink } from 'react-router-dom';
 import {
   LayoutDashboard,
+  BrainCircuit,
   TrendingUp,
   Users,
   Package,
@@ -38,6 +39,7 @@ const navGroups: { label: string; items: NavItem[] }[] = [
     label: 'Desempenho e equipe',
     items: [
       { path: '/vendedores', label: 'Vendedores', icon: Users },
+      { path: '/supervisor', label: 'Meu Supervisor', icon: BrainCircuit },
       { path: '/resultado-financeiro', label: 'Resultado financeiro', icon: CircleDollarSign },
       { path: '/resultados-diarios', label: 'Resultados diários', icon: CalendarDays },
       { path: '/estoque', label: 'Estoque', icon: Package },

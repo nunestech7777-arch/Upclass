@@ -164,6 +164,18 @@ export type ConversationMessage = {
   updated_at: string;
 };
 
+/** Staging dos webhooks do Kommo. O frontend só lê metadados — nunca payload nem raw_body. */
+export type KommoWebhookEvent = {
+  id: string;
+  received_at: string;
+  processed: boolean;
+  processed_at: string | null;
+  error: string | null;
+  result: Record<string, unknown> | null;
+  payload: Record<string, unknown>;
+  raw_body: string | null;
+};
+
 export type Goals = {
   id: 1;
   weekly_devices_target: number;
@@ -261,6 +273,7 @@ export type Database = {
     Tables: {
       sellers: { Row: Seller; Insert: Partial<Seller>; Update: Partial<Seller>; Relationships: [] };
       kommo_users: { Row: KommoUser; Insert: Partial<KommoUser>; Update: Partial<KommoUser>; Relationships: [] };
+      kommo_webhook_events: { Row: KommoWebhookEvent; Insert: Partial<KommoWebhookEvent>; Update: Partial<KommoWebhookEvent>; Relationships: [] };
       products: { Row: Product; Insert: Partial<Product>; Update: Partial<Product>; Relationships: [] };
       sales: { Row: Sale; Insert: Partial<Sale>; Update: Partial<Sale>; Relationships: [] };
       mercadophone_webhook_events: { Row: MercadoPhoneWebhookEvent; Insert: Partial<MercadoPhoneWebhookEvent>; Update: Partial<MercadoPhoneWebhookEvent>; Relationships: [] };
