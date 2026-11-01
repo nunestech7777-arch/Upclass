@@ -12,26 +12,67 @@ function getToken(): string {
   return token;
 }
 
+export interface RetryPolicy {
+  /** Esperas entre tentativas (ms); o número de tentativas é delaysMs.length + 1. */
+  delaysMs: number[];
+  /** Tempo máximo de cada tentativa (ms). */
+  timeoutMs: number;
+}
+
+/** Padrão (rotinas). Exportado para os testes trocarem as esperas por zero. */
+export const retryPolicy: RetryPolicy = { delaysMs: [2_000], timeoutMs: 25_000 };
+/** Webhook: mantém o comportamento original (uma tentativa só; o limite de tempo é o da própria
+ * function). A rotina de 30 min reconfere o que falhar. */
+export const WEBHOOK_POLICY: RetryPolicy = { delaysMs: [], timeoutMs: 120_000 };
+
+const sleep = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
+
+/** Falha que vale repetir: rede, tempo esgotado, 429 e 5xx. 4xx (token, parâmetro) não melhora repetindo. */
+class RetryableError extends Error {}
+
 async function call(
   className: string,
   method: string,
   body?: Record<string, unknown>,
-  httpMethod: 'GET' | 'POST' = 'POST'
+  httpMethod: 'GET' | 'POST' = 'POST',
+  policy: RetryPolicy = retryPolicy
   // deno-lint-ignore no-explicit-any
 ): Promise<any> {
   const url = `${BASE_URL}?class=${className}&method=${method}`;
-  const res = await fetch(url, {
-    method: httpMethod,
-    headers: {
-      Authorization: getToken(),
-      'Content-Type': 'application/json',
-    },
-    body: httpMethod === 'POST' ? JSON.stringify(body ?? {}) : undefined,
-  });
-  if (!res.ok) {
-    throw new Error(`MercadoPhone API ${className}.${method} failed: ${res.status} ${await res.text()}`);
+  const attempts = policy.delaysMs.length + 1;
+  for (let attempt = 1; ; attempt++) {
+    try {
+      let res: Response;
+      try {
+        res = await fetch(url, {
+          method: httpMethod,
+          headers: {
+            Authorization: getToken(),
+            'Content-Type': 'application/json',
+          },
+          body: httpMethod === 'POST' ? JSON.stringify(body ?? {}) : undefined,
+          signal: AbortSignal.timeout(policy.timeoutMs),
+        });
+      } catch (err) {
+        throw new RetryableError(`MercadoPhone API ${className}.${method}: falha de rede/tempo esgotado (${String(err)})`);
+      }
+      if (!res.ok) {
+        const message = `MercadoPhone API ${className}.${method} failed: ${res.status} ${await res.text()}`;
+        if (res.status === 429 || res.status >= 500) throw new RetryableError(message);
+        throw new Error(message);
+      }
+      try {
+        return await res.json();
+      } catch (err) {
+        throw new RetryableError(`MercadoPhone API ${className}.${method}: resposta não é JSON (${String(err)})`);
+      }
+    } catch (err) {
+      if (!(err instanceof RetryableError) || attempt >= attempts) {
+        throw err instanceof RetryableError ? new Error(`${err.message} — após ${attempt} tentativa(s)`) : err;
+      }
+      await sleep(policy.delaysMs[attempt - 1]);
+    }
   }
-  return res.json();
 }
 
 export interface MercadoPhoneProduct {
@@ -108,9 +149,15 @@ export async function fetchAllVendedores(): Promise<MercadoPhoneSeller[]> {
  * Histórico de vendas, uma linha por item, com o vendedor, a receita (`valorTotal`), o custo
  * (`valorCusto`) e o lucro da linha. Datas no horário da loja (`YYYY-MM-DD HH:mm:ss`), como o
  * MercadoPhone as grava. O limite por página da API é 300; `totalItens` não respeita o filtro de
- * datas, então a paginação para na primeira página incompleta.
+ * datas, então a paginação para na primeira página incompleta. Resposta sem `data.itens` lança erro
+ * (histórico incompleto nunca é tratado como vazio); falhas transitórias são repetidas (ver `call`).
  */
-export async function fetchHistoricoVendas(dataInicial: string, dataFinal: string, concurrency = 1): Promise<HistoricoVendaRow[]> {
+export async function fetchHistoricoVendas(
+  dataInicial: string,
+  dataFinal: string,
+  concurrency = 1,
+  policy: RetryPolicy = retryPolicy
+): Promise<HistoricoVendaRow[]> {
   const items: HistoricoVendaRow[] = [];
   const limit = 300;
   const page = async (n: number): Promise<HistoricoVendaRow[]> => {
@@ -120,8 +167,14 @@ export async function fetchHistoricoVendas(dataInicial: string, dataFinal: strin
       order: 'data_venda',
       direction: 'asc',
       filters: { dataVendaInicial: dataInicial, dataVendaFinal: dataFinal },
-    });
-    return res?.data?.itens ?? [];
+    }, 'POST', policy);
+    // Resposta sem a lista é inválida — nunca é "dia sem vendas" (a API devolve itens: [] nesse caso).
+    // Tratá-la como vazia faria a conciliação marcar linhas válidas como ausentes ou removidas.
+    const pageItems = res?.data?.itens;
+    if (!Array.isArray(pageItems)) {
+      throw new Error(`MercadoPhone API HistoricoVendaApiController.index: resposta sem data.itens (página ${n}, ${dataInicial}..${dataFinal})`);
+    }
+    return pageItems;
   };
   // `concurrency` > 1 busca páginas em lotes paralelos (a API leva ~2,5 s por página); a ordem final
   // é a das páginas e a busca para no primeiro lote com página incompleta.

@@ -136,15 +136,22 @@ describe('planFinancialReconcile', () => {
     assert.equal(plan.counts.history_items_without_row, 0);
   });
 
-  it('troca só com modelo igual: modelo diferente ou sem nome segue removido e sinalizado', () => {
-    const history = [hist({ vendaId: 900, produtoId: 2, tipoProdutoDescricao: 'PRODUTO APPLE', produtoDescricao: 'PRODUTO APPLE - IPHONE 13 - IMEI: 1 - 128GB' })];
-    const other = row('900-1-4', { amount: 3000, product_name: 'IPHONE 14 PRO - 128GB' });
+  it('troca por OUTRO modelo (ou sem nome) mantém a linha ativa com os valores atuais e gera alerta — sem apagar receita nem duplicar', () => {
+    const history = [hist({ vendaId: 900, produtoId: 2, tipoProdutoDescricao: 'PRODUTO APPLE', produtoDescricao: 'PRODUTO APPLE - IPHONE 13 - IMEI: 1 - 128GB', valorTotal: 3000, valorCliente: 3000, valorCusto: 2500, lucro: 500 })];
+    const other = row('900-1-4', { amount: 3000, product_name: 'IPHONE 14 PRO - 128GB', revenue: 3000, cost: 2400, profit: 600, financial_status: 'ok' });
     const plan = planFinancialReconcile(history, [other]);
-    assert.equal(apply([other], plan)[0].item_status, 'removed');
-    assert.equal(plan.counts.history_items_without_row, 1);
+    const after = apply([other], plan)[0];
+    assert.equal(after.item_status, 'active');
+    assert.equal(after.revenue, 3000);
+    assert.equal(after.cost, 2400, 'valores atuais mantidos até revisão');
+    assert.equal(plan.alerts.length, 1);
+    assert.equal(plan.alerts[0].kind, 'model_swap');
+    assert.equal((plan.alerts[0].proposed as { cost: number }).cost, 2500);
+    assert.equal(plan.counts.rows_removed, 0);
     const unnamed = row('901-1-4', { amount: 3000 });
     const plan2 = planFinancialReconcile([{ ...history[0], vendaId: 901 }], [unnamed]);
-    assert.equal(apply([unnamed], plan2)[0].item_status, 'removed');
+    assert.equal(apply([unnamed], plan2)[0].item_status, 'active');
+    assert.equal(plan2.alerts[0].kind, 'model_swap');
   });
 
   it('linha já marcada como removida volta a ativa quando a unidade nova está no pedido (caso 8277349)', () => {

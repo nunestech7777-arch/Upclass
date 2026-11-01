@@ -1,8 +1,8 @@
 import { createClient } from 'jsr:@supabase/supabase-js@2';
-import { fetchHistoricoVendas } from '../_shared/mercadophone.ts';
+import { fetchHistoricoVendas, WEBHOOK_POLICY } from '../_shared/mercadophone.ts';
 import { itemSellerKey, mapItemSellers, type ItemSeller } from '../_shared/itemSellers.ts';
 import { isCancelledStatus, planFinancialReconcile, type HistoricoFinanceItem } from '../_shared/financialReconcile.ts';
-import { SALE_FINANCE_COLUMNS } from '../_shared/financialSync.ts';
+import { SALE_FINANCE_COLUMNS, saveAlerts, saveAttempts, withProductName, withSyncStamp, type AttemptOutcome } from '../_shared/financialSync.ts';
 
 interface VendaItem {
   produtoId: number | string;
@@ -137,12 +137,16 @@ Deno.serve(async (req) => {
     // O payload não traz o vendedor de cada item; ele vem do histórico de vendas (uma linha por item).
     let itemSellers = new Map<string, ItemSeller | null>();
     let orderHistory: HistoricoFinanceItem[] | null = null;
+    let minuteHistorySize = 0;
+    let historyError: string | null = null;
     try {
       const minute = String(venda.dataVenda).slice(0, 16);
-      const historico = await fetchHistoricoVendas(`${minute}:00`, `${minute}:59`);
+      const historico = await fetchHistoricoVendas(`${minute}:00`, `${minute}:59`, 1, WEBHOOK_POLICY);
       itemSellers = mapItemSellers(historico);
+      minuteHistorySize = historico.length;
       orderHistory = historico.filter((row) => String(row.vendaId) === String(venda.id));
     } catch (err) {
+      historyError = String(err).slice(0, 500);
       console.error('failed to fetch item sellers; mercadophone-sync reconcilia depois', err);
     }
 
@@ -231,22 +235,40 @@ Deno.serve(async (req) => {
     }
 
     // Custo e lucro do pedido, quando o histórico já o trouxe; senão o mercadophone-sync concilia.
+    // Cada tentativa fica registrada (financial_reconcile_attempts) com o motivo quando não concilia.
+    let outcome: AttemptOutcome = historyError ? 'api_error' : minuteHistorySize === 0 ? 'empty_history' : 'order_not_in_history';
+    let outcomeDetail: string | null = historyError;
     if (orderHistory && orderHistory.length > 0) {
       const { data: orderRows, error: rowsError } = await supabase
         .from('sales')
         .select(SALE_FINANCE_COLUMNS)
         .eq('mp_order_id', String(venda.id));
       if (rowsError) throw new Error(`listar itens do pedido: ${rowsError.message}`);
-      const plan = planFinancialReconcile(orderHistory, orderRows ?? []);
+      // Nome do produto: necessário para reconhecer troca de unidade (sem ele a troca vira alerta).
+      const rows = (orderRows ?? []).map(withProductName);
+      const plan = planFinancialReconcile(orderHistory, rows);
       const syncedAt = new Date().toISOString();
-      for (const update of plan.updates) {
-        const { error } = await supabase
-          .from('sales')
-          .update({ ...update.patch, financial_synced_at: syncedAt })
-          .eq('id', update.id);
-        if (error) throw new Error(`gravar financeiro do item ${update.externalId}: ${error.message}`);
+      try {
+        for (const update of plan.updates) {
+          const { error } = await supabase
+            .from('sales')
+            .update({ ...withSyncStamp(update.patch as Record<string, unknown>, syncedAt), financial_checked_at: syncedAt })
+            .eq('id', update.id);
+          if (error) throw new Error(`gravar financeiro do item ${update.externalId}: ${error.message}`);
+        }
+      } catch (err) {
+        await saveAttempts(supabase, 'webhook', [{ orderId: String(venda.id), outcome: 'apply_error', detail: String(err).slice(0, 500) }]).catch(() => {});
+        throw err;
       }
+      const after = rows.map((r) => ({ ...r, ...(plan.updates.find((u) => u.id === r.id)?.patch ?? {}) }));
+      const open = after.filter((r) => (r.item_status ?? 'active') === 'active' && r.financial_status !== 'ok').length;
+      outcome = open === 0 ? 'reconciled' : 'still_pending';
+      outcomeDetail = open === 0 ? null : `${open} item(ns) ainda sem custo/receita conciliados`;
+      await saveAlerts(supabase, plan.alerts).catch((err) => console.error('failed to save reconcile alerts', err));
     }
+    await saveAttempts(supabase, 'webhook', [{ orderId: String(venda.id), outcome, detail: outcomeDetail }]).catch((err) =>
+      console.error('failed to save reconcile attempt', err)
+    );
 
     await supabase
       .from('mercadophone_webhook_events')
