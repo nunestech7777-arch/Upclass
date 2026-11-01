@@ -7,6 +7,7 @@ import { addDays, formatInstantBR, longDateBR, storeToday } from '../../lib/fina
 import { int, pct } from '../../lib/finance/format';
 import type { SupervisorFilters } from '../../lib/supervisor/filters';
 import { formatSeconds, variation, type SupervisorSummary } from '../../lib/supervisor/metrics';
+import { AnimatedText } from '../../components/ui/AnimatedNumber';
 
 /** Resposta mediana acima disso vira alerta no relatório (regra fixa, sem IA). */
 const SLOW_MEDIAN_SECONDS = 30 * 60;
@@ -80,7 +81,7 @@ export function SupervisorReports() {
       ) : !cur || !prev ? (
         <LoadingBlock />
       ) : (
-        <>
+        <div className={`sv-stack uc-reload-scope ${current.loading || previous.loading ? 'is-reloading' : ''}`}>
           <Panel title="Resumo geral" eyebrow="Comparado com o dia anterior">
             <div className="sv-compare">
               <Compare label="Atendimentos" value={int(cur.conversations)} delta={variation(cur.conversations, prev.conversations)} />
@@ -178,7 +179,7 @@ export function SupervisorReports() {
               </p>
             </Panel>
           </div>
-        </>
+        </div>
       )}
     </div>
   );
@@ -189,7 +190,9 @@ function Compare({ label, value, delta, lowerIsBetter = false }: { label: string
   return (
     <div className="sv-compare-item">
       <small>{label}</small>
-      <strong>{value}</strong>
+      <strong>
+        <AnimatedText text={value} />
+      </strong>
       <span className={good == null ? 'sv-muted' : good ? 'sv-good' : 'sv-bad'}>
         {delta == null ? 'sem base de comparação' : `${delta > 0 ? '+' : ''}${delta.toFixed(0)}% vs. dia anterior`}
       </span>

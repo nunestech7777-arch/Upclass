@@ -30,7 +30,11 @@ const toDraft = (g: DeviceGoal): Draft => ({
  */
 export function DeviceGoalsManager() {
   const source = useFinanceSource();
-  const { month, setMonth } = useFinanceParams();
+  // Mês próprio do cadastro (permite meses futuros): começa no mês do filtro geral e o acompanha,
+  // mas escolher outro mês aqui não muda o período das outras páginas.
+  const { month: periodMonth } = useFinanceParams();
+  const [month, setMonth] = useState(periodMonth);
+  useEffect(() => setMonth(periodMonth), [periodMonth]);
   const [sellers, setSellers] = useState<FinanceSeller[]>([]);
   const [goals, setGoals] = useState<DeviceGoal[]>([]);
   const [drafts, setDrafts] = useState<Record<string, Draft>>({});
@@ -206,7 +210,7 @@ export function DeviceGoalsManager() {
                 <strong className="tone-goal">{goals.some((g) => g.accessory_revenue_target != null) ? `${brl(totalAccessoryRevenue)} em acessórios` : 'Sem metas de faturamento de acessórios'}</strong>
               </p>
             </div>
-            <div className="fin-table-wrap" style={{ opacity: loading ? 0.6 : 1 }}>
+            <div className={`fin-table-wrap uc-reload-scope ${loading ? 'is-reloading' : ''}`}>
               <table className="fin-table">
                 <thead>
                   <tr>

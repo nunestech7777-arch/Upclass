@@ -1,15 +1,15 @@
-import { formatDateBR, wallClock } from '../lib/finance/dates';
+import { addDays, formatDateBR, wallClock } from '../lib/finance/dates';
+import { PRESET_LABELS, formatRange } from '../lib/finance/dashboard';
+import { usePeriod } from '../context/PeriodContext';
 import React, { useEffect, useMemo, useState } from 'react';
 import { EmptyState } from '../components/brand/BrandLogo';
 import {
-  Calendar,
   Search,
   ChevronLeft,
   ChevronRight,
   Eye,
   X,
   ShoppingBag,
-  SlidersHorizontal,
   Trophy,
   CircleDollarSign,
   TrendingUp,
@@ -21,9 +21,6 @@ import {
   fetchSellers,
   fetchSalesInRange,
   classifyProductCategory,
-  getMonthRange,
-  getWeekRange,
-  getDayRange,
   fetchSaleOrderDetails,
 } from '../lib/api';
 import { parseSaleExternalId, summarizeSaleItems } from '../lib/saleDetails';
@@ -33,7 +30,6 @@ import { MetricCard, MetricDetailModal, MetricGrid, StickyFilterBar } from '../c
 import type { SaleOrderDetails } from '../lib/saleDetails';
 import type { Sale, Product, Seller } from '../lib/database.types';
 
-export type DatePreset = 'today' | 'yesterday' | 'this_week' | 'this_month' | 'last_month' | 'custom';
 
 export interface SaleRow extends Sale {
   productName: string;
@@ -60,133 +56,9 @@ function formatOptionalCurrency(value: number | null): string {
   return value == null ? '—' : formatCurrency(value);
 }
 
-function toISODateInput(date: Date): string {
-  const y = date.getFullYear();
-  const m = String(date.getMonth() + 1).padStart(2, '0');
-  const d = String(date.getDate()).padStart(2, '0');
-  return `${y}-${m}-${d}`;
-}
-
 function parseISODateInput(val: string): Date {
   const [y, m, d] = val.split('-').map(Number);
   return new Date(y, m - 1, d);
-}
-
-/** Retorna o intervalo { start, end, label } para o preset escolhido */
-export function calculateDateRange(preset: DatePreset, customStart: Date, customEnd: Date): { start: Date; end: Date; label: string } {
-  const now = new Date();
-
-  switch (preset) {
-    case 'today': {
-      const { start, end } = getDayRange(now);
-      return { start, end, label: `Hoje (${formatDate(start)})` };
-    }
-    case 'yesterday': {
-      const yesterday = new Date(now.getFullYear(), now.getMonth(), now.getDate() - 1);
-      const { start, end } = getDayRange(yesterday);
-      return { start, end, label: `Ontem (${formatDate(start)})` };
-    }
-    case 'this_week': {
-      const { start, end } = getWeekRange(now);
-      const displayEnd = new Date(end.getTime() - 86400000);
-      return { start, end, label: `Esta semana (${formatDate(start)} a ${formatDate(displayEnd)})` };
-    }
-    case 'this_month': {
-      const { start, end } = getMonthRange(now);
-      const monthName = start.toLocaleDateString('pt-BR', { month: 'long', year: 'numeric' });
-      return { start, end, label: `Este mês (${monthName})` };
-    }
-    case 'last_month': {
-      const lastMonthDate = new Date(now.getFullYear(), now.getMonth() - 1, 1);
-      const { start, end } = getMonthRange(lastMonthDate);
-      const monthName = start.toLocaleDateString('pt-BR', { month: 'long', year: 'numeric' });
-      return { start, end, label: `Mês anterior (${monthName})` };
-    }
-    case 'custom': {
-      const start = new Date(customStart.getFullYear(), customStart.getMonth(), customStart.getDate(), 0, 0, 0, 0);
-      const end = new Date(customEnd.getFullYear(), customEnd.getMonth(), customEnd.getDate() + 1, 0, 0, 0, 0);
-      return {
-        start,
-        end,
-        label: `${formatDate(customStart)} a ${formatDate(customEnd)}`,
-      };
-    }
-  }
-}
-
-// ============================================================
-// Modal de Período Personalizado
-// ============================================================
-interface CustomRangeModalProps {
-  initialStart: Date;
-  initialEnd: Date;
-  onApply: (start: Date, end: Date) => void;
-  onClose: () => void;
-}
-
-function CustomRangeModal({ initialStart, initialEnd, onApply, onClose }: CustomRangeModalProps) {
-  const [startDateStr, setStartDateStr] = useState(() => toISODateInput(initialStart));
-  const [endDateStr, setEndDateStr] = useState(() => toISODateInput(initialEnd));
-
-  const handleSave = (e: React.FormEvent) => {
-    e.preventDefault();
-    const start = parseISODateInput(startDateStr);
-    const end = parseISODateInput(endDateStr);
-    if (start > end) {
-      alert('A data inicial não pode ser posterior à data final.');
-      return;
-    }
-    onApply(start, end);
-    onClose();
-  };
-
-  return (
-    <div className="modal-overlay" onClick={onClose}>
-      <div className="sales-modal-shell" onClick={(e) => e.stopPropagation()}>
-        <div className="sales-modal-header">
-          <h3 className="sales-modal-title">Selecionar Período Personalizado</h3>
-          <button className="sales-modal-close-btn" onClick={onClose} aria-label="Fechar">
-            <X size={18} />
-          </button>
-        </div>
-
-        <form onSubmit={handleSave}>
-          <div className="sales-modal-body">
-            <div className="custom-date-inputs">
-              <div className="custom-date-field">
-                <label>Data Inicial</label>
-                <input
-                  type="date"
-                  value={startDateStr}
-                  onChange={(e) => setStartDateStr(e.target.value)}
-                  required
-                />
-              </div>
-
-              <div className="custom-date-field">
-                <label>Data Final</label>
-                <input
-                  type="date"
-                  value={endDateStr}
-                  onChange={(e) => setEndDateStr(e.target.value)}
-                  required
-                />
-              </div>
-            </div>
-          </div>
-
-          <div className="sales-modal-footer">
-            <button type="button" className="btn-secondary" onClick={onClose}>
-              Cancelar
-            </button>
-            <button type="submit" className="btn-primary">
-              Aplicar Período
-            </button>
-          </div>
-        </form>
-      </div>
-    </div>
-  );
 }
 
 // ============================================================
@@ -473,16 +345,8 @@ export function Sales() {
   const [sellers, setSellers] = useState<Seller[]>([]);
   const [loadingBase, setLoadingBase] = useState(true);
 
-  // Filtro de Período Principal no Topo Direito
-  const [datePreset, setDatePreset] = useState<DatePreset>('this_month');
-  const [customRange, setCustomRange] = useState<{ start: Date; end: Date }>(() => {
-    const now = new Date();
-    return {
-      start: new Date(now.getFullYear(), now.getMonth(), 1),
-      end: now,
-    };
-  });
-  const [isCustomModalOpen, setIsCustomModalOpen] = useState(false);
+  // Período: filtro geral do sistema (barra abaixo do menu do topo)
+  const period = usePeriod();
 
   // Vendas carregadas para o período ativo
   const [sales, setSales] = useState<Sale[]>([]);
@@ -515,10 +379,15 @@ export function Sales() {
       .finally(() => setLoadingBase(false));
   }, []);
 
-  // 2. Intervalo de data atual calculado
-  const activeRange = useMemo(() => {
-    return calculateDateRange(datePreset, customRange.start, customRange.end);
-  }, [datePreset, customRange]);
+  // 2. Intervalo do filtro geral (fim exclusivo: meia-noite do dia seguinte)
+  const activeRange = useMemo(
+    () => ({
+      start: parseISODateInput(period.range.from),
+      end: parseISODateInput(addDays(period.range.to, 1)),
+      label: `${PRESET_LABELS[period.preset]} (${formatRange(period.range)})`,
+    }),
+    [period.preset, period.range]
+  );
 
   // 3. Busca de vendas sempre que o intervalo ativo mudar
   useEffect(() => {
@@ -709,14 +578,6 @@ export function Sales() {
     return filteredSales.slice(startIdx, startIdx + PAGE_SIZE);
   }, [filteredSales, currentPage]);
 
-  const handlePresetChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
-    const val = e.target.value as DatePreset;
-    setDatePreset(val);
-    if (val === 'custom') {
-      setIsCustomModalOpen(true);
-    }
-  };
-
   const isLoading = loadingBase || loadingSales;
 
   return (
@@ -730,38 +591,6 @@ export function Sales() {
           </p>
         </div>
 
-        <div className="sales-date-filter-container">
-          <div className="sales-date-filter-label">
-            <Calendar size={16} color="var(--accent-text)" />
-            <span>Período:</span>
-          </div>
-
-          <select
-            className="sales-date-select"
-            value={datePreset}
-            onChange={handlePresetChange}
-          >
-            <option value="today">Hoje</option>
-            <option value="yesterday">Ontem</option>
-            <option value="this_week">Esta semana</option>
-            <option value="this_month">Este mês</option>
-            <option value="last_month">Mês anterior</option>
-            <option value="custom">
-              {datePreset === 'custom' ? `Personalizado (${activeRange.label})` : 'Período personalizado...'}
-            </option>
-          </select>
-
-          {datePreset === 'custom' && (
-            <button
-              className="sales-custom-date-btn"
-              onClick={() => setIsCustomModalOpen(true)}
-              title="Ajustar datas do período personalizado"
-            >
-              <SlidersHorizontal size={14} />
-              <span>Ajustar</span>
-            </button>
-          )}
-        </div>
       </div>
 
       {/* 2. Filtros — fixos no topo durante a rolagem */}
@@ -895,7 +724,7 @@ export function Sales() {
       </MetricGrid>
 
       {/* 4. Tabela de Listagem de Vendas */}
-      <div className="sales-table-card" style={{ opacity: isLoading ? 0.6 : 1 }}>
+      <div className={`sales-table-card uc-reload-scope ${isLoading ? 'is-reloading' : ''}`}>
         <div className="sales-table-wrapper">
           <table className="sales-table">
             <thead>
@@ -987,19 +816,6 @@ export function Sales() {
           </div>
         )}
       </div>
-
-      {/* Modal de Período Personalizado */}
-      {isCustomModalOpen && (
-        <CustomRangeModal
-          initialStart={customRange.start}
-          initialEnd={customRange.end}
-          onApply={(start, end) => {
-            setCustomRange({ start, end });
-            setDatePreset('custom');
-          }}
-          onClose={() => setIsCustomModalOpen(false)}
-        />
-      )}
 
       {/* Detalhamento dos indicadores */}
       {metricDetail && (metricDetail === 'avg' ? (

@@ -1,0 +1,123 @@
+/* Filtro de período geral — logo abaixo do menu do topo, no alto de todas as páginas. */
+.pb-bar {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 10px 14px;
+  margin: 0 0 20px;
+  padding: 8px 12px;
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-lg);
+  background: var(--surface-card);
+  box-shadow: var(--shadow-sm);
+  font-size: 13px;
+  color: var(--text-secondary);
+}
+
+.pb-title {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--text-tertiary);
+}
+.pb-title svg {
+  color: var(--accent-text);
+}
+
+.pb-control {
+  display: inline-flex;
+  align-items: center;
+  gap: 2px;
+  border: 1px solid var(--border-subtle);
+  border-radius: 10px;
+  background: var(--surface-field);
+  padding: 2px;
+}
+.pb-control select {
+  border: none;
+  background: transparent;
+  box-shadow: none;
+  padding: 6px 6px;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--text-primary);
+  cursor: pointer;
+}
+.pb-control select:focus-visible,
+.pb-arrow:focus-visible {
+  outline: 2px solid var(--accent-text);
+  outline-offset: 1px;
+}
+
+.pb-arrow {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 30px;
+  height: 30px;
+  border: none;
+  border-radius: 8px;
+  background: transparent;
+  color: var(--text-secondary);
+  cursor: pointer;
+}
+.pb-arrow:hover:not(:disabled) {
+  background: var(--surface-muted);
+  color: var(--text-primary);
+}
+.pb-arrow:disabled {
+  opacity: 0.35;
+  cursor: default;
+}
+
+.pb-range {
+  font-weight: 600;
+  color: var(--text-primary);
+}
+
+.pb-dates {
+  display: inline-flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+.pb-dates label {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+.pb-dates input {
+  border: 1px solid var(--border-subtle);
+  border-radius: 8px;
+  padding: 6px 8px;
+  font-size: 13px;
+  background: var(--surface-field);
+  color: var(--text-primary);
+}
+
+.pb-hint {
+  margin-left: auto;
+  font-size: 12px;
+  color: var(--text-tertiary);
+}
+
+@media (max-width: 640px) {
+  .pb-bar {
+    margin-bottom: 16px;
+  }
+  .pb-control {
+    flex: 1 1 auto;
+  }
+  .pb-control select {
+    flex: 1;
+    min-width: 0;
+  }
+  .pb-hint {
+    margin-left: 0;
+    flex-basis: 100%;
+  }
+}

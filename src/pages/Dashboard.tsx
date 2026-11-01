@@ -1,5 +1,4 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
-import { useSearchParams } from 'react-router-dom';
 import { CircleDollarSign, Headphones, Percent, RefreshCw, Smartphone, TrendingUp, Wallet } from 'lucide-react';
 import './Dashboard.css';
 import '../components/finance/finance.css';
@@ -8,13 +7,15 @@ import { SoldProductsModal } from '../components/SoldProductsModal';
 import { EmptyState, KpiCard, SectionEyebrow } from '../components/finance/FinancePrimitives';
 import { CoverageStatus } from '../components/dashboard/CoverageStatus';
 import { useFinanceSource } from '../components/finance/useFinance';
-import { PeriodFilter } from '../components/dashboard/PeriodFilter';
+import { usePeriod } from '../context/PeriodContext';
 import { GoalCards } from '../components/dashboard/GoalCards';
 import { SalesItemsDialog, TopProductCard, TopProductDialog } from '../components/dashboard/TopProducts';
 import { SalesEvolutionChart } from '../components/dashboard/SalesEvolutionChart';
 import { ConversionNotice, SellerRankings } from '../components/dashboard/SellerRankings';
+import { AnimatedNumber } from '../components/ui/AnimatedNumber';
+import { countDelay, useScrollReveal } from '../lib/motion';
 import { MigrationPendingError, type ConversionStatus, type DashboardData, type DeviceGoal } from '../lib/finance/financeApi';
-import { formatInstantBR, monthOf, monthTitle, storeHourNow, storeToday } from '../lib/finance/dates';
+import { formatInstantBR, monthOf, monthTitle, storeHourNow } from '../lib/finance/dates';
 import { brl, int, pct } from '../lib/finance/format';
 import {
   PRESET_LABELS,
@@ -26,30 +27,20 @@ import {
   defaultMode,
   formatRange,
   goalWindow,
-  presetRange,
   rangeCoverage,
   salesIn,
   summarizeMoney,
   summarizeUnits,
   topProduct,
   unitGoalProgress,
-  type PeriodPreset,
   type SeriesMode,
 } from '../lib/finance/dashboard';
 
-const PRESETS = Object.keys(PRESET_LABELS) as PeriodPreset[];
+const REVEAL_TARGETS = ':scope > .dv-kpis > *, :scope > .dv-goals > *, :scope > .dv-tops > *, :scope > :not(.dv-kpis, .dv-goals, .dv-tops, .dv-reload-bar)';
 
 export function Dashboard() {
   const source = useFinanceSource();
-  const [params, setParams] = useSearchParams();
-  const today = storeToday();
-
-  const rawPreset = params.get('periodo');
-  const preset: PeriodPreset = PRESETS.includes(rawPreset as PeriodPreset) ? (rawPreset as PeriodPreset) : 'month';
-  const range = useMemo(
-    () => presetRange(preset, today, { from: params.get('de') ?? undefined, to: params.get('ate') ?? undefined }),
-    [preset, today, params]
-  );
+  const { preset, range, today } = usePeriod();
   const need = useMemo(() => dataRange(range, today), [range, today]);
 
   const [data, setData] = useState<DashboardData | null>(null);
@@ -140,24 +131,20 @@ export function Dashboard() {
     };
   }, [data, need.from, need.to, range, today, goalsState]);
 
+  // Enquanto um período fora do intervalo carregado é consultado, o painel anterior fica na tela
+  // (esmaecido) em vez de sumir: a recarga é discreta e os números contam do valor antigo ao novo.
+  const [lastView, setLastView] = useState(view);
+  if (view && view !== lastView) setLastView(view);
+  const shown = view ?? lastView;
+  const reloading = loading || (!view && !!lastView);
+
+  // Cards e seções abaixo da dobra entram quando chegam à tela (no celular, quase tudo).
+  const contentRef = useRef<HTMLDivElement>(null);
+  useScrollReveal(contentRef, REVEAL_TARGETS, !!shown && !!data && !error);
+
   const deviceRow = view?.deviceRows.find((r) => r.seller.id === deviceSeller);
   const modeKey = `${range.from}|${range.to}`;
   const activeMode: SeriesMode = mode && mode.key === modeKey ? mode.value : defaultMode(range);
-
-  const setFilter = (next: PeriodPreset, custom?: { from: string; to: string }) => {
-    setParams((prev) => {
-      const q = new URLSearchParams(prev);
-      q.set('periodo', next);
-      if (next === 'custom' && custom) {
-        q.set('de', custom.from);
-        q.set('ate', custom.to);
-      } else {
-        q.delete('de');
-        q.delete('ate');
-      }
-      return q;
-    });
-  };
 
   return (
     <div className="fin-page dv-page">
@@ -174,49 +161,48 @@ export function Dashboard() {
             <RefreshCw size={15} className={loading ? 'fin-spin' : ''} /> Atualizar
           </button>
           <CoverageStatus coverage={view?.coverage ?? null} />
-          <PeriodFilter preset={preset} range={range} today={today} onChange={setFilter} />
         </div>
       </header>
 
       {error ? (
         <EmptyState title={error instanceof MigrationPendingError ? 'Módulo financeiro ainda não ativado no banco' : 'Não foi possível carregar o Dashboard'}>{error.message}</EmptyState>
-      ) : !view || !data ? (
-        <div className="fin-loading">Carregando o Dashboard…</div>
+      ) : !shown || !data ? (
+        <DashboardSkeleton />
       ) : (
-        <div className={loading ? 'is-reloading' : ''}>
+        <div ref={contentRef} className={`dv-content dv-enter ${reloading ? 'dv-reloading' : ''}`} aria-busy={reloading}>
+          <span className="dv-reload-bar" aria-hidden="true" />
           <div className="dv-kpis">
-            <KpiCard label="Aparelhos vendidos" value={int(view.units.devices)} icon={<Smartphone size={18} />} tone="goal" caption="iPhones no período" />
-            <KpiCard label="Acessórios vendidos" value={int(view.units.accessories)} icon={<Headphones size={18} />} tone="profit" caption={view.units.gifts ? `${int(view.units.gifts)} brinde(s) fora da contagem` : 'Acessórios pagos'} />
-            <KpiCard label="Faturamento" value={brl(view.money.revenue)} icon={<CircleDollarSign size={18} />} tone="neutral" badge={view.coverage.complete ? undefined : 'Parcial'} caption="Receita líquida conciliada" />
-            <KpiCard label="Lucro bruto" value={brl(view.money.profit)} icon={<Wallet size={18} />} tone={view.money.profit < 0 ? 'deficit' : 'profit'} highlight badge={view.coverage.complete ? undefined : 'Parcial'} caption="Faturamento − custo dos produtos" />
-            <KpiCard label="Margem" value={pct(view.money.margin)} icon={<Percent size={18} />} tone="neutral" caption={view.money.margin == null ? 'Indisponível sem faturamento' : 'Lucro bruto ÷ faturamento'} />
+            <KpiCard label="Aparelhos vendidos" value={<AnimatedNumber value={shown.units.devices} format={int} delay={countDelay(1)} />} icon={<Smartphone size={18} />} tone="goal" caption="iPhones no período" />
+            <KpiCard label="Acessórios vendidos" value={<AnimatedNumber value={shown.units.accessories} format={int} delay={countDelay(2)} />} icon={<Headphones size={18} />} tone="profit" caption={shown.units.gifts ? `${int(shown.units.gifts)} brinde(s) fora da contagem` : 'Acessórios pagos'} />
+            <KpiCard label="Faturamento" value={<AnimatedNumber value={shown.money.revenue} format={brl} delay={countDelay(3)} />} icon={<CircleDollarSign size={18} />} tone="neutral" badge={shown.coverage.complete ? undefined : 'Parcial'} caption="Receita líquida conciliada" />
+            <KpiCard label="Lucro bruto" value={<AnimatedNumber value={shown.money.profit} format={brl} delay={countDelay(4)} />} icon={<Wallet size={18} />} tone={shown.money.profit < 0 ? 'deficit' : 'profit'} highlight badge={shown.coverage.complete ? undefined : 'Parcial'} caption="Faturamento − custo dos produtos" />
+            <KpiCard label="Margem" value={<AnimatedNumber value={shown.money.margin} format={pct} delay={countDelay(5)} />} icon={<Percent size={18} />} tone="neutral" caption={shown.money.margin == null ? 'Indisponível sem faturamento' : 'Lucro bruto ÷ faturamento'} />
           </div>
 
-          <GoalCards week={view.week} month={view.month} units={view.units} onOpenSales={() => setSalesOpen(true)} />
+          <GoalCards week={shown.week} month={shown.month} units={shown.units} onOpenSales={() => setSalesOpen(true)} />
 
           <div className="dv-tops">
-            <TopProductCard kind="devices" product={view.topDevice} onOpen={() => setDetail('devices')} />
-            <TopProductCard kind="accessories" product={view.topAccessory} onOpen={() => setDetail('accessories')} />
+            <TopProductCard kind="devices" product={shown.topDevice} onOpen={() => setDetail('devices')} />
+            <TopProductCard kind="accessories" product={shown.topAccessory} onOpen={() => setDetail('accessories')} />
           </div>
 
           <SalesEvolutionChart
-            points={view.series.points}
-            granularity={view.series.granularity}
+            points={shown.series.points}
+            granularity={shown.series.granularity}
             mode={activeMode}
             onModeChange={(m) => setMode({ key: modeKey, value: m })}
-            totals={{ devices: view.units.devices, accessories: view.units.accessories }}
-            subtitle={`${view.series.granularity === 'hour' ? 'Por hora' : view.series.granularity === 'day' ? 'Por dia' : 'Por mês'} · ${formatRange(range)}${activeMode === 'cumulative' ? ' · acumulado até o último dado real' : ''}`}
+            totals={{ devices: shown.units.devices, accessories: shown.units.accessories }}
+            subtitle={`${shown.series.granularity === 'hour' ? 'Por hora' : shown.series.granularity === 'day' ? 'Por dia' : 'Por mês'} · ${formatRange(range)}${activeMode === 'cumulative' ? ' · acumulado até o último dado real' : ''}`}
           />
 
           <SellerRankings
-            rows={view.sellerRows}
-            month={monthOf(range.to)}
-            operation={{ profit: view.money.profit, revenue: view.money.revenue, orders: view.units.orders }}
+            rows={shown.sellerRows}
+            operation={{ profit: shown.money.profit, revenue: shown.money.revenue, orders: shown.units.orders }}
             devices={{
-              rows: view.deviceRows,
+              rows: shown.deviceRows,
               monthLabel: monthTitle(refMonth),
               goalsAvailable: goalsState?.available ?? true,
-              operationDevices: view.units.devices,
+              operationDevices: shown.units.devices,
               onOpenSeller: setDeviceSeller,
             }}
           />
@@ -256,6 +242,20 @@ export function Dashboard() {
         initialStartDate={range.from}
         initialEndDate={range.to}
       />
+    </div>
+  );
+}
+
+/** Placeholders foscos no formato do painel enquanto a primeira carga não chega. */
+function DashboardSkeleton() {
+  const blocks = (n: number, cls: string) => Array.from({ length: n }, (_, i) => <span key={i} className={`dv-skel ${cls}`} />);
+  return (
+    <div className="dv-skeleton" role="status" aria-live="polite">
+      <span className="uc-sr-only">Carregando o Dashboard…</span>
+      <div className="dv-kpis">{blocks(5, 'is-kpi')}</div>
+      <div className="dv-goals">{blocks(3, 'is-goal')}</div>
+      <div className="dv-tops">{blocks(2, 'is-top')}</div>
+      {blocks(1, 'is-chart')}
     </div>
   );
 }

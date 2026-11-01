@@ -52,7 +52,7 @@ export function Goals() {
 
       <h2 className="h2">Metas de unidades</h2>
 
-      <div className="grid-dashboard" style={{opacity: loading ? 0.6 : 1}}>
+      <div className={`grid-dashboard uc-reload-scope ${loading ? 'is-reloading' : ''}`}>
         <div className="card flex-col gap-4">
           <h2 className="h2">Meta Semanal</h2>
           <div className="flex-col gap-2">

@@ -419,7 +419,7 @@ export function Inventory() {
       <StockTurnoverPanel items={classified} />
 
       <div className="inventory-container">
-        <div className="inventory-table-card" style={{ opacity: loading && items.length > 0 ? 0.7 : 1 }}>
+        <div className={`inventory-table-card uc-reload-scope ${loading && items.length > 0 ? 'is-reloading' : ''}`}>
           <table className="inventory-table">
             <thead>
               <tr>

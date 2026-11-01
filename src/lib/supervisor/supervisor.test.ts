@@ -3,9 +3,12 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { channelOf, originLabel, kommoLeadUrl } from './channels.ts';
 import {
+  byTimeline,
   conversationStats,
   formatSeconds,
   median,
+  sortByTimeline,
+  storeDayOf,
   summarize,
   variation,
   type PeriodConversation,
@@ -147,4 +150,22 @@ test('transcrição para o avaliador: marca mensagem sem texto e não inventa co
     t,
     '[28/10, 09:00] Cliente: Oi, tem iPhone 15?\n[28/10, 09:01] Vendedor (Ana): [mensagem sem texto disponível]\n[28/10, 09:02] Vendedor (Ana): [voice]'
   );
+});
+
+test('sortByTimeline: mesma ordem que sort(byTimeline), inclusive empates e received_seq ausente', () => {
+  const list: PeriodMessage[] = [
+    msg('a', 'client', '2026-10-28T12:00:00Z', 3),
+    msg('b', 'seller', '2026-10-28T11:00:00.000Z', 2),
+    { conversation_id: 'c', sender: 'bot', sent_at: '2026-10-28T12:00:00Z' },
+    msg('d', 'client', '2026-10-28T12:00:00Z', 3),
+    msg('e', 'seller', '2026-10-28T09:00:00-03:00', 1),
+    msg('f', 'client', '2026-10-28T12:00:00Z', 1),
+  ];
+  assert.deepEqual(sortByTimeline(list), [...list].sort(byTimeline));
+  assert.equal(list[0].conversation_id, 'a');
+});
+
+test('storeDayOf: dia no fuso de Brasília', () => {
+  assert.equal(storeDayOf('2026-10-28T02:59:59Z'), '2026-10-27');
+  assert.equal(storeDayOf('2026-10-28T03:00:00Z'), '2026-10-28');
 });

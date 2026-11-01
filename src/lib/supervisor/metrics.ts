@@ -83,6 +83,19 @@ export function byTimeline(a: PeriodMessage, b: PeriodMessage): number {
 }
 
 /**
+ * Mesma ordem de `[...messages].sort(byTimeline)` (sort estável, mesmos critérios), mas lendo cada
+ * horário uma vez só — com milhares de mensagens o Date.parse dentro da comparação pesava na tela.
+ */
+export function sortByTimeline<T extends PeriodMessage>(messages: T[]): T[] {
+  const keyed = messages.map((m) => ({ m, t: Date.parse(m.sent_at), seq: m.received_seq ?? Number.MAX_SAFE_INTEGER }));
+  keyed.sort((a, b) => {
+    const d = a.t - b.t;
+    return d !== 0 ? d : a.seq - b.seq;
+  });
+  return keyed.map((k) => k.m);
+}
+
+/**
  * Rodadas de atendimento de uma conversa: a primeira mensagem do cliente abre a espera e a primeira
  * resposta humana depois dela fecha (vendedor identificado ou envio pelo aparelho). Resposta
  * automática não conta como atendimento. Com `periodEnd`, mensagens depois do fim do período só
@@ -95,7 +108,7 @@ export function conversationStats(messages: PeriodMessage[], periodEnd?: string)
   let waitingSince: string | null = null;
   // Espera no FIM do período: "sem resposta" é histórico do período, não muda com a resposta do dia seguinte.
   let waitingAtEnd: string | null = null;
-  for (const m of [...messages].sort(byTimeline)) {
+  for (const m of sortByTimeline(messages)) {
     const inPeriod = Date.parse(m.sent_at) < endMs;
     if (!inPeriod && waitingAtEnd === null) waitingAtEnd = waitingSince ?? '';
     if (m.sender === 'client') {
@@ -138,7 +151,7 @@ export function groupMessages(messages: PeriodMessage[]): Map<string, PeriodMess
     if (list) list.push(m);
     else grouped.set(m.conversation_id, [m]);
   }
-  for (const list of grouped.values()) list.sort(byTimeline);
+  for (const [id, list] of grouped) grouped.set(id, sortByTimeline(list));
   return grouped;
 }
 
@@ -313,9 +326,12 @@ function groupMetrics(
   };
 }
 
+// Criar um Intl.DateTimeFormat por chamada custava ~0,5 s por resumo (uma chamada por conversa e por rodada).
+const STORE_DAY_FORMAT = new Intl.DateTimeFormat('en-CA', { timeZone: 'America/Sao_Paulo' });
+
 /** Dia da loja (AAAA-MM-DD, America/Sao_Paulo) de um instante. */
 export function storeDayOf(iso: string): string {
-  return new Intl.DateTimeFormat('en-CA', { timeZone: 'America/Sao_Paulo' }).format(new Date(iso));
+  return STORE_DAY_FORMAT.format(new Date(iso));
 }
 
 /**

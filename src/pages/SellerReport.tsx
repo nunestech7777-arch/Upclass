@@ -15,6 +15,7 @@ import {
 } from '../lib/api';
 import type { Seller } from '../lib/database.types';
 import './SellerReport.css';
+import { AnimatedText } from '../components/ui/AnimatedNumber';
 
 interface ReportData {
   seller: Seller;
@@ -102,7 +103,9 @@ export function SellerReport() {
           title="Clique para ver os iPhones vendidos"
         >
           <Smartphone size={22} className="seller-kpi-icon" style={{ color: 'var(--accent-text)' }} />
-          <span className="seller-kpi-value">{data?.devicesSold ?? 0}</span>
+          <span className="seller-kpi-value">
+            <AnimatedText text={String(data?.devicesSold ?? 0)} />
+          </span>
           <span className="seller-kpi-label">IPHONES</span>
           <span className="seller-kpi-hint">Ver detalhes →</span>
         </div>
@@ -115,7 +118,9 @@ export function SellerReport() {
           title="Clique para ver os Acessórios vendidos"
         >
           <Headphones size={22} className="seller-kpi-icon" style={{ color: 'var(--success)' }} />
-          <span className="seller-kpi-value">{data?.accessoriesSold ?? 0}</span>
+          <span className="seller-kpi-value">
+            <AnimatedText text={String(data?.accessoriesSold ?? 0)} />
+          </span>
           <span className="seller-kpi-label">ACESSÓRIOS</span>
           <span className="seller-kpi-hint">Ver detalhes →</span>
         </div>
@@ -128,13 +133,17 @@ export function SellerReport() {
           title="Clique para ver todos os produtos vendidos"
         >
           <ShoppingBag size={22} className="seller-kpi-icon" />
-          <span className="seller-kpi-value">{data?.productsSold ?? 0}</span>
+          <span className="seller-kpi-value">
+            <AnimatedText text={String(data?.productsSold ?? 0)} />
+          </span>
           <span className="seller-kpi-label">TOTAL PRODUTOS</span>
           <span className="seller-kpi-hint">Ver detalhes →</span>
         </div>
         <div className="seller-kpi-card">
           <TrendingUp size={22} className="seller-kpi-icon" />
-          <span className="seller-kpi-value">{data?.conversionRate ?? 0}%</span>
+          <span className="seller-kpi-value">
+            <AnimatedText text={`${data?.conversionRate ?? 0}%`} />
+          </span>
           <span className="seller-kpi-label">CONVERSÃO</span>
         </div>
       </div>

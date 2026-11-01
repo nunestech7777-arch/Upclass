@@ -29,7 +29,7 @@ export function SellerFinanceSection({ sellerId }: { sellerId: string }) {
           </h2>
           <div className="fin-filters">
             <MonthPicker month={month} onChange={setMonth} />
-            <Link className="fin-btn" to={`/resultado-financeiro?mes=${month}`}>
+            <Link className="fin-btn" to={`/resultado-financeiro`}>
               Ranking de lucro
             </Link>
           </div>

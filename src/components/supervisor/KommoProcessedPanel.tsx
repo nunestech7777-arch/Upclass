@@ -2,6 +2,7 @@ import React from 'react';
 import { Bot } from 'lucide-react';
 import { int } from '../../lib/finance/format';
 import type { KommoProcessed } from '../../lib/supervisor/attendance';
+import { AnimatedText } from '../ui/AnimatedNumber';
 
 /**
  * "Conversas processadas — critério Kommo" ao lado das conversas únicas do Meu Supervisor, para
@@ -22,12 +23,16 @@ export function KommoProcessedPanel({
       <div className="sv-kp-totals">
         <div>
           <small>Conversas processadas — critério Kommo</small>
-          <strong>{int(data.total)}</strong>
+          <strong>
+            <AnimatedText text={int(data.total)} />
+          </strong>
           <span>soma por atendente (uma conversa com 2 atendentes conta 2)</span>
         </div>
         <div>
           <small>Conversas únicas</small>
-          <strong>{int(uniqueConversations)}</strong>
+          <strong>
+            <AnimatedText text={int(uniqueConversations)} />
+          </strong>
           <span>cada conversa uma vez (cliente escreveu ou uma pessoa respondeu)</span>
         </div>
       </div>
@@ -36,7 +41,9 @@ export function KommoProcessedPanel({
           <li key={u.kommoUserId}>
             <div className="sv-bars-row">
               <span>{kommoUserName(u.kommoUserId)}</span>
-              <strong>{int(u.talks)}</strong>
+              <strong>
+                <AnimatedText text={int(u.talks)} />
+              </strong>
             </div>
             <span className="fin-progress" aria-hidden="true">
               <span className="fin-progress-fill sv-fill-whatsapp" style={{ width: `${(u.talks / max) * 100}%` }} />
@@ -49,7 +56,9 @@ export function KommoProcessedPanel({
               <span className="sv-inline-icon">
                 <Bot size={14} aria-hidden="true" /> Robô
               </span>
-              <strong>{int(data.robot.total)}</strong>
+              <strong>
+                <AnimatedText text={int(data.robot.total)} />
+              </strong>
             </div>
             <span className="fin-progress" aria-hidden="true">
               <span className="fin-progress-fill sv-fill-other" style={{ width: `${(data.robot.total / max) * 100}%` }} />

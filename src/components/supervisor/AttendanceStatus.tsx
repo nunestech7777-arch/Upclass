@@ -9,6 +9,7 @@ import {
   type AttendanceTotals,
   type ConversationAttendance,
 } from '../../lib/supervisor/attendance';
+import { AnimatedText } from '../ui/AnimatedNumber';
 
 const ICON: Record<AttendanceFilter, React.ReactNode> = {
   atendida: <CheckCircle2 size={16} aria-hidden="true" />,
@@ -62,7 +63,9 @@ export function AttendanceStatusPanel({
                 {ICON[f]}
                 <span>{filterLabel(f)}</span>
               </span>
-              <strong>{f === 'aguardando_distribuicao' && distributionUnknown ? '—' : int(n)}</strong>
+              <strong>
+                <AnimatedText text={f === 'aguardando_distribuicao' && distributionUnknown ? '—' : int(n)} />
+              </strong>
               <small>
                 {f !== 'aguardando_distribuicao'
                   ? `${pct(share)} das conversas`

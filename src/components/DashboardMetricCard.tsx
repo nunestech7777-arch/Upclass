@@ -1,6 +1,7 @@
 import React from 'react';
 import { ChevronRight } from 'lucide-react';
 import './DashboardMetricCard.css';
+import { CountUpValue } from './ui/AnimatedNumber';
 
 export interface DashboardMetricCardProps {
   icon: React.ReactNode;
@@ -53,7 +54,9 @@ export function DashboardMetricCard({
       <div className="metric-icon-wrapper" style={{ color: iconColor }}>
         {icon}
       </div>
-      <span className="metric-card-value">{value}</span>
+      <span className="metric-card-value">
+        <CountUpValue value={value} />
+      </span>
       <span className="metric-card-label">{label}</span>
       {sublabel && <span className="metric-card-sublabel">{sublabel}</span>}
       {isInteractive && (

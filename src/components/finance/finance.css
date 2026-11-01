@@ -169,7 +169,7 @@
 }
 .fin-empty p { color: var(--fin-muted); margin-top: 4px; }
 .fin-loading { padding: 40px; text-align: center; color: var(--fin-muted); }
-.is-reloading { opacity: 0.6; transition: opacity 0.2s; }
+/* .is-reloading: ver .uc-reload-scope em index.css (mesma recarga do Dashboard). */
 .fin-spin { animation: fin-spin 1s linear infinite; }
 @keyframes fin-spin { to { transform: rotate(360deg); } }
 

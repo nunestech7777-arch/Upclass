@@ -11,6 +11,7 @@ import { GoalsTransferActions } from './GoalsTransfer';
 import { EmptyState } from './FinancePrimitives';
 import { useFinanceParams, useFinanceSource } from './useFinance';
 import './finance.css';
+import { AnimatedText } from '../ui/AnimatedNumber';
 
 type Draft = { profit: string; worst: string };
 
@@ -23,7 +24,11 @@ const toNumber = parseMoneyInput;
  */
 export function ProfitGoalsManager() {
   const source = useFinanceSource();
-  const { month, setMonth } = useFinanceParams();
+  // Mês próprio do cadastro (permite meses futuros): começa no mês do filtro geral e o acompanha,
+  // mas escolher outro mês aqui não muda o período das outras páginas.
+  const { month: periodMonth } = useFinanceParams();
+  const [month, setMonth] = useState(periodMonth);
+  useEffect(() => setMonth(periodMonth), [periodMonth]);
   const [sellers, setSellers] = useState<FinanceSeller[]>([]);
   const [goals, setGoals] = useState<ProfitGoal[]>([]);
   const [drafts, setDrafts] = useState<Record<string, Draft>>({});
@@ -115,7 +120,7 @@ export function ProfitGoalsManager() {
         <p className="fin-muted fin-small">
           A meta da operação é a soma das metas individuais do mês. Meta vazia = “Sem meta” (diferente de zero). O pior cenário deve ser menor ou
           igual à meta. As metas de unidades acima continuam valendo para os rankings de quantidade.{' '}
-          <Link className="fin-link" to={`/resultado-financeiro?mes=${month}`}>
+          <Link className="fin-link" to={`/resultado-financeiro`}>
             Ver resultado do mês
           </Link>
         </p>
@@ -130,11 +135,16 @@ export function ProfitGoalsManager() {
             <div className="fin-goal-box">
               <span className="fin-eyebrow">Meta da operação · {monthLabel(month)}</span>
               <p>
-                <strong className="tone-goal">{goals.length ? brl(total) : 'Sem metas cadastradas'}</strong>
+                <strong className="tone-goal">
+                  <AnimatedText text={goals.length ? brl(total) : 'Sem metas cadastradas'} />
+                </strong>
                 {goals.length > 0 && (
                   <>
                     {' '}
-                    · pior cenário <strong className="tone-worst">{brl(totalWorst)}</strong> · {int(goals.length)} vendedor(es)
+                    · pior cenário{' '}
+                    <strong className="tone-worst">
+                      <AnimatedText text={brl(totalWorst)} />
+                    </strong> · {int(goals.length)} vendedor(es)
                   </>
                 )}
               </p>

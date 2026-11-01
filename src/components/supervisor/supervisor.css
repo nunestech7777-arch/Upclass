@@ -25,7 +25,7 @@
 
 /* Abas das seções ---------------------------------------------------------- */
 .sv-tabs {
-  display: flex; gap: 4px; padding: 4px; border: 1px solid var(--fin-border); border-radius: 14px;
+  display: flex; flex: none; gap: 4px; padding: 4px; border: 1px solid var(--fin-border); border-radius: 14px;
   background: var(--fin-surface); overflow-x: auto; scrollbar-width: none; -webkit-overflow-scrolling: touch;
 }
 .sv-tabs::-webkit-scrollbar { display: none; }
@@ -136,12 +136,16 @@
 .sv-conv-list, .sv-conv-detail {
   border: 1px solid var(--fin-border); border-radius: 16px; background: var(--fin-surface); box-shadow: var(--shadow-sm); min-width: 0;
 }
-.sv-conv-list { display: flex; flex-direction: column; position: sticky; top: 16px; max-height: calc(100vh - 32px); overflow: hidden; }
+/* Coluna flex com altura máxima: só a lista de conversas pode encolher (ver .sv-conv-items). Filtros, busca,
+   contagem e paginação têm `flex: none` — um item com overflow (os filtros rolam na horizontal) tem altura
+   mínima 0 e seria espremido junto com a lista, cortando os textos. */
+.sv-conv-list { display: flex; flex-direction: column; position: sticky; top: calc(var(--mobile-header-height, 0px) + 16px); max-height: max(calc(100vh - var(--mobile-header-height, 0px) - 32px), 420px); overflow: hidden; }
+.sv-conv-list > .sv-status-filters, .sv-conv-list > .sv-search, .sv-conv-list > .sv-conv-count, .sv-conv-list > .sv-pager { flex: none; }
 .sv-search { display: flex; align-items: center; gap: 8px; margin: 12px 12px 6px; padding: 0 10px; border: 1px solid var(--fin-border); border-radius: 10px; color: var(--fin-muted); background: var(--surface-field); }
 .sv-search input { border: none !important; background: transparent !important; box-shadow: none !important; padding: 9px 0; flex: 1; min-width: 0; font-size: 14px; color: var(--fin-text); }
 .sv-conv-count { font-size: 12px; color: var(--fin-muted); padding: 2px 14px 8px; }
 .sv-conv-list > .sv-loading, .sv-conv-list > .sv-error, .sv-conv-list > .fin-empty { margin: 0 12px 12px; }
-.sv-conv-items { overflow-y: auto; flex: 1; padding: 0 6px 6px; }
+.sv-conv-items { overflow-y: auto; flex: 1 1 auto; min-height: 120px; padding: 0 6px 6px; }
 .sv-conv-item { display: flex; flex-direction: column; gap: 6px; padding: 10px; border-radius: 10px; color: inherit; border: 1px solid transparent; }
 .sv-conv-item:hover { background: var(--fin-row-hover); }
 .sv-conv-item.is-active { background: var(--fin-selected); border-color: var(--fin-highlight-border); }
@@ -354,10 +358,15 @@
 .sv-att-card strong { font-size: 22px; font-weight: 800; font-variant-numeric: tabular-nums; }
 .sv-att-card small { font-size: 11.5px; color: var(--fin-muted); }
 
-.sv-status-filters { display: flex; gap: 6px; overflow-x: auto; padding: 2px 2px 8px; scrollbar-width: thin; }
+/* Filtros de status: rolam na horizontal quando não cabem, nunca na vertical, e mantêm a altura do conteúdo. */
+.sv-status-filters {
+  display: flex; align-items: center; gap: 6px; flex: none; overflow-x: auto; overflow-y: hidden;
+  padding: 6px 12px 10px; scrollbar-width: thin; -webkit-overflow-scrolling: touch;
+}
 .sv-status-filters button {
+  display: inline-flex; align-items: center; flex: 0 0 auto; min-height: 28px;
   border: 1px solid var(--fin-border); background: var(--fin-surface); color: var(--fin-text); border-radius: 999px;
-  font-size: 12px; font-weight: 600; padding: 4px 10px; white-space: nowrap; cursor: pointer;
+  font-size: 12px; font-weight: 600; line-height: 1.25; padding: 5px 12px; white-space: nowrap; cursor: pointer;
 }
 .sv-status-filters button.is-active { border-color: var(--fin-accent); background: var(--action-primary-soft); color: var(--fin-accent); }
 .sv-status-filters button:focus-visible { outline: 2px solid var(--fin-accent); outline-offset: 2px; }

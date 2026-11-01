@@ -1,0 +1,14 @@
+/* Seletor de tema do vídeo de referência: dois botões redondos, o ativo preenchido em alto contraste. */
+.uc-theme-toggle { display: inline-flex; align-items: center; gap: 4px; }
+.uc-theme-toggle button {
+  display: inline-flex; align-items: center; justify-content: center;
+  width: 34px; height: 34px; border-radius: 999px; border: 0; padding: 0;
+  background: transparent; color: var(--text-secondary); cursor: pointer;
+  transition: background-color 0.2s ease, color 0.2s ease, transform 0.2s var(--ease-out);
+  touch-action: manipulation; -webkit-tap-highlight-color: transparent;
+}
+.uc-theme-toggle button:hover { color: var(--text-primary); }
+.uc-theme-toggle button:active { transform: scale(0.92); }
+/* Mesmas cores da pílula da navegação: azul-tinta no claro, degradê azul → roxo no escuro. */
+.uc-theme-toggle button.is-active { background: var(--tn-pill, var(--uc-ink)); color: #FFFFFF; box-shadow: var(--tn-pill-shadow, none); }
+.uc-theme-toggle button:focus-visible { outline: 2px solid var(--uc-cyan); outline-offset: 2px; }

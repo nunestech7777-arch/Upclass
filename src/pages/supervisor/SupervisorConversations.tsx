@@ -136,7 +136,7 @@ export function SupervisorConversations() {
         ) : rows.length === 0 ? (
           <EmptyState title="Nenhuma conversa encontrada.">Mude o período, o atendente, o canal, o status ou a busca.</EmptyState>
         ) : (
-          <ul className={`sv-conv-items ${loading ? 'is-reloading' : ''}`}>
+          <ul className={`sv-conv-items uc-reload-scope ${loading ? 'is-reloading' : ''}`}>
             {visible.map((c) => {
               const a = data.attendance.get(c.id);
               return (

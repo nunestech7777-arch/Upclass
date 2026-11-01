@@ -10,12 +10,12 @@ import {
   Trophy,
   ArrowRight,
   Sparkles,
-  ChevronLeft,
-  ChevronRight,
   Camera,
   CircleDollarSign,
 } from 'lucide-react';
 import { useTheme } from '../context/ThemeContext';
+import { usePeriod } from '../context/PeriodContext';
+import { addDays } from '../lib/finance/dates';
 import { SellerAvatar } from '../components/SellerAvatar';
 import { SellerPhotoModal } from '../components/SellerPhotoModal';
 import {
@@ -24,15 +24,19 @@ import {
   fetchAllConversations,
   fetchProducts,
   computeSellerPerformance,
-  getMonthRange,
   type SellerPerformance,
 } from '../lib/api';
 import type { Seller } from '../lib/database.types';
 import './Sellers.css';
+import { AnimatedText } from '../components/ui/AnimatedNumber';
 
 type RankingType = 'iphones' | 'accessories' | 'sales' | 'conversion';
 
-const MONTH_NAMES_FULL = ['Janeiro', 'Fevereiro', 'Março', 'Abril', 'Maio', 'Junho', 'Julho', 'Agosto', 'Setembro', 'Outubro', 'Novembro', 'Dezembro'];
+
+const localDate = (iso: string) => {
+  const [y, m, d] = iso.split('-').map(Number);
+  return new Date(y, m - 1, d);
+};
 
 export function Sellers() {
   const { theme } = useTheme();
@@ -41,11 +45,13 @@ export function Sellers() {
   const [performance, setPerformance] = useState<SellerPerformance[]>([]);
   const [loading, setLoading] = useState(true);
   const [rankingType, setRankingType] = useState<RankingType>('iphones');
-  const [viewMonth, setViewMonth] = useState<Date>(() => new Date());
+  const { range } = usePeriod();
   const [editingPhotoSeller, setEditingPhotoSeller] = useState<Seller | null>(null);
 
   useEffect(() => {
-    const { start, end } = getMonthRange(viewMonth);
+    // Fim exclusivo: meia-noite do dia seguinte ao último dia do período geral.
+    const start = localDate(range.from);
+    const end = localDate(addDays(range.to, 1));
     setLoading(true);
     Promise.all([
       fetchVisibleSellers(),
@@ -57,16 +63,7 @@ export function Sellers() {
         setPerformance(computeSellerPerformance(sellers, sales, conversations, products));
       })
       .finally(() => setLoading(false));
-  }, [viewMonth]);
-
-  const handleNavigateMonth = (delta: number) => {
-    setViewMonth((prev) => new Date(prev.getFullYear(), prev.getMonth() + delta, 1));
-  };
-
-  const isCurrentMonth = useMemo(() => {
-    const now = new Date();
-    return viewMonth.getFullYear() === now.getFullYear() && viewMonth.getMonth() === now.getMonth();
-  }, [viewMonth]);
+  }, [range]);
 
   // Compute Leaders for the Podium Highlights
   const leaderIphones = useMemo(() => {
@@ -158,42 +155,13 @@ export function Sellers() {
             Acompanhe o desempenho individual dividido por iPhones, Acessórios e Taxa de Conversão
           </p>
           <Link
-            to={`/resultado-financeiro?mes=${viewMonth.getFullYear()}-${String(viewMonth.getMonth() + 1).padStart(2, '0')}`}
+            to="/resultado-financeiro"
             className="sellers-profit-link"
           >
             <CircleDollarSign size={15} />
             Ver ranking de lucro e metas financeiras
             <ArrowRight size={14} />
           </Link>
-        </div>
-
-        {/* Month Selector */}
-        <div className="sellers-month-nav">
-          <button
-            className="sellers-month-arrow"
-            onClick={() => handleNavigateMonth(-1)}
-            aria-label="Mês anterior"
-          >
-            <ChevronLeft size={16} />
-          </button>
-          <select
-            className="sellers-month-select"
-            value={viewMonth.getMonth()}
-            onChange={(e) => setViewMonth(new Date(viewMonth.getFullYear(), Number(e.target.value), 1))}
-            aria-label="Selecionar mês"
-          >
-            {MONTH_NAMES_FULL.map((name, idx) => (
-              <option key={name} value={idx}>{name} de {viewMonth.getFullYear()}</option>
-            ))}
-          </select>
-          <button
-            className="sellers-month-arrow"
-            onClick={() => handleNavigateMonth(1)}
-            disabled={isCurrentMonth}
-            aria-label="Próximo mês"
-          >
-            <ChevronRight size={16} />
-          </button>
         </div>
 
         {/* Tab Controls */}
@@ -339,7 +307,7 @@ export function Sellers() {
       )}
 
       {/* Sellers Cards Grid */}
-      <div className="seller-grid" style={{ opacity: loading ? 0.6 : 1 }}>
+      <div className={`seller-grid uc-reload-scope ${loading ? 'is-reloading' : ''}`}>
         {rankedSellers.map(({ seller, sold, devicesSold, accessoriesSold, conversion, rank }) => {
           const badge = getRankBadge(rank);
 
@@ -384,7 +352,9 @@ export function Sellers() {
                     <Smartphone size={14} />
                     iPhones Vendidos
                   </span>
-                  <span className="seller-stat-val">{devicesSold} un.</span>
+                  <span className="seller-stat-val">
+                    <AnimatedText text={`${devicesSold} un.`} />
+                  </span>
                 </div>
 
                 <div className={`seller-stat-row ${rankingType === 'accessories' ? 'highlight-metric' : ''}`}>
@@ -392,7 +362,9 @@ export function Sellers() {
                     <Headphones size={14} />
                     Acessórios Vendidos
                   </span>
-                  <span className="seller-stat-val">{accessoriesSold} un.</span>
+                  <span className="seller-stat-val">
+                    <AnimatedText text={`${accessoriesSold} un.`} />
+                  </span>
                 </div>
 
                 <div className={`seller-stat-row ${rankingType === 'sales' ? 'highlight-metric' : ''}`}>
@@ -400,7 +372,9 @@ export function Sellers() {
                     <Package size={14} />
                     Total Geral
                   </span>
-                  <span className="seller-stat-val">{sold} un.</span>
+                  <span className="seller-stat-val">
+                    <AnimatedText text={`${sold} un.`} />
+                  </span>
                 </div>
 
                 <div className={`seller-stat-row ${rankingType === 'conversion' ? 'highlight-metric' : ''}`}>
@@ -409,7 +383,7 @@ export function Sellers() {
                     Taxa de Conversão
                   </span>
                   <span className="seller-stat-val" style={{ color: 'var(--accent-text)' }}>
-                    {conversion}%
+                    <AnimatedText text={`${conversion}%`} />
                   </span>
                 </div>
               </div>

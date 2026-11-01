@@ -5,6 +5,7 @@ import type { SeriesMode, SeriesPoint } from '../../lib/finance/dashboard';
 import { int } from '../../lib/finance/format';
 import { SectionEyebrow } from '../finance/FinancePrimitives';
 import { useFinanceColors } from '../finance/useFinance';
+import { chartMotion, usePrefersReducedMotion } from '../../lib/motion';
 
 interface Props {
   points: SeriesPoint[];
@@ -27,6 +28,7 @@ const unitWord = (n: number) => (n === 1 ? 'unidade' : 'unidades');
  */
 export function SalesEvolutionChart({ points, granularity, mode, onModeChange, totals, subtitle }: Props) {
   const c = useFinanceColors();
+  const reduced = usePrefersReducedMotion();
   const [hidden, setHidden] = useState<Record<SeriesKey, boolean>>({ devices: false, accessories: false });
 
   const series: { key: SeriesKey; name: string; color: string; total: number }[] = [
@@ -126,8 +128,8 @@ export function SalesEvolutionChart({ points, granularity, mode, onModeChange, t
                 activeDot={{ r: 5 }}
                 hide={hidden[s.key]}
                 connectNulls={false}
-                isAnimationActive
-                animationDuration={500}
+                // A linha se desenha da esquerda para a direita; em atualizações o Recharts transforma a curva anterior.
+                {...chartMotion(reduced)}
               />
             ))}
           </LineChart>

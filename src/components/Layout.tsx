@@ -1,22 +1,19 @@
-import React, { useState, useEffect } from 'react';
-import { Outlet, useLocation } from 'react-router-dom';
-import { Sidebar } from './Sidebar';
-import { MobileHeader } from './MobileHeader';
+import React, { useRef } from 'react';
+import { Outlet } from 'react-router-dom';
+import { TopNav } from './TopNav';
+import { PeriodBar } from './PeriodBar';
+import { usePageMotion } from '../lib/motion';
 
 export function Layout() {
-  const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
-  const location = useLocation();
-
-  // Automatically close mobile menu whenever the route changes
-  useEffect(() => {
-    setMobileMenuOpen(false);
-  }, [location.pathname]);
+  const mainRef = useRef<HTMLElement>(null);
+  // Cards, números e blocos de todas as páginas entram com a mesma cascata do Dashboard.
+  usePageMotion(mainRef);
 
   return (
     <div className="app-container">
-      <MobileHeader onToggleSidebar={() => setMobileMenuOpen(prev => !prev)} />
-      <Sidebar isOpen={mobileMenuOpen} onClose={() => setMobileMenuOpen(false)} />
-      <main className="main-content">
+      <TopNav />
+      <main ref={mainRef} className="main-content">
+        <PeriodBar />
         <Outlet />
       </main>
     </div>

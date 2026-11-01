@@ -182,7 +182,7 @@ export function WeeklyGoalsManager() {
                 <strong className="tone-goal">{goals.length > 0 ? `${int(total)} aparelhos · ${goals.length} vendedor(es)` : 'Nenhuma meta cadastrada nesta semana'}</strong>
               </p>
             </div>
-            <div className="fin-table-wrap" style={{ opacity: loading ? 0.6 : 1 }}>
+            <div className={`fin-table-wrap uc-reload-scope ${loading ? 'is-reloading' : ''}`}>
               <table className="fin-table">
                 <thead>
                   <tr>

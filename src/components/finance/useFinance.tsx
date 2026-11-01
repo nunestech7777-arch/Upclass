@@ -3,7 +3,7 @@ import { useSearchParams } from 'react-router-dom';
 import { chartThemeFor } from '../../lib/chartTheme';
 import { useTheme } from '../../context/ThemeContext';
 import { buildMonthFinance, type MonthFinance } from '../../lib/finance/calc';
-import { isMonthKey, monthOf, storeToday } from '../../lib/finance/dates';
+import { usePeriod } from '../../context/PeriodContext';
 import { supabaseFinanceSource, type FinanceSource, type MonthFinanceData } from '../../lib/finance/financeApi';
 
 const FinanceSourceContext = createContext<FinanceSource>(supabaseFinanceSource);
@@ -17,13 +17,12 @@ export function useFinanceSource(): FinanceSource {
 }
 
 /**
- * Competência (`?mes=AAAA-MM`) e vendedor aberto no painel lateral (`?vendedor=`) ficam na URL,
- * para o período sobreviver à navegação entre ranking, resultados diários e relatório.
+ * Competência = mês do período geral do sistema (filtro no topo, ver PeriodContext); vendedor aberto
+ * no painel lateral (`?vendedor=`) e dia selecionado (`?dia=`) ficam na URL.
  */
 export function useFinanceParams() {
   const [params, setParams] = useSearchParams();
-  const rawMonth = params.get('mes');
-  const month = isMonthKey(rawMonth) ? rawMonth : monthOf(storeToday());
+  const { month, setMonth } = usePeriod();
   const sellerId = params.get('vendedor');
   const day = params.get('dia');
 
@@ -48,7 +47,10 @@ export function useFinanceParams() {
     month,
     sellerId,
     day,
-    setMonth: (m: string) => update({ mes: m, dia: null }),
+    setMonth: (m: string) => {
+      setMonth(m);
+      update({ dia: null }, true);
+    },
     openSeller: (id: string) => update({ vendedor: id }),
     closeSeller: () => update({ vendedor: null }),
     setDay: (d: string | null) => update({ dia: d }, true),
@@ -84,11 +86,13 @@ export function useMonthFinance(month: string): MonthFinanceState {
     };
   }, [source, month, nonce]);
 
+  // Ao trocar de mês, o mês anterior continua na tela (esmaecido por `loading`) até o novo chegar —
+  // a mesma recarga do Dashboard: nada desmonta e os números contam do valor antigo ao novo.
   const finance = useMemo(
     () =>
-      data && data.month === month
+      data
         ? buildMonthFinance({
-            month,
+            month: data.month,
             sellers: data.sellers,
             productNames: data.productNames,
             sales: data.sales,
@@ -96,10 +100,10 @@ export function useMonthFinance(month: string): MonthFinanceState {
             iphoneBaseline: data.iphoneBaseline,
           })
         : null,
-    [data, month]
+    [data]
   );
 
-  return { data, finance, loading, error, reload: () => setNonce((n) => n + 1) };
+  return { data, finance, loading: loading || (!!data && data.month !== month), error, reload: () => setNonce((n) => n + 1) };
 }
 
 /** Cores do módulo financeiro, coerentes entre cards, gráficos e legendas. */

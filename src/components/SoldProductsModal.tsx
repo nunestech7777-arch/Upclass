@@ -29,6 +29,7 @@ import {
 import type { Sale, Product, Seller } from '../lib/database.types';
 import { formatDateBR, formatWallDateTime, wallClock } from '../lib/finance/dates';
 import './SoldProductsModal.css';
+import { AnimatedText } from './ui/AnimatedNumber';
 
 export type ProductTypeFilter = 'all' | 'Aparelhos' | 'Acessórios';
 export type PeriodFilterOption = 'today' | '7days' | '30days' | 'month' | 'custom' | 'all';
@@ -524,7 +525,7 @@ export function SoldProductsModal({
             </div>
             <div className="summary-card-content">
               <span className="summary-card-label">Quantidade Total</span>
-              <span className="summary-card-value">{summaryMetrics.totalUnits} un.</span>
+              <span className="summary-card-value"><AnimatedText text={`${summaryMetrics.totalUnits} un.`} /></span>
               <span className="summary-card-sub">
                 {summaryMetrics.totalIphones} iPhones • {summaryMetrics.totalAccessories} Acessórios
               </span>
@@ -537,7 +538,7 @@ export function SoldProductsModal({
             </div>
             <div className="summary-card-content">
               <span className="summary-card-label">Valor Total Vendido</span>
-              <span className="summary-card-value">{formatCurrency(summaryMetrics.totalRevenue)}</span>
+              <span className="summary-card-value"><AnimatedText text={formatCurrency(summaryMetrics.totalRevenue)} /></span>
               <span className="summary-card-sub positive">Faturamento no período</span>
             </div>
           </div>
@@ -548,7 +549,7 @@ export function SoldProductsModal({
             </div>
             <div className="summary-card-content">
               <span className="summary-card-label">Média por Produto</span>
-              <span className="summary-card-value">{formatCurrency(summaryMetrics.avgTicket)}</span>
+              <span className="summary-card-value"><AnimatedText text={formatCurrency(summaryMetrics.avgTicket)} /></span>
               <span className="summary-card-sub">Valor vendido ÷ unidades</span>
             </div>
           </div>
@@ -559,7 +560,7 @@ export function SoldProductsModal({
             </div>
             <div className="summary-card-content">
               <span className="summary-card-label">Lucro (conciliado)</span>
-              <span className="summary-card-value">{summaryMetrics.totalProfit != null ? formatCurrency(summaryMetrics.totalProfit) : '—'}</span>
+              <span className="summary-card-value"><AnimatedText text={summaryMetrics.totalProfit != null ? formatCurrency(summaryMetrics.totalProfit) : '—'} /></span>
               <span className="summary-card-sub">
                 {summaryMetrics.totalProfit != null ? 'Custo histórico do Mercado Phone' : 'Custo ainda não conciliado'}
               </span>

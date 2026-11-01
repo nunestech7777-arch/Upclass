@@ -1,6 +1,7 @@
 import React, { useEffect, useRef } from 'react';
 import { AlertTriangle, ChevronRight, X } from 'lucide-react';
 import './metrics.css';
+import { CountUpValue } from '../ui/AnimatedNumber';
 
 /**
  * Peças compartilhadas pelas abas Vendas e Estoque: grade de 5 cards clicáveis, modal de
@@ -31,7 +32,7 @@ export function MetricCard({ icon, tone, badge, label, value, caption, partial, 
       </div>
       <span className="mc-label">{label}</span>
       <span className="mc-value" title={typeof value === 'string' ? value : undefined}>
-        {loading ? '…' : value}
+        {loading ? '…' : <CountUpValue value={value} />}
       </span>
       {caption && <span className="mc-caption">{loading ? 'carregando…' : caption}</span>}
       {!loading && partial && (

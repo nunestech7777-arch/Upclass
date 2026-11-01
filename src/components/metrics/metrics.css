@@ -62,13 +62,12 @@
 
 /* ============================================================
    Barra de filtros fixa (sticky)
-   Desktop: rolagem ocorre dentro de .main-content (top: 0).
-   Mobile / Tablet (<= 1024px): rolagem ocorre na janela, logo abaixo do MobileHeader.
+   A página rola na janela: a barra gruda logo abaixo da navegação do topo (TopNav).
    ============================================================ */
 .mc-filters-sticky {
   position: -webkit-sticky;
   position: sticky;
-  top: 0;
+  top: var(--mobile-header-height, 0px);
   z-index: 100;
   margin-top: -10px;
   margin-bottom: -4px;

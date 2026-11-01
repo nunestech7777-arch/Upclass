@@ -1,12 +1,10 @@
-import React, { useMemo } from 'react';
+import React from 'react';
 import { Area, CartesianGrid, ComposedChart, Line, ReferenceDot, ResponsiveContainer, Tooltip, XAxis, YAxis } from 'recharts';
+import { chartMotion } from '../lib/motion';
 import { tooltipStyle, useChartTheme } from '../lib/chartTheme';
 import { hasWeeklyEvolution, type WeeklyEvolutionPoint } from '../lib/weeklyEvolution';
 import { formatDateBR } from '../lib/finance/dates';
 import './WeeklyGoalChart.css';
-
-const prefersReducedMotion = () =>
-  typeof window !== 'undefined' && window.matchMedia?.('(prefers-reduced-motion: reduce)').matches;
 
 function signed(n: number): string {
   const v = Math.round(n * 10) / 10;
@@ -16,7 +14,6 @@ function signed(n: number): string {
 /** Evolução acumulada da semana: realizado (linha cheia) contra o ritmo da meta (tracejada). */
 export function WeeklyGoalChart({ points }: { points: WeeklyEvolutionPoint[] }) {
   const chart = useChartTheme();
-  const animate = useMemo(() => !prefersReducedMotion(), []);
 
   if (!hasWeeklyEvolution(points)) {
     return (
@@ -67,8 +64,8 @@ export function WeeklyGoalChart({ points }: { points: WeeklyEvolutionPoint[] }) 
                 );
               }}
             />
-            <Line type="linear" dataKey="expected" stroke={chart.reference} strokeWidth={2} strokeDasharray="6 5" dot={false} activeDot={false} isAnimationActive={false} />
-            <Area type="monotone" dataKey="realized" stroke={chart.series[0]} strokeWidth={3} fill="url(#wgcFill)" connectNulls={false} dot={{ r: 3, fill: chart.series[0], strokeWidth: 0 }} activeDot={{ r: 5 }} isAnimationActive={animate} />
+            <Line {...chartMotion()} type="linear" dataKey="expected" stroke={chart.reference} strokeWidth={2} strokeDasharray="6 5" dot={false} activeDot={false} isAnimationActive={false} />
+            <Area {...chartMotion()} type="monotone" dataKey="realized" stroke={chart.series[0]} strokeWidth={3} fill="url(#wgcFill)" connectNulls={false} dot={{ r: 3, fill: chart.series[0], strokeWidth: 0 }} activeDot={{ r: 5 }} />
             {today && <ReferenceDot x={today.label} y={today.realized as number} r={7} fill={chart.surface} stroke={chart.series[0]} strokeWidth={3} ifOverflow="visible" />}
           </ComposedChart>
         </ResponsiveContainer>

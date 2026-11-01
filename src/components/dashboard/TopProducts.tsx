@@ -4,6 +4,10 @@ import { brl, int, pct } from '../../lib/finance/format';
 import { formatDateBR, wallClock } from '../../lib/finance/dates';
 import { isReconciled, type FinanceSale } from '../../lib/finance/calc';
 import type { TopProduct } from '../../lib/finance/dashboard';
+import { countDelay } from '../../lib/motion';
+import { AnimatedNumber } from '../ui/AnimatedNumber';
+
+const units = (v: number | null | undefined) => `${int(v)} un.`;
 
 interface CardProps {
   kind: 'devices' | 'accessories';
@@ -14,6 +18,7 @@ interface CardProps {
 export function TopProductCard({ kind, product, onOpen }: CardProps) {
   const isDevice = kind === 'devices';
   const title = isDevice ? 'Aparelho mais vendido' : 'Acessório mais vendido';
+  const delay = countDelay(isDevice ? 7 : 8);
   return (
     <button type="button" className="fin-panel dv-top" onClick={onOpen} disabled={!product} aria-label={`${title}: ver detalhes`}>
       <span className="fin-eyebrow">
@@ -26,15 +31,21 @@ export function TopProductCard({ kind, product, onOpen }: CardProps) {
           <div className="dv-top-stats">
             <div>
               <span>Quantidade</span>
-              <b className="tone-profit">{int(product.qty)} un.</b>
+              <b className="tone-profit">
+                <AnimatedNumber value={product.qty} format={units} delay={delay} />
+              </b>
             </div>
             <div>
               <span>Participação</span>
-              <b>{pct(product.share)}</b>
+              <b>
+                <AnimatedNumber value={product.share} format={pct} delay={delay} />
+              </b>
             </div>
             <div>
               <span>Faturamento gerado</span>
-              <b>{brl(product.revenue)}</b>
+              <b>
+                <AnimatedNumber value={product.revenue} format={brl} delay={delay} />
+              </b>
             </div>
           </div>
           {product.unreconciled > 0 && <span className="fin-badge-partial">Faturamento parcial · {int(product.unreconciled)} item(ns) sem custo conciliado</span>}

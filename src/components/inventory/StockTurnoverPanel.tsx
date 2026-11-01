@@ -1,8 +1,10 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { CartesianGrid, Legend, Line, LineChart, ResponsiveContainer, Tooltip, XAxis, YAxis } from 'recharts';
+import { chartMotion } from '../../lib/motion';
 import { CalendarClock, Hourglass, Info, X } from 'lucide-react';
 import { MetricCard } from '../metrics/MetricPanel';
 import type { StockItem } from '../../lib/finance/stockMetrics';
+import { usePeriod } from '../../context/PeriodContext';
 import { addDays, addMonths, formatDateBR, monthOf, storeToday } from '../../lib/finance/dates';
 import { brl } from '../../lib/finance/format';
 import { fetchStockMovements, fetchTurnoverLines } from '../../lib/finance/turnoverApi';
@@ -19,8 +21,6 @@ import {
   summarizeStockAge,
   TURNOVER_CATEGORIES,
   TURNOVER_LABELS,
-  TURNOVER_PRESET_LABELS,
-  turnoverRange,
   type CategoryFilter,
   type StockMovement,
   type TurnoverLine,
@@ -42,14 +42,16 @@ const monthShort = (m: string) => `${MONTH_SHORT[Number(m.slice(5, 7)) - 1]}/${m
  */
 export function StockTurnoverPanel({ items }: { items: StockItem[] }) {
   const today = storeToday();
-  const [preset, setPreset] = useState<TurnoverPreset>('last30');
-  const [custom, setCustom] = useState({ from: today, to: today });
+  const period = usePeriod();
   const [category, setCategory] = useState<CategoryFilter>('all');
   const minCustom = addDays(today, -365);
+  // Período geral, limitado a hoje e a um ano de histórico; "Este mês"/"Mês passado" comparam com o mês anterior.
+  const preset: TurnoverPreset = period.preset === 'month' ? 'month' : period.preset === 'lastMonth' ? 'lastMonth' : 'custom';
   const range = useMemo(() => {
-    const r = turnoverRange(preset, today, custom);
-    return r.from < minCustom ? { ...r, from: minCustom } : r;
-  }, [preset, today, custom, minCustom]);
+    const from = period.range.from < minCustom ? minCustom : period.range.from;
+    const to = period.range.to > today ? today : period.range.to;
+    return from <= to ? { from, to } : { from: to, to };
+  }, [period.range, today, minCustom]);
   const prev = useMemo(() => previousRange(preset, range), [preset, range]);
 
   const [movements, setMovements] = useState<StockMovement[]>([]);
@@ -148,23 +150,6 @@ export function StockTurnoverPanel({ items }: { items: StockItem[] }) {
         </div>
       </div>
       <div className="turn-filters">
-        <div className="turn-seg" role="tablist" aria-label="Período das vendas">
-          {(Object.keys(TURNOVER_PRESET_LABELS) as TurnoverPreset[]).map((p) => (
-            <button key={p} type="button" role="tab" aria-selected={preset === p} className={preset === p ? 'is-active' : ''} onClick={() => setPreset(p)}>
-              {TURNOVER_PRESET_LABELS[p]}
-            </button>
-          ))}
-        </div>
-        {preset === 'custom' && (
-          <div className="turn-dates">
-            <label>
-              De <input type="date" value={custom.from} min={minCustom} max={custom.to} onChange={(e) => e.target.value && setCustom((c) => ({ ...c, from: e.target.value }))} />
-            </label>
-            <label>
-              Até <input type="date" value={custom.to} min={custom.from} max={today} onChange={(e) => e.target.value && setCustom((c) => ({ ...c, to: e.target.value }))} />
-            </label>
-          </div>
-        )}
         <div className="turn-seg" role="tablist" aria-label="Categoria">
           {(['all', ...TURNOVER_CATEGORIES] as CategoryFilter[]).map((c) => (
             <button key={c} type="button" role="tab" aria-selected={category === c} className={category === c ? 'is-active' : ''} onClick={() => setCategory(c)}>
@@ -467,7 +452,7 @@ function TurnoverModal({
                   />
                   <Legend formatter={(v: string) => <span style={{ color: 'var(--text-dark)' }}>{TURNOVER_LABELS[v as keyof typeof TURNOVER_LABELS] ?? v}</span>} />
                   {shownCats.map((c) => (
-                    <Line key={c} type="linear" dataKey={c} stroke={`var(--turn-${c})`} strokeWidth={2} dot={{ r: 4 }} activeDot={{ r: 6 }} connectNulls={false} />
+                    <Line {...chartMotion()} key={c} type="linear" dataKey={c} stroke={`var(--turn-${c})`} strokeWidth={2} dot={{ r: 4 }} activeDot={{ r: 6 }} connectNulls={false} />
                   ))}
                 </LineChart>
               </ResponsiveContainer>

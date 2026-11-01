@@ -12,6 +12,7 @@ import {
   UserX,
 } from 'lucide-react';
 import { Bar, CartesianGrid, ComposedChart, Legend, Line, ResponsiveContainer, Tooltip, XAxis, YAxis } from 'recharts';
+import { chartMotion } from '../../lib/motion';
 import { KpiCard } from '../../components/finance/FinancePrimitives';
 import { AttendanceStatusPanel } from '../../components/supervisor/AttendanceStatus';
 import { KommoProcessedPanel } from '../../components/supervisor/KommoProcessedPanel';
@@ -43,7 +44,7 @@ export function SupervisorOverview() {
   const qs = search ? `?${search}` : '';
 
   return (
-    <div className={`sv-stack ${loading ? 'is-reloading' : ''}`}>
+    <div className={`sv-stack uc-reload-scope ${loading ? 'is-reloading' : ''}`}>
       {s.conversations === 0 ? (
         <EmptyState title="Nenhum atendimento no período.">Ajuste o período, o vendedor ou o canal para ver as conversas do Kommo.</EmptyState>
       ) : null}
@@ -95,8 +96,8 @@ export function SupervisorOverview() {
                   <YAxis yAxisId="r" orientation="right" axisLine={false} tickLine={false} tick={{ fill: chart.axis, fontSize: 11 }} unit=" min" width={56} />
                   <Tooltip contentStyle={tooltipStyle(chart)} formatter={(v, name) => (name === 'Resposta média' ? [`${v} min`, name] : [v, name])} />
                   <Legend wrapperStyle={{ fontSize: 12 }} />
-                  <Bar yAxisId="l" dataKey="conversas" name="Atendimentos" fill={chart.series[0]} radius={[4, 4, 0, 0]} maxBarSize={28} />
-                  <Line yAxisId="r" dataKey="resposta" name="Resposta média" stroke={chart.series[2]} strokeWidth={2.5} dot={false} connectNulls />
+                  <Bar {...chartMotion()} yAxisId="l" dataKey="conversas" name="Atendimentos" fill={chart.series[0]} radius={[4, 4, 0, 0]} maxBarSize={28} />
+                  <Line {...chartMotion()} yAxisId="r" dataKey="resposta" name="Resposta média" stroke={chart.series[2]} strokeWidth={2.5} dot={false} connectNulls />
                 </ComposedChart>
               </ResponsiveContainer>
             </div>

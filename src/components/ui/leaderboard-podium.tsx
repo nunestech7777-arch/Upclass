@@ -3,6 +3,7 @@ import { cva, type VariantProps } from "class-variance-authority"
 import { Crown } from "lucide-react"
 import { cn } from "@/lib/utils"
 import "./leaderboard-podium.css"
+import { AnimatedText } from "./AnimatedNumber"
 
 // Types
 export interface LeaderboardRanking {
@@ -229,7 +230,7 @@ const LeaderboardPodium = React.forwardRef<
               {/* Value */}
               {showValue && (
                 <span className="podium-user-value">
-                  {ranking.value.toLocaleString('pt-BR')}
+                  <AnimatedText text={ranking.value.toLocaleString('pt-BR')} />
                 </span>
               )}
 

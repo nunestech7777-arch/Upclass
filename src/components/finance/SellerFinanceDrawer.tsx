@@ -93,7 +93,7 @@ export function SellerFinanceDrawer({ row, ctx, sales, productNames, sellerNames
             {row.seller.show_in_ranking ? <EyeOff size={15} /> : <Eye size={15} />}
             {row.seller.show_in_ranking ? 'Excluir do ranking' : 'Mostrar no ranking'}
           </button>
-          <Link className="fin-btn" to={`/vendedores/${row.seller.id}?mes=${ctx.month}`}>
+          <Link className="fin-btn" to={`/vendedores/${row.seller.id}`}>
             <ExternalLink size={15} />
             Abrir relatório completo
           </Link>

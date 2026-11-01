@@ -7,8 +7,8 @@ export interface StoreRange {
 }
 
 /**
- * Filtros compartilhados pelas seções do Meu Supervisor (ficam na URL: ?periodo, ?de, ?ate,
- * ?vendedor, ?canal). `seller` = id do vendedor que RESPONDEU, 'none' = conversas sem atendente identificado.
+ * Filtros compartilhados pelas seções do Meu Supervisor (período = filtro geral do sistema; ?vendedor
+ * e ?canal ficam na URL). `seller` = id do vendedor que RESPONDEU, 'none' = conversas sem atendente identificado.
  */
 export interface SupervisorFilters {
   range: StoreRange;

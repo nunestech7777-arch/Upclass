@@ -39,7 +39,7 @@ export function DailyResults() {
   return (
     <div className="fin-page">
       <header className="fin-page-head">
-        <Link to={`/resultado-financeiro?mes=${month}`} className="fin-back">
+        <Link to={`/resultado-financeiro`} className="fin-back">
           <ArrowLeft size={15} /> Ranking de lucro
         </Link>
         <SectionEyebrow icon={<CalendarDays size={14} />}>Acompanhamento diário</SectionEyebrow>
@@ -62,7 +62,7 @@ export function DailyResults() {
       ) : !finance || !data ? (
         <div className="fin-loading">Carregando resultados diários…</div>
       ) : (
-        <div className={loading ? 'is-reloading' : ''}>
+        <div className={`uc-reload-scope ${loading ? 'is-reloading' : ''}`}>
           <DailyIndicators finance={finance} />
           <CoverageNotice coverage={finance.coverage} />
           <EmptyDaysNotice days={finance.emptyCompleteDays} lastSaleAt={lastSaleAt} />

@@ -2,6 +2,7 @@ import React from 'react';
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
 import { ThemeProvider } from './context/ThemeContext';
 import { AuthProvider } from './context/AuthContext';
+import { PeriodProvider } from './context/PeriodContext';
 import { RequireAuth } from './components/RequireAuth';
 import { RequireAdmin, RequireSeller } from './components/RequireRole';
 import { SellerPortal } from './pages/SellerPortal';
@@ -33,6 +34,7 @@ export default function App() {
     <ThemeProvider>
       <BrowserRouter>
         <AuthProvider>
+          <PeriodProvider>
           <Routes>
             <Route path="/login" element={<Login />} />
             <Route element={<RequireAuth />}>
@@ -71,6 +73,7 @@ export default function App() {
             </Route>
             <Route path="*" element={<Navigate to="/" replace />} />
           </Routes>
+          </PeriodProvider>
         </AuthProvider>
         <InstallPrompt />
       </BrowserRouter>

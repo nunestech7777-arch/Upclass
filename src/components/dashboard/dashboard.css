@@ -88,3 +88,124 @@
   .dv-coverage-grid { grid-template-columns: 1fr 1fr; }
   .dv-coverage-headline { font-size: 18px; }
 }
+
+/* ============================================================
+   Movimento — abertura em cascata, recarga discreta, placeholders.
+   Curva --ease-out (a mesma da referência); --dv-stagger = STAGGER_MS em src/lib/motion.ts.
+   ============================================================ */
+.dv-page { --dv-stagger: 55ms; --dv-enter-dur: 0.8s; }
+
+@keyframes dv-rise {
+  from { opacity: 0; transform: translateY(14px) scale(0.985); filter: blur(8px); }
+}
+@keyframes dv-rise-lite {
+  from { opacity: 0; transform: translateY(10px); }
+}
+@keyframes dv-title-reveal {
+  from { -webkit-mask-position: 100% 0; mask-position: 100% 0; transform: translateX(-6px); }
+}
+@keyframes dv-grow { from { transform: scaleX(0); } }
+@keyframes dv-sweep { from { transform: translateX(-100%); } to { transform: translateX(290%); } }
+@keyframes dv-shimmer { from { background-position: 100% 0; } to { background-position: 0 0; } }
+
+/* Cabeçalho: o texto entra primeiro e o título se revela da esquerda para a direita.
+   Começa logo depois do logo do menu lateral (Sidebar.css), seguindo a leitura da esquerda para a direita. */
+.dv-page { --dv-head-delay: 0.1s; }
+.dv-head > * { animation: dv-rise var(--dv-enter-dur) var(--ease-out) var(--dv-head-delay) backwards; }
+.dv-head > .dv-head-actions { animation-delay: calc(var(--dv-head-delay) + var(--dv-stagger)); }
+.dv-head .fin-title {
+  -webkit-mask-image: linear-gradient(90deg, #000 45%, transparent 55%);
+  mask-image: linear-gradient(90deg, #000 45%, transparent 55%);
+  -webkit-mask-size: 250% 100%;
+  mask-size: 250% 100%;
+  -webkit-mask-position: 0 0;
+  mask-position: 0 0;
+  animation: dv-title-reveal 0.9s var(--ease-out) calc(var(--dv-head-delay) + 0.08s) backwards;
+}
+
+/* Conteúdo: cada card sai do desfoque em sequência de leitura (linha por linha, da esquerda para a direita).
+   `backwards` mantém o estado inicial só durante o atraso; ao terminar, o card volta ao estilo normal. */
+.dv-enter > .dv-kpis > *,
+.dv-enter > .dv-goals > *,
+.dv-enter > .dv-tops > *,
+.dv-enter > :not(.dv-kpis, .dv-goals, .dv-tops, .dv-reload-bar) {
+  animation: dv-rise var(--dv-enter-dur) var(--ease-out) backwards;
+  animation-delay: calc(var(--dv-i, 0) * var(--dv-stagger));
+}
+.dv-kpis > :nth-child(1) { --dv-i: 1; }
+.dv-kpis > :nth-child(2) { --dv-i: 2; }
+.dv-kpis > :nth-child(3) { --dv-i: 3; }
+.dv-kpis > :nth-child(4) { --dv-i: 4; }
+.dv-kpis > :nth-child(5) { --dv-i: 5; }
+.dv-goals > :nth-child(1) { --dv-i: 4; }
+.dv-goals > :nth-child(2) { --dv-i: 5; }
+.dv-goals > :nth-child(3) { --dv-i: 6; }
+.dv-tops > :nth-child(1) { --dv-i: 7; }
+.dv-tops > :nth-child(2) { --dv-i: 8; }
+.dv-enter > .dv-chart { --dv-i: 9; }
+.dv-enter > .dv-chart ~ * { --dv-i: 10; }
+
+/* Abaixo da dobra: o card espera oculto e entra ao chegar na tela (classes do useScrollReveal);
+   cards revelados juntos seguem a mesma cascata. */
+.dv-enter .rv-pending { opacity: 0; animation-name: none !important; }
+.dv-enter .rv-in {
+  animation: dv-rise var(--dv-enter-dur) var(--ease-out) backwards;
+  animation-delay: calc(var(--rv-i, 0) * var(--dv-stagger));
+}
+
+/* Barras de meta e de ranking crescem depois que o card aparece; em atualizações deslizam até o novo valor. */
+.dv-page .fin-progress-fill {
+  transform-origin: left center;
+  transition: width 0.7s var(--ease-out);
+  animation: dv-grow 1s var(--ease-out) backwards;
+  animation-delay: calc(var(--dv-i, 0) * var(--dv-stagger) + 0.25s);
+}
+
+.dv-enter .rv-pending .fin-progress-fill { animation: none; }
+.dv-enter .rv-in .fin-progress-fill { animation-delay: calc(var(--rv-i, 0) * var(--dv-stagger) + 0.25s); }
+
+/* Recarga: o painel continua na tela, esmaecido, com uma barra fina correndo no topo. */
+.dv-content { position: relative; }
+.dv-content > :not(.dv-reload-bar) { transition: opacity 0.3s ease, filter 0.3s ease; }
+.dv-reloading > :not(.dv-reload-bar) { opacity: 0.55; filter: saturate(0.75); }
+.dv-reload-bar {
+  position: absolute; top: -10px; left: 0; right: 0; height: 2px; border-radius: 999px;
+  overflow: hidden; pointer-events: none; opacity: 0; transition: opacity 0.25s ease;
+}
+.dv-reload-bar::after {
+  content: ''; position: absolute; inset: 0; width: 35%;
+  background: linear-gradient(90deg, transparent, var(--fin-accent, var(--primary)), transparent);
+  animation: dv-sweep 1.2s ease-in-out infinite;
+}
+.dv-reloading .dv-reload-bar { opacity: 1; }
+
+/* Placeholders da primeira carga: blocos foscos no formato dos cards. */
+.dv-skeleton { display: flex; flex-direction: column; }
+.dv-skel {
+  display: block; border: 1px solid var(--fin-border); border-radius: 14px;
+  background: linear-gradient(100deg, var(--fin-surface) 35%, var(--fin-surface-2) 50%, var(--fin-surface) 65%);
+  background-size: 300% 100%;
+  animation: dv-shimmer 1.6s ease-in-out infinite, dv-rise-lite 0.5s var(--ease-out) backwards;
+}
+.dv-skel.is-kpi { height: 118px; }
+.dv-skel.is-goal { height: 176px; }
+.dv-skel.is-top { height: 196px; }
+.dv-skel.is-chart { height: 440px; border-radius: 16px; }
+
+/* Celular e telas de toque: sem desfoque animado (mais leve para a GPU), mesma sequência. */
+@media (max-width: 760px), (pointer: coarse) {
+  .dv-page { --dv-enter-dur: 0.6s; }
+  .dv-head > *,
+  .dv-enter > .dv-kpis > *,
+  .dv-enter > .dv-goals > *,
+  .dv-enter > .dv-tops > *,
+  .dv-enter > :not(.dv-kpis, .dv-goals, .dv-tops, .dv-reload-bar),
+  .dv-enter .rv-in { animation-name: dv-rise-lite; }
+  .dv-reloading > :not(.dv-reload-bar) { filter: none; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .dv-page *, .dv-page *::after { animation: none !important; }
+  .dv-head .fin-title { -webkit-mask-image: none; mask-image: none; }
+  .dv-reload-bar::after { width: 100%; background: var(--fin-accent, var(--primary)); }
+}

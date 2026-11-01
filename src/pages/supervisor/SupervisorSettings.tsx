@@ -60,7 +60,7 @@ export function SupervisorSettings() {
         ) : !health ? (
           <LoadingBlock label="Conferindo a integração…" />
         ) : (
-          <>
+          <div className={`sv-stack uc-reload-scope ${loading ? 'is-reloading' : ''}`}>
             <div className={`sv-health ${healthy ? 'is-ok' : 'is-warn'}`}>
               {healthy ? <CheckCircle2 size={18} aria-hidden="true" /> : <AlertTriangle size={18} aria-hidden="true" />}
               <span>
@@ -88,7 +88,7 @@ export function SupervisorSettings() {
                 {health.failed} conferência(s) não responderam a tempo e aparecem como “—”. Use Atualizar para tentar de novo.
               </p>
             )}
-          </>
+          </div>
         )}
       </Panel>
 

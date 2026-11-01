@@ -27,9 +27,9 @@ function Th({ k, current, onSort, children, left }: { k: RankSortKey; current: R
   );
 }
 
-function SellerCell({ row, month }: { row: SellerDashRow; month: string }) {
+function SellerCell({ row }: { row: SellerDashRow }) {
   return (
-    <Link to={`/vendedores/${row.seller.id}?mes=${month}`} className="fin-seller-cell" title="Abrir relatório do vendedor">
+    <Link to={`/vendedores/${row.seller.id}`} className="fin-seller-cell" title="Abrir relatório do vendedor">
       <SellerAvatar name={row.seller.name} photoUrl={row.seller.photo_url} size="sm" />
       <span className="fin-seller-name">{row.seller.name}</span>
     </Link>
@@ -49,13 +49,12 @@ export interface DeviceRankingProps {
 
 interface Props {
   rows: SellerDashRow[];
-  month: string;
   operation: { profit: number; revenue: number; orders: number };
   devices: DeviceRankingProps;
 }
 
 /** Rankings por vendedor do ITEM: lucro bruto e margem, com ordenação. */
-export function SellerRankings({ rows, month, operation, devices }: Props) {
+export function SellerRankings({ rows, operation, devices }: Props) {
   const [tab, setTab] = useState<Tab>('profit');
   const [sortKey, setSortKey] = useState<RankSortKey>('profit');
   const effective: RankSortKey = tab === 'margin' ? 'margin' : sortKey;
@@ -126,7 +125,7 @@ export function SellerRankings({ rows, month, operation, devices }: Props) {
                 <tr key={r.seller.id}>
                   <td className="col-rank fin-rank">{String(i + 1).padStart(2, '0')}</td>
                   <td className="align-left">
-                    <SellerCell row={r} month={month} />
+                    <SellerCell row={r} />
                     {r.reconciledItems < r.items && <span className="fin-tag tone-warn">parcial</span>}
                   </td>
                   {tab === 'profit' && (

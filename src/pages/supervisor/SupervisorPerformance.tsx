@@ -2,6 +2,7 @@ import React, { useEffect, useMemo, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { ArrowLeft, CheckCircle2, Clock3, Link2, MessagesSquare, Star, TrendingUp, UserX } from 'lucide-react';
 import { Bar, CartesianGrid, ComposedChart, Legend, Line, ResponsiveContainer, Tooltip, XAxis, YAxis } from 'recharts';
+import { chartMotion } from '../../lib/motion';
 import { KpiCard } from '../../components/finance/FinancePrimitives';
 import { SellerAvatar } from '../../components/SellerAvatar';
 import { EmptyState, ErrorBlock, LoadingBlock, Panel } from '../../components/supervisor/SupervisorPrimitives';
@@ -13,6 +14,7 @@ import { dayLabel, formatInstantBR } from '../../lib/finance/dates';
 import { int } from '../../lib/finance/format';
 import { formatSeconds } from '../../lib/supervisor/metrics';
 import { fetchAnalyzedConversations, type AnalyzedConversation } from '../../lib/supervisor/supervisorApi';
+import { AnimatedText } from '../../components/ui/AnimatedNumber';
 
 export function SupervisorPerformance() {
   const ctx = useSupervisor();
@@ -30,7 +32,7 @@ function TeamGrid() {
   const rows = data.summary.bySeller;
 
   return (
-    <div className={`sv-stack ${loading ? 'is-reloading' : ''}`}>
+    <div className={`sv-stack uc-reload-scope ${loading ? 'is-reloading' : ''}`}>
       {rows.length === 0 ? (
         <EmptyState title="Nenhum atendimento no período." />
       ) : (
@@ -59,23 +61,33 @@ function TeamGrid() {
               <span className="sv-seller-stats">
                 <span>
                   <small>Atendimentos</small>
-                  <b>{int(r.conversations)}</b>
+                  <b>
+                    <AnimatedText text={int(r.conversations)} />
+                  </b>
                 </span>
                 <span>
                   <small>Resposta média</small>
-                  <b>{formatSeconds(r.avgResponseSeconds)}</b>
+                  <b>
+                    <AnimatedText text={formatSeconds(r.avgResponseSeconds)} />
+                  </b>
                 </span>
                 <span>
                   <small>Mediana</small>
-                  <b>{formatSeconds(r.medianResponseSeconds)}</b>
+                  <b>
+                    <AnimatedText text={formatSeconds(r.medianResponseSeconds)} />
+                  </b>
                 </span>
                 <span>
                   <small>Sem resposta</small>
-                  <b className={r.awaiting ? 'sv-warn' : ''}>{int(r.awaiting)}</b>
+                  <b className={r.awaiting ? 'sv-warn' : ''}>
+                    <AnimatedText text={int(r.awaiting)} />
+                  </b>
                 </span>
                 <span>
                   <small>Analisadas</small>
-                  <b>{int(r.analyzed)}</b>
+                  <b>
+                    <AnimatedText text={int(r.analyzed)} />
+                  </b>
                 </span>
                 <span>
                   <small>Avaliação</small>
@@ -166,7 +178,7 @@ function SellerDetail({ sellerId }: { sellerId: string }) {
         <LoadingBlock />
       ) : (
         <>
-          <div className={`sv-kpis ${loading ? 'is-reloading' : ''}`}>
+          <div className={`sv-kpis uc-reload-scope ${loading ? 'is-reloading' : ''}`}>
             <KpiCard label="Atendimentos" value={int(s.conversations)} icon={<MessagesSquare size={18} />} tone="goal" highlight caption="Conversas em que ele respondeu" />
             <KpiCard label="Tempo médio de resposta" value={formatSeconds(s.avgResponseSeconds)} icon={<Clock3 size={18} />} tone="neutral" caption={s.responses ? `Mediana ${formatSeconds(s.medianResponseSeconds)} · ${int(s.responses)} respostas` : 'Sem respostas no período'} />
             <KpiCard label="Clientes sem resposta" value={int(s.awaiting)} icon={<UserX size={18} />} tone={s.awaiting ? 'deficit' : 'profit'} />
@@ -185,8 +197,8 @@ function SellerDetail({ sellerId }: { sellerId: string }) {
                   <YAxis yAxisId="r" orientation="right" axisLine={false} tickLine={false} tick={{ fill: chart.axis, fontSize: 11 }} unit=" min" width={56} />
                   <Tooltip contentStyle={tooltipStyle(chart)} formatter={(v, name) => (name === 'Resposta média' ? [`${v} min`, name] : [v, name])} />
                   <Legend wrapperStyle={{ fontSize: 12 }} />
-                  <Bar yAxisId="l" dataKey="conversas" name="Atendimentos" fill={chart.series[0]} radius={[4, 4, 0, 0]} maxBarSize={28} />
-                  <Line yAxisId="r" dataKey="resposta" name="Resposta média" stroke={chart.series[2]} strokeWidth={2.5} dot={false} connectNulls />
+                  <Bar {...chartMotion()} yAxisId="l" dataKey="conversas" name="Atendimentos" fill={chart.series[0]} radius={[4, 4, 0, 0]} maxBarSize={28} />
+                  <Line {...chartMotion()} yAxisId="r" dataKey="resposta" name="Resposta média" stroke={chart.series[2]} strokeWidth={2.5} dot={false} connectNulls />
                 </ComposedChart>
               </ResponsiveContainer>
             </div>

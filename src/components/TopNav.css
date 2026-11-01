@@ -1,0 +1,221 @@
+/* Barra superior de navegação — formato do vídeo de referência (trilho arredondado, pílula da página
+   atual, só ela com ícone) com as cores do próprio sistema em cada tema. */
+:root {
+  --topnav-height: 68px;
+  /* Altura real da barra (com a área segura do iPhone); barras fixas das páginas grudam logo abaixo. */
+  --mobile-header-height: calc(var(--topnav-height) + env(safe-area-inset-top, 0px));
+
+  --tn-bar: color-mix(in srgb, var(--surface-page) 86%, transparent);
+  --tn-border: var(--border-subtle);
+  --tn-track: var(--surface-card);
+  --tn-track-border: var(--border-subtle);
+  --tn-text: var(--text-secondary);
+  --tn-text-hover: var(--text-primary);
+  --tn-pill: var(--uc-ink);
+  --tn-pill-text: #FFFFFF;
+  --tn-pill-shadow: 0 6px 16px -4px rgba(0, 2, 41, 0.35);
+}
+[data-theme='dark'] {
+  /* Azul-marinho da página e dos cards; seleção no degradê azul → roxo da marca. */
+  --tn-bar: color-mix(in srgb, var(--surface-page) 82%, transparent);
+  --tn-track: var(--surface-card);
+  --tn-track-border: var(--border-subtle);
+  --tn-pill: linear-gradient(120deg, #063FF1 0%, #4B2BEF 55%, #8A2BE2 100%);
+  --tn-pill-text: #FFFFFF;
+  --tn-pill-shadow: 0 8px 22px -6px rgba(6, 63, 241, 0.55), inset 0 1px 0 rgba(255, 255, 255, 0.14);
+}
+
+.app-topnav {
+  position: sticky;
+  top: 0;
+  z-index: 900;
+  background: var(--tn-bar);
+  backdrop-filter: saturate(1.4) blur(14px);
+  -webkit-backdrop-filter: saturate(1.4) blur(14px);
+  border-bottom: 1px solid var(--tn-border);
+  padding-top: env(safe-area-inset-top, 0px);
+}
+
+.tn-row {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  grid-template-areas: 'brand nav actions';
+  align-items: center;
+  gap: 20px;
+  min-height: var(--topnav-height);
+  padding: 0 28px;
+  box-sizing: border-box;
+}
+
+.tn-brand { grid-area: brand; display: inline-flex; align-items: center; border-radius: 999px; }
+.tn-brand:focus-visible { outline: 2px solid var(--focus-color, var(--uc-cyan)); outline-offset: 3px; }
+.tn-logo { height: 32px; width: auto; display: block; }
+
+.tn-nav { grid-area: nav; position: relative; min-width: 0; display: flex; justify-content: center; }
+
+.tn-track {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  gap: 2px;
+  padding: 4px;
+  border-radius: 999px;
+  background: var(--tn-track);
+  border: 1px solid var(--tn-track-border);
+  box-shadow: var(--shadow-sm);
+  max-width: 100%;
+}
+
+.tn-pill {
+  position: absolute;
+  top: 0;
+  left: 0;
+  z-index: 0;
+  border-radius: 999px;
+  background: var(--tn-pill);
+  box-shadow: var(--tn-pill-shadow);
+  opacity: 0;
+  pointer-events: none;
+  will-change: transform, width;
+}
+
+.tn-link,
+.tn-more-btn {
+  position: relative;
+  z-index: 1;
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  height: 38px;
+  padding: 0 15px;
+  border: 0;
+  border-radius: 999px;
+  background: none;
+  color: var(--tn-text);
+  font: inherit;
+  font-size: 13.5px;
+  font-weight: 550;
+  white-space: nowrap;
+  cursor: pointer;
+  text-decoration: none;
+  transition: color 0.25s ease;
+  touch-action: manipulation;
+  -webkit-tap-highlight-color: transparent;
+}
+.tn-link:hover, .tn-more-btn:hover { color: var(--tn-text-hover); }
+.tn-link:focus-visible, .tn-more-btn:focus-visible { outline: 2px solid var(--focus-color, var(--uc-cyan)); outline-offset: 2px; }
+
+/* Como no vídeo: só a página selecionada mostra o ícone; ele entra junto com a pílula. */
+.tn-link svg {
+  flex-shrink: 0;
+  margin-left: -24px;
+  opacity: 0;
+  transform: scale(0.5);
+  transition: margin-left 0.34s cubic-bezier(0.22, 0.9, 0.24, 1), opacity 0.2s ease, transform 0.34s cubic-bezier(0.22, 0.9, 0.24, 1);
+}
+.tn-link.active,
+.tn-more-btn.active {
+  color: var(--tn-pill-text);
+  font-weight: 650;
+  transition: color 0.2s ease 0.1s;
+}
+.tn-link.active svg { margin-left: 0; opacity: 1; transform: none; transition-delay: 0.06s; }
+.tn-more-btn.active svg:first-child { color: inherit; }
+.tn-more-chevron { transition: transform 0.25s var(--ease-out); }
+.tn-more-btn[aria-expanded='true'] .tn-more-chevron { transform: rotate(180deg); }
+
+.tn-more { position: relative; z-index: 1; }
+.tn-more-menu {
+  position: absolute;
+  right: 0;
+  top: calc(100% + 10px);
+  z-index: 1000;
+  min-width: 240px;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  padding: 8px;
+  background: var(--surface-elevated);
+  border: 1px solid var(--border-subtle);
+  border-radius: 18px;
+  box-shadow: var(--shadow-pop, 0 20px 50px rgba(0, 2, 41, 0.25));
+  transform-origin: top right;
+  animation: tn-menu-in 0.22s var(--ease-out);
+}
+@keyframes tn-menu-in { from { opacity: 0; transform: translateY(-6px) scale(0.97); } }
+.tn-more-group {
+  font-size: 10.5px;
+  font-weight: 700;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--text-tertiary, var(--text-secondary));
+  padding: 8px 12px 4px;
+}
+.tn-more-item {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 9px 12px;
+  border-radius: 999px;
+  color: var(--text-primary);
+  font-size: 14px;
+  font-weight: 550;
+  text-decoration: none;
+}
+.tn-more-item svg { color: var(--text-secondary); }
+.tn-more-item:hover, .tn-more-item:focus-visible { background: var(--action-subtle-hover, var(--surface-subtle)); outline: none; }
+.tn-more-item.active { background: var(--tn-pill); color: var(--tn-pill-text); }
+.tn-more-item.active svg { color: inherit; }
+.tn-more-hint { margin-left: auto; font-size: 12px; color: var(--text-secondary); }
+
+.tn-measure {
+  position: absolute;
+  left: 0;
+  top: 0;
+  display: flex;
+  gap: 2px;
+  visibility: hidden;
+  pointer-events: none;
+  height: 0;
+  overflow: hidden;
+}
+
+.tn-actions { grid-area: actions; display: flex; align-items: center; gap: 12px; }
+.tn-divider { width: 1px; height: 24px; background: var(--border-subtle); }
+
+/* Entrada ao abrir o sistema: logo, páginas e controles descem em sequência (mesma curva do Dashboard). */
+@media (prefers-reduced-motion: no-preference) {
+  .tn-brand, .tn-track > .tn-link, .tn-more, .tn-actions {
+    animation: uc-drop-in 0.5s var(--ease-out) backwards;
+    animation-delay: calc(60ms + var(--tn-i, 0) * 30ms);
+  }
+}
+
+/* Tablet: menos respiro. */
+@media (max-width: 1180px) {
+  .tn-row { padding: 0 20px; gap: 14px; }
+  .tn-link, .tn-more-btn { padding: 0 12px; }
+}
+
+/* Celular: logo e controles na primeira linha; páginas numa segunda linha do mesmo cabeçalho. */
+@media (max-width: 760px) {
+  :root { --topnav-height: 112px; }
+  .tn-row {
+    grid-template-columns: minmax(0, 1fr) auto;
+    grid-template-areas: 'brand actions' 'nav nav';
+    row-gap: 8px;
+    padding: 10px 14px 10px;
+    min-height: 0;
+  }
+  .tn-logo { height: 28px; }
+  .tn-nav { justify-content: stretch; }
+  .tn-track { width: 100%; justify-content: space-between; }
+  .tn-link, .tn-more-btn { height: 36px; padding: 0 12px; font-size: 13px; }
+  .tn-actions { gap: 6px; }
+  .tn-divider { display: none; }
+  .tn-actions .uc-user-name, .tn-actions .uc-user-chevron { display: none; }
+  .tn-actions .uc-user-btn { padding: 2px; }
+  .tn-actions .uc-theme-toggle button { width: 32px; height: 32px; }
+  .tn-actions .uc-user-avatar { width: 32px; height: 32px; font-size: 12px; }
+  .tn-more-menu { right: 0; min-width: min(260px, calc(100vw - 28px)); }
+}

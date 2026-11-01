@@ -8,6 +8,7 @@ import type { SaleOrderDetails } from '../../lib/saleDetails';
 import { CategoryProfitChart } from './FinanceCharts';
 import { PctWithBar } from './FinancePrimitives';
 import { useFinanceSource } from './useFinance';
+import { AnimatedText } from '../ui/AnimatedNumber';
 
 interface Props {
   row: SellerFinance;
@@ -28,7 +29,9 @@ function Metric({ label, value, tone, hint }: { label: string; value: string; to
   return (
     <div className="fin-metric">
       <span className="fin-metric-label">{label}</span>
-      <span className={`fin-metric-value ${tone ?? ''}`}>{value}</span>
+      <span className={`fin-metric-value ${tone ?? ''}`}>
+        <AnimatedText text={value} />
+      </span>
       {hint && <span className="fin-metric-hint">{hint}</span>}
     </div>
   );
@@ -68,11 +71,15 @@ export function SellerFinanceDetail({ row, ctx, sales, productNames, sellerNames
       <div className="fin-detail-goal">
         <div>
           <span className="fin-metric-label">Meta</span>
-          <strong className="tone-goal">{row.target != null ? brl(row.target) : 'Sem meta'}</strong>
+          <strong className="tone-goal">
+            <AnimatedText text={row.target != null ? brl(row.target) : 'Sem meta'} />
+          </strong>
         </div>
         <div>
           <span className="fin-metric-label">Pior cenário</span>
-          <strong className="tone-worst">{row.worst != null ? brl(row.worst) : '—'}</strong>
+          <strong className="tone-worst">
+            <AnimatedText text={row.worst != null ? brl(row.worst) : '—'} />
+          </strong>
         </div>
         <div>
           <span className="fin-metric-label">% da meta</span>
@@ -81,16 +88,20 @@ export function SellerFinanceDetail({ row, ctx, sales, productNames, sellerNames
         <div>
           <span className="fin-metric-label">Falta</span>
           <strong className={row.gap ? 'tone-deficit' : 'tone-profit'}>
-            {row.gap == null ? '—' : row.gap === 0 ? 'Meta batida' : brl(row.gap)}
+            <AnimatedText text={row.gap == null ? '—' : row.gap === 0 ? 'Meta batida' : brl(row.gap)} />
           </strong>
         </div>
         <div>
           <span className="fin-metric-label">{ctx.phase === 'past' ? 'Fechamento' : 'Projeção'}</span>
-          <strong>{row.projection != null ? brl(row.projection) : 'Indisponível'}</strong>
+          <strong>
+            <AnimatedText text={row.projection != null ? brl(row.projection) : 'Indisponível'} />
+          </strong>
         </div>
         <div>
           <span className="fin-metric-label">Meta-base de hoje</span>
-          <strong>{row.neededPerDay != null && ctx.phase === 'current' ? brl(row.neededPerDay) : '—'}</strong>
+          <strong>
+            <AnimatedText text={row.neededPerDay != null && ctx.phase === 'current' ? brl(row.neededPerDay) : '—'} />
+          </strong>
         </div>
       </div>
 

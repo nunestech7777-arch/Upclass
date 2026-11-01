@@ -114,7 +114,7 @@ export function FinancialResults() {
 
       <div className="fin-filters">
         <MonthPicker month={month} onChange={setMonth} allowFuture={1} />
-        <Link className="fin-btn" to={`/resultados-diarios?mes=${month}`}>
+        <Link className="fin-btn" to={`/resultados-diarios`}>
           Resultados diários <ArrowRight size={15} />
         </Link>
       </div>
@@ -125,14 +125,14 @@ export function FinancialResults() {
           <p>
             Usando a soma das metas dos vendedores (<strong className="tone-goal">{brl(finance.totals.target)}</strong>) ·{' '}
             {int(data?.goals.filter((g) => g.profit_target != null).length ?? 0)} vendedor(es) com meta ·{' '}
-            <Link to={`/metas?mes=${month}`} className="fin-link">
+            <Link to={`/metas`} className="fin-link">
               editar metas
             </Link>
           </p>
         ) : (
           <p>
             Nenhuma meta de lucro cadastrada para {monthLabel(month)}.{' '}
-            <Link to={`/metas?mes=${month}`} className="fin-link">
+            <Link to={`/metas`} className="fin-link">
               Cadastrar metas de lucro
             </Link>
           </p>
@@ -178,7 +178,7 @@ export function FinancialResults() {
       ) : !finance ? (
         <div className="fin-loading">Carregando resultados financeiros…</div>
       ) : (
-        <div className={loading ? 'is-reloading' : ''}>
+        <div className={`uc-reload-scope ${loading ? 'is-reloading' : ''}`}>
           <div className="fin-kpis">
             <KpiCard
               label="Lucro realizado total"

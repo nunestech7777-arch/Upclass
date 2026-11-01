@@ -68,7 +68,7 @@ export function SupervisorAiAnalysis() {
       ) : !s ? (
         <LoadingBlock />
       ) : (
-        <div className={`sv-kpis sv-kpis-3 ${loading ? 'is-reloading' : ''}`}>
+        <div className={`sv-kpis sv-kpis-3 uc-reload-scope ${loading ? 'is-reloading' : ''}`}>
           <KpiCard label="Conversas no período" value={int(s.conversations)} icon={<Sparkles size={18} />} tone="goal" />
           <KpiCard label="Analisadas" value={int(s.analyzed)} icon={<CheckCircle2 size={18} />} tone="profit" caption={`${pct(s.conversations ? (s.analyzed / s.conversations) * 100 : null)} do período`} />
           <KpiCard label="Pendentes de análise" value={int(s.pending)} icon={<CircleDashed size={18} />} tone="warn" caption="Prontas para avaliação quando o Supervisor IA for ativado" />

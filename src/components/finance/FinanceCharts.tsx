@@ -14,6 +14,7 @@ import {
   XAxis,
   YAxis,
 } from 'recharts';
+import { chartMotion } from '../../lib/motion';
 import { TrendingUp, Users, BarChart3 } from 'lucide-react';
 import type { Aggregate, DayFinance, MonthFinance, SellerFinance } from '../../lib/finance/calc';
 import { brl, brlAxis, pct } from '../../lib/finance/format';
@@ -100,9 +101,9 @@ export function SellerComparisonChart({ sellers }: { sellers: SellerFinance[] })
                 }
               />
               <ReferenceLine x={0} stroke={c.muted} />
-              <Bar dataKey="meta" fill={c.goal} radius={[0, 4, 4, 0]} barSize={8} />
-              <Bar dataKey="pior" fill={c.worst} radius={[0, 4, 4, 0]} barSize={8} />
-              <Bar dataKey="realizado" fill={c.profit} radius={[0, 4, 4, 0]} barSize={8}>
+              <Bar {...chartMotion()} dataKey="meta" fill={c.goal} radius={[0, 4, 4, 0]} barSize={8} />
+              <Bar {...chartMotion()} dataKey="pior" fill={c.worst} radius={[0, 4, 4, 0]} barSize={8} />
+              <Bar {...chartMotion()} dataKey="realizado" fill={c.profit} radius={[0, 4, 4, 0]} barSize={8}>
                 {data.map((d) => (
                   <Cell key={d.name} fill={d.realizado < 0 ? c.deficit : c.profit} />
                 ))}
@@ -173,9 +174,9 @@ export function MonthEvolutionChart({ finance }: { finance: MonthFinance }) {
                 return <TooltipBox title={`Dia ${String(p.day).padStart(2, '0')} · ${formatDateBR(p.date)}`} rows={rows} />;
               }}
             />
-            <Line type="monotone" dataKey="goal" stroke={c.goal} strokeWidth={2} strokeDasharray="5 5" dot={false} connectNulls />
-            <Line type="linear" dataKey="projection" stroke={c.worst} strokeWidth={2} strokeDasharray="6 4" dot={false} connectNulls />
-            <Line type="monotone" dataKey="realized" stroke={c.profit} strokeWidth={3} dot={false} activeDot={{ r: 4 }} />
+            <Line {...chartMotion()} type="monotone" dataKey="goal" stroke={c.goal} strokeWidth={2} strokeDasharray="5 5" dot={false} connectNulls />
+            <Line {...chartMotion()} type="linear" dataKey="projection" stroke={c.worst} strokeWidth={2} strokeDasharray="6 4" dot={false} connectNulls />
+            <Line {...chartMotion()} type="monotone" dataKey="realized" stroke={c.profit} strokeWidth={3} dot={false} activeDot={{ r: 4 }} />
           </LineChart>
         </ResponsiveContainer>
       </div>
@@ -253,7 +254,7 @@ export function DailyProfitChart({
             />
             <ReferenceLine y={0} stroke={c.muted} />
             {dailyGoal != null && <ReferenceLine y={dailyGoal} stroke={c.goal} strokeDasharray="6 4" />}
-            <Bar
+            <Bar {...chartMotion()}
               dataKey="value"
               radius={[4, 4, 0, 0]}
               cursor="pointer"
@@ -315,7 +316,7 @@ export function CategoryProfitChart({ byCategory }: { byCategory: Aggregate['byC
               <YAxis type="category" dataKey="name" width={84} tick={{ fill: c.text, fontSize: 12 }} axisLine={false} tickLine={false} />
               {tooltip}
               <ReferenceLine x={0} stroke={c.muted} />
-              <Bar dataKey="value" radius={4} barSize={14}>
+              <Bar {...chartMotion()} dataKey="value" radius={4} barSize={14}>
                 {data.map((d) => (
                   <Cell key={d.name} fill={d.value < 0 ? c.deficit : palette[d.name]} />
                 ))}
@@ -327,7 +328,7 @@ export function CategoryProfitChart({ byCategory }: { byCategory: Aggregate['byC
         <div style={{ width: '100%', height: 190 }}>
           <ResponsiveContainer>
             <PieChart>
-              <Pie data={data} dataKey="value" nameKey="name" innerRadius={52} outerRadius={78} paddingAngle={2} stroke="none">
+              <Pie {...chartMotion()} data={data} dataKey="value" nameKey="name" innerRadius={52} outerRadius={78} paddingAngle={2} stroke="none">
                 {data.map((d) => (
                   <Cell key={d.name} fill={palette[d.name]} />
                 ))}

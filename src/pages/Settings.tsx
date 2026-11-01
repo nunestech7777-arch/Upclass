@@ -76,7 +76,7 @@ export function Settings() {
         <h1 className="h1">Configurações do Painel</h1>
       </div>
 
-      <div className="card" style={{maxWidth: '600px', width: '100%', opacity: loading ? 0.6 : 1}}>
+      <div className={`card uc-reload-scope ${loading ? 'is-reloading' : ''}`} style={{maxWidth: '600px', width: '100%'}}>
         <div className="flex-col gap-6">
           <div className="flex-between" style={{paddingBottom: '16px', borderBottom: '1px solid var(--border-color)', gap: '12px'}}>
             <div>

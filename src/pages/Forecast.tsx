@@ -1,5 +1,6 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import { AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts';
+import { chartMotion } from '../lib/motion';
 import { ShoppingBag, Smartphone, Headphones, AlertTriangle, Apple } from 'lucide-react';
 import './Forecast.css';
 import '../components/finance/finance.css';
@@ -50,6 +51,7 @@ import {
   TeamFilters, TeamProjectionTable, TeamSummaryCards, type RatioTeamRow, type TeamRow } from '../components/forecast/ForecastTeamSection';
 import { Link } from 'react-router-dom';
 import { tooltipStyle, useChartTheme } from '../lib/chartTheme';
+import { AnimatedText } from '../components/ui/AnimatedNumber';
 
 type CategoryFilter = 'all' | 'devices' | 'accessories';
 
@@ -100,7 +102,7 @@ export function Forecast() {
 
   const ctx = useMemo(() => buildContext(month), [month]);
 
-  const view = useMemo(() => {
+  const freshView = useMemo(() => {
     if (!data || data.month !== month) return null;
     // Metas independentes por categoria (aparelhos × acessórios), por métrica (unidades × R$) e por vendedor.
     const deviceGoalBy = new Map(data.deviceGoals.map((g) => [g.seller_id, g.device_target]));
@@ -200,6 +202,11 @@ export function Forecast() {
       operationTotal,
     };
   }, [data, month, ctx, sellerFilter, sortKey, unit, metric, ratio, ratioSort]);
+  // Como no Dashboard: ao trocar de mês, a projeção anterior fica na tela (esmaecida) até a nova chegar.
+  const [lastView, setLastView] = useState(freshView);
+  if (freshView && freshView !== lastView) setLastView(freshView);
+  const view = freshView ?? lastView;
+  const reloading = loading || (!freshView && !!view);
 
   // Vendedor filtrado que não existe no mês escolhido volta para "todos".
   useEffect(() => {
@@ -226,7 +233,7 @@ export function Forecast() {
         ) : !view ? (
           <div className="fin-loading">Carregando projeção da equipe…</div>
         ) : (
-          <div className={loading ? 'is-reloading' : ''}>
+          <div className={`uc-reload-scope ${reloading ? 'is-reloading' : ''}`}>
             {data && !data.deviceGoalsAvailable && (
               <div className="fin-notice is-partial" role="status">
                 <AlertTriangle size={16} />
@@ -382,7 +389,7 @@ export function Forecast() {
                         metas individuais ({view.summary.target.toLocaleString('pt-BR')}); o gráfico e as categorias abaixo usam a meta global.{' '}
                       </>
                     )}
-                    <Link className="fin-link" to={`/metas?mes=${month}`}>
+                    <Link className="fin-link" to={`/metas`}>
                       Editar metas de {metric === 'revenue' ? 'faturamento de ' : ''}{UNIT_COPY[unit].many}
                     </Link>
                     {data ? ` · dados de ${formatInstantBR(data.loadedAt)}` : ''}
@@ -444,8 +451,8 @@ export function Forecast() {
                     ]}
                     contentStyle={tooltipStyle(chart)}
                   />
-                  <Area type="monotone" dataKey="meta" name="meta" stroke={chart.reference} strokeDasharray="5 5" strokeWidth={2} fill="none" />
-                  <Area type="monotone" dataKey="produtos" name="produtos" stroke={chartColor} strokeWidth={3} fillOpacity={1} fill="url(#colorForecastProducts)" />
+                  <Area {...chartMotion()} type="monotone" dataKey="meta" name="meta" stroke={chart.reference} strokeDasharray="5 5" strokeWidth={2} fill="none" />
+                  <Area {...chartMotion()} type="monotone" dataKey="produtos" name="produtos" stroke={chartColor} strokeWidth={3} fillOpacity={1} fill="url(#colorForecastProducts)" />
                 </AreaChart>
               </ResponsiveContainer>
             </div>
@@ -473,7 +480,9 @@ export function Forecast() {
                     <div className="progress-header">
                       <span className="progress-name">{name}</span>
                       <span className="progress-percent">
-                        <strong>{fmt(d.projection)} un.</strong> / {d.target.toLocaleString('pt-BR')} un. ({d.target > 0 && d.attainment != null ? `${percentage}%` : 'sem meta'})
+                        <strong>
+                          <AnimatedText text={`${fmt(d.projection)} un.`} />
+                        </strong> / {d.target.toLocaleString('pt-BR')} un. ({d.target > 0 && d.attainment != null ? `${percentage}%` : 'sem meta'})
                       </span>
                     </div>
                     <div className="progress-bar-bg">

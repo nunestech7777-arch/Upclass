@@ -3,6 +3,7 @@ import { AlertTriangle, CheckCircle2, Clock, Info, MinusCircle, TrendingDown } f
 import type { Coverage, PaceStatus } from '../../lib/finance/calc';
 import { brl, int, pct } from '../../lib/finance/format';
 import { dayLabel } from '../../lib/finance/dates';
+import { CountUpValue } from '../ui/AnimatedNumber';
 
 /** Preenchimento limitado a 100%; o texto ao lado mostra o valor real. */
 export function ProgressBar({ value, tone }: { value: number | null; tone: 'profit' | 'goal' | 'worst' | 'deficit' | 'warn' }) {
@@ -35,7 +36,7 @@ export function SectionEyebrow({ icon, children }: { icon?: React.ReactNode; chi
 
 interface KpiCardProps {
   label: string;
-  value: string;
+  value: React.ReactNode;
   icon: React.ReactNode;
   tone: 'profit' | 'goal' | 'worst' | 'deficit' | 'warn' | 'neutral';
   caption?: React.ReactNode;
@@ -51,7 +52,9 @@ export function KpiCard({ label, value, icon, tone, caption, progress, highlight
         <span className="fin-kpi-label">{label}</span>
         <span className={`fin-kpi-icon tone-${tone}`}>{icon}</span>
       </div>
-      <span className={`fin-kpi-value tone-${tone}`}>{value}</span>
+      <span className={`fin-kpi-value tone-${tone}`}>
+        <CountUpValue value={value} />
+      </span>
       {badge && <span className="fin-badge-partial">{badge}</span>}
       {caption && <span className="fin-kpi-caption">{caption}</span>}
       {progress !== undefined && <ProgressBar value={progress} tone={tone === 'neutral' ? 'goal' : tone} />}

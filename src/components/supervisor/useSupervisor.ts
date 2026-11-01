@@ -1,29 +1,25 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useOutletContext, useSearchParams } from 'react-router-dom';
-import { PRESET_LABELS, presetRange, type PeriodPreset } from '../../lib/finance/dashboard';
-import { storeToday } from '../../lib/finance/dates';
+import { usePeriod } from '../../context/PeriodContext';
 import { isChannelFilter } from '../../lib/supervisor/channels';
 import type { SupervisorFilters } from '../../lib/supervisor/filters';
 import type { Seller } from '../../lib/database.types';
 import { loadPeriodSummary, type PeriodSummaryResult } from '../../lib/supervisor/supervisorApi';
 
-const PRESETS = Object.keys(PRESET_LABELS) as PeriodPreset[];
-
-/** Filtros do Meu Supervisor guardados na URL — continuam valendo ao trocar de seção. */
+/** Filtros do Meu Supervisor: período = filtro geral do sistema; atendente e canal ficam na URL. */
 export function useSupervisorFilters() {
   const [params, setParams] = useSearchParams();
-  const today = storeToday();
-  const rawPreset = params.get('periodo');
-  const preset: PeriodPreset = PRESETS.includes(rawPreset as PeriodPreset) ? (rawPreset as PeriodPreset) : 'week';
+  const { preset, range, today } = usePeriod();
   const rawChannel = params.get('canal');
+  const seller = params.get('vendedor') || 'all';
 
   const filters: SupervisorFilters = useMemo(
     () => ({
-      range: presetRange(preset, today, { from: params.get('de') ?? undefined, to: params.get('ate') ?? undefined }),
-      seller: params.get('vendedor') || 'all',
+      range,
+      seller,
       channel: isChannelFilter(rawChannel) ? rawChannel : 'all',
     }),
-    [preset, today, params, rawChannel]
+    [range, seller, rawChannel]
   );
 
   const update = useCallback(

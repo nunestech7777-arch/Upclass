@@ -94,8 +94,6 @@ export function SupervisorLayout() {
       {showFilters && (
         <SupervisorFiltersBar
           filters={filtersState.filters}
-          preset={filtersState.preset}
-          today={filtersState.today}
           sellers={sellers}
           update={filtersState.update}
         />

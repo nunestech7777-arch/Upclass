@@ -1,4 +1,4 @@
-import React, { createContext, useContext, useState, useEffect } from 'react';
+import React, { createContext, useContext, useState, useLayoutEffect } from 'react';
 
 type Theme = 'light' | 'dark';
 
@@ -18,7 +18,8 @@ export function ThemeProvider({ children }: { children: React.ReactNode }) {
     return (saved === 'light' || saved === 'dark') ? saved : 'dark';
   });
 
-  useEffect(() => {
+  // Antes da pintura: a troca animada (themeTransition.ts) captura a página já no tema novo.
+  useLayoutEffect(() => {
     try { localStorage.setItem('theme', theme); } catch { /* armazenamento indisponível */ }
     document.querySelector('meta[name="theme-color"]')?.setAttribute('content', theme === 'dark' ? '#000229' : '#F3F4FA');
     document.documentElement.setAttribute('data-theme', theme);

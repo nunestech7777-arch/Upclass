@@ -37,6 +37,7 @@ import { REVIEW_LABELS } from '../../lib/finance/appleProducts';
 import { int } from '../../lib/finance/format';
 import { MonthPicker } from '../finance/MonthPicker';
 import type { FinanceSeller } from '../../lib/finance/calc';
+import { AnimatedText } from '../ui/AnimatedNumber';
 
 export type TeamRow = SellerUnitRow & { name: string; seller: FinanceSeller };
 
@@ -181,7 +182,7 @@ function SortTh({ keys, current, onSort, children, align = 'right' }: { keys: [F
   );
 }
 
-export function TeamProjectionTable({ kind, metric, rows, team, ctx, month, sortKey, onSort }: TableProps) {
+export function TeamProjectionTable({ kind, metric, rows, team, ctx, sortKey, onSort }: TableProps) {
   const mc = metricCopy(kind, metric);
   const teamProjection = team.projection != null ? shownProjection(metric, team.projection) : null;
   const label = (n: number) => metricLabel(kind, metric, n);
@@ -207,7 +208,7 @@ export function TeamProjectionTable({ kind, metric, rows, team, ctx, month, sort
               <tr key={r.sellerId}>
                 <td className="col-rank fin-rank">{String(i + 1).padStart(2, '0')}</td>
                 <td className="align-left">
-                  <Link to={`/vendedores/${r.sellerId}?mes=${month}`} className="fin-seller-cell" title="Abrir relatório do vendedor">
+                  <Link to={`/vendedores/${r.sellerId}`} className="fin-seller-cell" title="Abrir relatório do vendedor">
                     <SellerAvatar name={r.seller.name} photoUrl={r.seller.photo_url} size="sm" />
                     <span className="fin-seller-name">{r.name}</span>
                   </Link>
@@ -261,7 +262,7 @@ export function TeamProjectionTable({ kind, metric, rows, team, ctx, month, sort
           <article key={r.sellerId} className="fc-card">
             <header>
               <span className="fin-rank">{String(i + 1).padStart(2, '0')}</span>
-              <Link to={`/vendedores/${r.sellerId}?mes=${month}`} className="fin-seller-cell">
+              <Link to={`/vendedores/${r.sellerId}`} className="fin-seller-cell">
                 <SellerAvatar name={r.seller.name} photoUrl={r.seller.photo_url} size="sm" />
                 <span className="fin-seller-name">{r.name}</span>
               </Link>
@@ -451,7 +452,7 @@ function RatioSortTh({ keys, current, onSort, children }: { keys: [RatioSortKey,
   );
 }
 
-export function RatioTable({ metric, rows, team, month, sortKey, onSort }: { metric: RatioMetric; rows: RatioTeamRow[]; team: RatioRow; month: string; sortKey: RatioSortKey; onSort: (k: RatioSortKey) => void }) {
+export function RatioTable({ metric, rows, team, sortKey, onSort }: { metric: RatioMetric; rows: RatioTeamRow[]; team: RatioRow; month: string; sortKey: RatioSortKey; onSort: (k: RatioSortKey) => void }) {
   const ticket = metric === 'ticket';
   const middle = (r: RatioRow) => (ticket ? formatMoney(r.revenue) : int(r.units));
   const pending = (r: RatioRow) =>
@@ -478,7 +479,7 @@ export function RatioTable({ metric, rows, team, month, sortKey, onSort }: { met
               <tr key={r.sellerId}>
                 <td className="col-rank fin-rank">{String(i + 1).padStart(2, '0')}</td>
                 <td className="align-left">
-                  <Link to={`/vendedores/${r.sellerId}?mes=${month}`} className="fin-seller-cell" title="Abrir relatório do vendedor">
+                  <Link to={`/vendedores/${r.sellerId}`} className="fin-seller-cell" title="Abrir relatório do vendedor">
                     <SellerAvatar name={r.seller.name} photoUrl={r.seller.photo_url} size="sm" />
                     <span className="fin-seller-name">{r.name}</span>
                   </Link>
@@ -511,7 +512,7 @@ export function RatioTable({ metric, rows, team, month, sortKey, onSort }: { met
           <article key={r.sellerId} className="fc-card">
             <header>
               <span className="fin-rank">{String(i + 1).padStart(2, '0')}</span>
-              <Link to={`/vendedores/${r.sellerId}?mes=${month}`} className="fin-seller-cell">
+              <Link to={`/vendedores/${r.sellerId}`} className="fin-seller-cell">
                 <SellerAvatar name={r.seller.name} photoUrl={r.seller.photo_url} size="sm" />
                 <span className="fin-seller-name">{r.name}</span>
               </Link>
@@ -603,7 +604,9 @@ export function AppleTypeStrip({ metric, teamTypes }: { metric: ForecastMetric; 
       {teamTypes.map((t) => (
         <li key={t.type}>
           <span className="fc-type-name">{t.type}</span>
-          <strong>{appleValue(metric, t.team.sold)}</strong>
+          <strong>
+            <AnimatedText text={appleValue(metric, t.team.sold)} />
+          </strong>
         </li>
       ))}
     </ul>
@@ -615,7 +618,6 @@ export function AppleTable({
   rows,
   team,
   ctx,
-  month,
   sortKey,
   onSort,
 }: {
@@ -673,7 +675,7 @@ export function AppleTable({
                   <tr className={isOpen ? 'is-selected' : ''}>
                     <td className="col-rank fin-rank">{String(i + 1).padStart(2, '0')}</td>
                     <td className="align-left">
-                      <Link to={`/vendedores/${r.sellerId}?mes=${month}`} className="fin-seller-cell" title="Abrir relatório do vendedor">
+                      <Link to={`/vendedores/${r.sellerId}`} className="fin-seller-cell" title="Abrir relatório do vendedor">
                         <SellerAvatar name={r.seller.name} photoUrl={r.seller.photo_url} size="sm" />
                         <span className="fin-seller-name">{r.name}</span>
                       </Link>
@@ -738,7 +740,7 @@ export function AppleTable({
           <article key={r.sellerId} className="fc-card">
             <header>
               <span className="fin-rank">{String(i + 1).padStart(2, '0')}</span>
-              <Link to={`/vendedores/${r.sellerId}?mes=${month}`} className="fin-seller-cell">
+              <Link to={`/vendedores/${r.sellerId}`} className="fin-seller-cell">
                 <SellerAvatar name={r.seller.name} photoUrl={r.seller.photo_url} size="sm" />
                 <span className="fin-seller-name">{r.name}</span>
               </Link>

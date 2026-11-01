@@ -24,6 +24,7 @@ import {
 import { brl, int, pct } from '../../lib/finance/format';
 import { dayLabel, formatDateBR } from '../../lib/finance/dates';
 import { PaceLabel } from './FinancePrimitives';
+import { AnimatedText } from '../ui/AnimatedNumber';
 
 // ---------------------------------------------------------------------------
 // Indicadores do dia/mês (anexos 06–07, topo)
@@ -36,7 +37,9 @@ function Indicator({ icon, label, value, tone, hint }: { icon: React.ReactNode; 
         {icon}
         {label}
       </span>
-      <span className={`fin-indicator-value ${tone ?? ''}`}>{value}</span>
+      <span className={`fin-indicator-value ${tone ?? ''}`}>
+        <AnimatedText text={value} />
+      </span>
       {hint && <span className="fin-indicator-hint">{hint}</span>}
     </div>
   );
@@ -108,31 +111,39 @@ export function ActionPlanPanel({
         <div>
           <span>Projeção</span>
           <strong className={plan.projectionDiff != null && plan.projectionDiff < 0 ? 'tone-deficit' : 'tone-profit'}>
-            {plan.projection != null ? brl(plan.projection) : 'Indisponível'}
+            <AnimatedText text={plan.projection != null ? brl(plan.projection) : 'Indisponível'} />
           </strong>
         </div>
         <div>
           <span>Meta</span>
-          <strong className="tone-goal">{plan.goal != null ? brl(plan.goal) : 'Sem meta'}</strong>
+          <strong className="tone-goal">
+            <AnimatedText text={plan.goal != null ? brl(plan.goal) : 'Sem meta'} />
+          </strong>
         </div>
         <div>
           <span>Diferença projetada</span>
           <strong className={plan.projectionDiff != null && plan.projectionDiff < 0 ? 'tone-deficit' : 'tone-profit'}>
-            {plan.projectionDiff != null ? brl(plan.projectionDiff) : '—'}
+            <AnimatedText text={plan.projectionDiff != null ? brl(plan.projectionDiff) : '—'} />
           </strong>
         </div>
         <div>
           <span>Ritmo atual</span>
-          <strong>{plan.pacePerDay != null ? `${brl(plan.pacePerDay)}/dia` : '—'}</strong>
+          <strong>
+            <AnimatedText text={plan.pacePerDay != null ? `${brl(plan.pacePerDay)}/dia` : '—'} />
+          </strong>
         </div>
         <div>
           <span>Necessário hoje (meta-base)</span>
-          <strong>{current && plan.todayBase != null ? brl(plan.todayBase) : '—'}</strong>
+          <strong>
+            <AnimatedText text={current && plan.todayBase != null ? brl(plan.todayBase) : '—'} />
+          </strong>
           {current && plan.todayGap != null && <em>Falta hoje: {brl(plan.todayGap)}</em>}
         </div>
         <div>
           <span>iPhones equivalentes hoje</span>
-          <strong>{plan.devicesEquivalent != null ? int(plan.devicesEquivalent) : '—'}</strong>
+          <strong>
+            <AnimatedText text={plan.devicesEquivalent != null ? int(plan.devicesEquivalent) : '—'} />
+          </strong>
           <em>
             {plan.devicesEquivalent != null && plan.avgIphoneProfit != null && plan.baseline
               ? `Lucro médio ${brl(plan.avgIphoneProfit)}/iPhone (${formatDateBR(plan.baseline.from)}–${formatDateBR(plan.baseline.to)})`
@@ -413,7 +424,9 @@ export function DayDetail({
                 <button type="button" className="fin-link-btn" onClick={() => onOpenSeller(g.sellerId)}>
                   {g.name}
                 </button>
-                <strong className={g.profit < 0 ? 'tone-deficit' : 'tone-profit'}>{brl(g.profit)}</strong>
+                <strong className={g.profit < 0 ? 'tone-deficit' : 'tone-profit'}>
+                  <AnimatedText text={brl(g.profit)} />
+                </strong>
               </header>
               {(['Aparelhos', 'Acessórios', 'Brindes'] as FinanceCategory[]).map((cat) =>
                 g.byCategory[cat].items.length === 0 ? null : (
