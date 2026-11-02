@@ -1,4 +1,4 @@
-import { useEffect, useLayoutEffect, useSyncExternalStore, type RefObject } from 'react';
+import { useEffect, useLayoutEffect, useRef, useState, useSyncExternalStore, type RefObject } from 'react';
 
 const QUERY = '(prefers-reduced-motion: reduce)';
 
@@ -29,12 +29,57 @@ export const countDelay = (i: number): number => 220 + i * STAGGER_MS;
 export const COUNT_DURATION_MS = 900;
 export const SCROLL_COUNT_DELAY_MS = 180;
 
-/** Atraso da contagem de um número conforme o card em que está (marcado por usePageMotion). */
+/** Barras de progresso: mesma duração e curva da contagem, para andarem juntas com o número ao lado. */
+export const BAR_DURATION_MS = COUNT_DURATION_MS;
+export const BAR_EASING = 'cubic-bezier(0.16, 1, 0.3, 1)';
+
+/** Atraso da contagem de um número conforme o card em que está (marcado por usePageMotion ou, no Dashboard, --dv-i). */
 export function countDelayFor(el: Element): number {
   const card = el.closest<HTMLElement>('[data-uc-i], [data-uc-scroll]');
-  if (!card) return countDelay(0);
+  if (!card) {
+    const i = parseFloat(getComputedStyle(el).getPropertyValue('--dv-i'));
+    return countDelay(Number.isFinite(i) ? i : 0);
+  }
   if (card.dataset.ucScroll != null) return SCROLL_COUNT_DELAY_MS;
   return countDelay(Number(card.dataset.ucI) || 0);
+}
+
+/**
+ * Momento da primeira exibição de um número ou barra: quando entra na área visível. Na abertura segue
+ * a cascata do card (`delay` ou a posição do card); revelado pela rolagem, acompanha a entrada do card.
+ * `takeDelay` entrega esse atraso uma única vez — mudanças de valor depois disso começam na hora.
+ */
+export function useFirstVisible(ref: RefObject<Element | null>, delay?: number) {
+  const [visible, setVisible] = useState(false);
+  const delayRef = useRef<number | undefined>(delay);
+  useEffect(() => {
+    const el = ref.current;
+    if (!el || typeof IntersectionObserver === 'undefined') {
+      setVisible(true);
+      return;
+    }
+    let first = true;
+    const io = new IntersectionObserver(
+      ([entry]) => {
+        if (entry.isIntersecting) {
+          if (!first) delayRef.current = SCROLL_COUNT_DELAY_MS;
+          else if (delayRef.current === undefined) delayRef.current = countDelayFor(el);
+          setVisible(true);
+          io.disconnect();
+        }
+        first = false;
+      },
+      { threshold: 0.12 }
+    );
+    io.observe(el);
+    return () => io.disconnect();
+  }, [ref]);
+  const takeDelay = (): number => {
+    const d = delayRef.current ?? 0;
+    delayRef.current = 0;
+    return d;
+  };
+  return { visible, takeDelay };
 }
 
 /** Mesma curva do token --ease-out (cubic-bezier(.16, 1, .3, 1)), aproximada por expo-out para uso em JS. */
@@ -115,7 +160,7 @@ export function chartMotion(reduced: boolean = isReduced()) {
  * Entrada das demais páginas — a mesma cascata do Dashboard aplicada por JS a qualquer rota.
  * Cada bloco visível (cards, painéis e os trechos de texto entre eles) sai do desfoque em ordem de
  * leitura, com o mesmo intervalo, duração e curva do Dashboard; o que está abaixo da dobra espera e
- * entra na rolagem; barras de progresso crescem depois do card; o título se revela da esquerda para
+ * entra na rolagem; barras (AnimatedBar) e números crescem com o card; o título se revela da esquerda para
  * a direita. Usa a Web Animations API para não depender das classes que o React controla.
  * ---------------------------------------------------------------------------------------------- */
 
@@ -131,7 +176,6 @@ export const CARD_SELECTOR = [
   '.seller-card', '.leader-card', '.fc-card', '.fin-goal-box', '.sv-panel', '.sv-status-card', '.sv-seller-card',
   '.sv-att-card', '.sales-table-card', '.inventory-table-card', '.sold-summary-card', '.profile-section',
 ].join(', ');
-const BAR_SELECTOR = '.fin-progress-fill';
 const SKIP_SELECTOR = [
   '.dv-page', '[role="dialog"]', '[aria-modal="true"]', '.fin-drawer-root', '.fin-modal-root', '.modal-overlay',
   '.mc-modal-overlay', '.sold-modal-overlay', '.sales-modal-shell', '.seller-photo-modal', '.access-modal', '.turn-modal',
@@ -146,7 +190,6 @@ const LITE: Keyframe[] = [
   { opacity: 0, transform: 'translateY(10px)' },
   { opacity: 1, transform: 'none' },
 ];
-const BAR: Keyframe[] = [{ transform: 'scaleX(0)' }, { transform: 'scaleX(1)' }];
 
 const isLite = () => window.matchMedia?.('(max-width: 760px), (pointer: coarse)').matches ?? false;
 
@@ -181,10 +224,6 @@ function collectPieces(root: Element, out: HTMLElement[], depth = 0): void {
 
 function enter(el: HTMLElement, delay: number, lite: boolean): Animation {
   const anim = el.animate(lite ? LITE : FULL, { duration: lite ? ENTER_LITE_MS : ENTER_MS, easing: EASE, delay, fill: 'backwards' });
-  for (const bar of el.querySelectorAll<HTMLElement>(BAR_SELECTOR)) {
-    bar.style.transformOrigin = 'left center';
-    bar.animate(BAR, { duration: 1000, easing: EASE, delay: delay + 250, fill: 'backwards' });
-  }
   const title = el.matches('h1') ? el : el.querySelector<HTMLElement>('h1');
   if (title && !lite) revealTitle(title, delay + 80);
   return anim;

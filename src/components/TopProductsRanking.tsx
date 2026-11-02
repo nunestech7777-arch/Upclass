@@ -2,6 +2,7 @@ import React from 'react';
 import { Headphones, Smartphone } from 'lucide-react';
 import type { RankedProduct } from '../lib/topProducts';
 import './TopProductsRanking.css';
+import { AnimatedBar } from './ui/AnimatedBar';
 
 interface Props {
   title: string;
@@ -33,7 +34,7 @@ export function TopProductsRanking({ title, kind, items, emptyText }: Props) {
               </span>
               {kind === 'accessories' && (
                 <span className="tpr-bar" aria-hidden="true">
-                  <span style={{ width: `${max > 0 ? Math.max(4, Math.round((p.qty / max) * 100)) : 0}%` }} />
+                  <AnimatedBar pct={max > 0 ? Math.max(4, Math.round((p.qty / max) * 100)) : 0} />
                 </span>
               )}
             </li>

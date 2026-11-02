@@ -23,6 +23,8 @@ import { formatInstantBR, dayLabel } from '../../lib/finance/dates';
 import { int, pct } from '../../lib/finance/format';
 import { CHANNEL_LABEL, type Channel } from '../../lib/supervisor/channels';
 import { formatSeconds } from '../../lib/supervisor/metrics';
+import { AnimatedBar } from '../../components/ui/AnimatedBar';
+import { AnimatedText } from '../../components/ui/AnimatedNumber';
 
 export function SupervisorOverview() {
   const { filters, sellerName, kommoUserName, search } = useSupervisor();
@@ -110,11 +112,13 @@ export function SupervisorOverview() {
                   <div className="sv-bars-row">
                     <span>{CHANNEL_LABEL[c]}</span>
                     <strong>
-                      {int(n)} <small>{pct(share)}</small>
+                      <AnimatedText text={int(n)} /> <small>
+                        <AnimatedText text={pct(share)} />
+                      </small>
                     </strong>
                   </div>
                   <span className="fin-progress" aria-hidden="true">
-                    <span className={`fin-progress-fill sv-fill-${c}`} style={{ width: `${share}%` }} />
+                    <AnimatedBar className={`fin-progress-fill sv-fill-${c}`} pct={share} />
                   </span>
                 </li>
               );

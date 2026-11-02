@@ -26,6 +26,7 @@ import {
 } from '../lib/sellerPortal';
 import { BrandLogo } from '../components/brand/BrandLogo';
 import './SellerPortal.css';
+import { AnimatedBar } from '../components/ui/AnimatedBar';
 
 const PAGE = 40;
 const units = (n: number) => `${n.toLocaleString('pt-BR')} ${n === 1 ? 'aparelho' : 'aparelhos'}`;
@@ -229,7 +230,7 @@ function GoalProgress({ loading, sold, goal, pct, weekly }: { loading: boolean; 
             aria-valuenow={sold}
             aria-label={`${sold} de ${goal} aparelhos`}
           >
-            <span className={`sp-bar-fill ${pct != null && pct >= 100 ? 'is-done' : ''}`} style={{ width: `${loading ? 0 : width}%` }} />
+            <AnimatedBar className={`sp-bar-fill ${pct != null && pct >= 100 ? 'is-done' : ''}`} pct={loading ? 0 : width} />
           </div>
           <p className="sp-muted">
             {loading ? 'carregando…' : `${units(sold)} de ${units(goal)}`}

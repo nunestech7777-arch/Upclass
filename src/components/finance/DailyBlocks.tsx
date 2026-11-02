@@ -195,7 +195,9 @@ export function ActionPlanPanel({
                   <td className={`align-right num ${deviation == null ? '' : deviation >= 0 ? 'tone-profit' : 'tone-deficit'}`}>
                     {deviation != null ? brl(deviation) : '—'}
                   </td>
-                  <td className="align-right num">{pct(s.pctTarget)}</td>
+                  <td className="align-right num">
+                    <AnimatedText text={pct(s.pctTarget)} />
+                  </td>
                   <td className={`align-right num ${projDiff == null ? '' : projDiff >= 0 ? 'tone-profit' : 'tone-deficit'}`}>
                     {projDiff != null ? brl(projDiff) : '—'}
                   </td>
@@ -329,7 +331,9 @@ export function DailyResultsTable({ days, selected, onSelect }: { days: DayFinan
                   {d.reconciledItems < d.items && <span className="fin-tag tone-warn">parcial</span>}
                 </td>
                 <td className="align-right num">{brl(d.dailyGoal)}</td>
-                <td className="align-right num">{pct(d.pctDailyGoal)}</td>
+                <td className="align-right num">
+                  <AnimatedText text={pct(d.pctDailyGoal)} />
+                </td>
                 <td className="align-right num">{brl(d.cumulative)}</td>
                 <td className="align-right num">{brl(d.expectedCumulative)}</td>
                 <td className="align-left">

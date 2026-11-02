@@ -47,6 +47,7 @@ import {
   TeamFilters, TeamProjectionTable, TeamSummaryCards, type RatioTeamRow, type TeamRow } from '../components/forecast/ForecastTeamSection';
 import { tooltipStyle, useChartTheme } from '../lib/chartTheme';
 import { AnimatedText } from '../components/ui/AnimatedNumber';
+import { AnimatedBar } from '../components/ui/AnimatedBar';
 
 type CategoryFilter = 'all' | 'devices' | 'accessories';
 
@@ -399,11 +400,11 @@ export function Forecast() {
                       <span className="progress-percent">
                         <strong>
                           <AnimatedText text={`${fmt(d.projection)} un.`} />
-                        </strong> / {d.target.toLocaleString('pt-BR')} un. ({d.target > 0 && d.attainment != null ? `${percentage}%` : 'sem meta'})
+                        </strong> / {d.target.toLocaleString('pt-BR')} un. ({d.target > 0 && d.attainment != null ? <AnimatedText text={`${percentage}%`} /> : 'sem meta'})
                       </span>
                     </div>
                     <div className="progress-bar-bg">
-                      <div className="progress-bar-fill" style={{ width: `${Math.min(percentage, 100)}%`, backgroundColor: color }} />
+                      <AnimatedBar className="progress-bar-fill" pct={percentage} style={{ backgroundColor: color }} />
                     </div>
                   </div>
                 );

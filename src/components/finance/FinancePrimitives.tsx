@@ -3,14 +3,14 @@ import { AlertTriangle, CheckCircle2, Clock, Info, MinusCircle, TrendingDown } f
 import type { Coverage, PaceStatus } from '../../lib/finance/calc';
 import { int, pct } from '../../lib/finance/format';
 import { dayLabel } from '../../lib/finance/dates';
-import { CountUpValue } from '../ui/AnimatedNumber';
+import { AnimatedText, CountUpValue } from '../ui/AnimatedNumber';
+import { AnimatedBar } from '../ui/AnimatedBar';
 
-/** Preenchimento limitado a 100%; o texto ao lado mostra o valor real. */
+/** Preenchimento limitado a 100% (animado, padrão do Dashboard); o texto ao lado mostra o valor real. */
 export function ProgressBar({ value, tone }: { value: number | null; tone: 'profit' | 'goal' | 'worst' | 'deficit' | 'warn' }) {
-  const width = value == null ? 0 : Math.max(0, Math.min(100, value));
   return (
     <span className="fin-progress" aria-hidden="true">
-      <span className={`fin-progress-fill tone-${tone}`} style={{ width: `${width}%` }} />
+      <AnimatedBar className={`fin-progress-fill tone-${tone}`} pct={value} />
     </span>
   );
 }
@@ -19,7 +19,9 @@ export function PctWithBar({ value, tone, label }: { value: number | null; tone:
   if (value == null) return <span className="fin-muted">Sem meta</span>;
   return (
     <span className="fin-pct-cell">
-      <span className={`fin-pct-text tone-${tone}`}>{label ?? pct(value)}</span>
+      <span className={`fin-pct-text tone-${tone}`}>
+        <AnimatedText text={label ?? pct(value)} />
+      </span>
       <ProgressBar value={value} tone={tone} />
     </span>
   );

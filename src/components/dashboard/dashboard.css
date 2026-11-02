@@ -104,7 +104,6 @@
 @keyframes dv-title-reveal {
   from { -webkit-mask-position: 100% 0; mask-position: 100% 0; transform: translateX(-6px); }
 }
-@keyframes dv-grow { from { transform: scaleX(0); } }
 @keyframes dv-sweep { from { transform: translateX(-100%); } to { transform: translateX(290%); } }
 @keyframes dv-shimmer { from { background-position: 100% 0; } to { background-position: 0 0; } }
 
@@ -153,16 +152,7 @@
   animation-delay: calc(var(--rv-i, 0) * var(--dv-stagger));
 }
 
-/* Barras de meta e de ranking crescem depois que o card aparece; em atualizações deslizam até o novo valor. */
-.dv-page .fin-progress-fill {
-  transform-origin: left center;
-  transition: width 0.7s var(--ease-out);
-  animation: dv-grow 1s var(--ease-out) backwards;
-  animation-delay: calc(var(--dv-i, 0) * var(--dv-stagger) + 0.25s);
-}
 
-.dv-enter .rv-pending .fin-progress-fill { animation: none; }
-.dv-enter .rv-in .fin-progress-fill { animation-delay: calc(var(--rv-i, 0) * var(--dv-stagger) + 0.25s); }
 
 /* Recarga: o painel continua na tela, esmaecido, com uma barra fina correndo no topo. */
 .dv-content { position: relative; }

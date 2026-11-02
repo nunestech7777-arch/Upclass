@@ -1,45 +1,21 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
-import { countDelayFor, easeOutExpo, usePrefersReducedMotion, COUNT_DURATION_MS, SCROLL_COUNT_DELAY_MS } from '../../lib/motion';
+import { easeOutExpo, useFirstVisible, usePrefersReducedMotion, COUNT_DURATION_MS } from '../../lib/motion';
 
 /**
  * Contagem compartilhada por todos os números do sistema (mesma duração e curva do Dashboard).
  * A primeira contagem parte de zero e só começa quando o número entra na área visível; o atraso
  * acompanha a entrada do card (prop `delay` ou, sem ela, a posição do card na cascata da página).
  * Depois só anima quando os valores mudam de fato, partindo do que está na tela — recarregar com
- * o mesmo dado não reinicia a contagem. Com movimento reduzido mostra o valor final direto.
+ * o mesmo dado não reinicia a contagem. Cada entrada na página (inclusive ao voltar a ela) conta de novo.
+ * Com movimento reduzido mostra o valor final direto.
  */
 function useCountUp(targets: readonly number[], delay: number | undefined, duration: number) {
   const reduced = usePrefersReducedMotion();
   const [shown, setShown] = useState<number[]>(() => targets.map(() => 0));
   const shownRef = useRef<number[]>(targets.map(() => 0));
-  const delayRef = useRef<number | undefined>(delay);
   const elRef = useRef<HTMLSpanElement>(null);
-  const [visible, setVisible] = useState(false);
+  const { visible, takeDelay } = useFirstVisible(elRef, delay);
   const key = targets.join('|');
-
-  useEffect(() => {
-    const el = elRef.current;
-    if (!el || typeof IntersectionObserver === 'undefined') {
-      setVisible(true);
-      return;
-    }
-    let first = true;
-    const io = new IntersectionObserver(
-      ([entry]) => {
-        if (entry.isIntersecting) {
-          // Visível já na abertura: segue a cascata; revelado na rolagem: acompanha o card.
-          if (!first) delayRef.current = SCROLL_COUNT_DELAY_MS;
-          else if (delayRef.current === undefined) delayRef.current = countDelayFor(el);
-          setVisible(true);
-          io.disconnect();
-        }
-        first = false;
-      },
-      { threshold: 0.12 }
-    );
-    io.observe(el);
-    return () => io.disconnect();
-  }, []);
 
   useEffect(() => {
     if (!visible) return;
@@ -50,11 +26,12 @@ function useCountUp(targets: readonly number[], delay: number | undefined, durat
       setShown(to);
       return;
     }
+    // O atraso de entrada vale só para a primeira exibição, mesmo que ela não precise contar (0 → 0);
+    // assim números e barras começam juntos nas mudanças seguintes.
+    const wait = takeDelay();
     const from = to.map((_, i) => shownRef.current[i] ?? 0);
     if (from.every((v, i) => v === to[i])) return;
     const whole = to.map((v, i) => Number.isInteger(v) && Number.isInteger(from[i]));
-    const wait = delayRef.current ?? 0;
-    delayRef.current = 0;
     let raf = 0;
     let start = 0;
     let prev = 0;
@@ -75,6 +52,8 @@ function useCountUp(targets: readonly number[], delay: number | undefined, durat
     };
     raf = requestAnimationFrame(tick);
     return () => cancelAnimationFrame(raf);
+    // takeDelay é estável no uso (lê/zera um ref); fora das dependências de propósito.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [key, reduced, duration, visible]);
 
   return { elRef, shown, reduced };

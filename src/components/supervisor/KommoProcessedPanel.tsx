@@ -3,6 +3,7 @@ import { Bot } from 'lucide-react';
 import { int } from '../../lib/finance/format';
 import type { KommoProcessed } from '../../lib/supervisor/attendance';
 import { AnimatedText } from '../ui/AnimatedNumber';
+import { AnimatedBar } from '../ui/AnimatedBar';
 
 /**
  * "Conversas processadas — critério Kommo" ao lado das conversas únicas do Meu Supervisor, para
@@ -46,7 +47,7 @@ export function KommoProcessedPanel({
               </strong>
             </div>
             <span className="fin-progress" aria-hidden="true">
-              <span className="fin-progress-fill sv-fill-whatsapp" style={{ width: `${(u.talks / max) * 100}%` }} />
+              <AnimatedBar className="fin-progress-fill sv-fill-whatsapp" pct={(u.talks / max) * 100} />
             </span>
           </li>
         ))}
@@ -61,7 +62,7 @@ export function KommoProcessedPanel({
               </strong>
             </div>
             <span className="fin-progress" aria-hidden="true">
-              <span className="fin-progress-fill sv-fill-other" style={{ width: `${(data.robot.total / max) * 100}%` }} />
+              <AnimatedBar className="fin-progress-fill sv-fill-other" pct={(data.robot.total / max) * 100} />
             </span>
             <small className="sv-muted">
               {data.robot.byAuthor.map((r) => `${r.name} ${int(r.talks)}`).join(' + ')} · {int(data.robot.uniqueTalks)} atendimento
