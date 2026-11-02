@@ -16,8 +16,14 @@
  * - Troca de UNIDADE no pedido (o MercadoPhone troca o iPhone por outro do mesmo modelo, com outro
  *   IMEI/produtoId, e a nova unidade não chega por webhook): se no mesmo pedido sobra exatamente uma
  *   linha sem item e um item sem linha, com o mesmo modelo e a mesma quantidade, a linha continua
- *   ATIVA com os valores da nova unidade (não vira `removed`). Sem nome do produto ou com mais de um
- *   candidato, segue a regra anterior.
+ *   ATIVA com os valores da nova unidade (não vira `removed`).
+ * - Troca por OUTRO modelo (ou sem par único): a linha continua ATIVA com os valores atuais — nunca
+ *   apaga receita nem cria linha — e vira alerta para revisão manual.
+ * - Proteção de valores já conciliados: depois de `graceDays` do lançamento da venda no painel
+ *   (`created_at`), mudança de receita/custo/lucro na origem NÃO é aplicada; vira alerta
+ *   `retroactive_change` (com `has_evidence` quando o valor atual foi gravado dentro desse prazo).
+ *   Exceção: custo desconhecido ou zero pode ser preenchido.
+ * - Linha já conciliada nunca é rebaixada para `not_found` por ausência do pedido na consulta.
  */
 
 export interface HistoricoFinanceItem {
@@ -59,6 +65,9 @@ export interface SaleFinanceRow {
   financial_note?: string | null;
   /** Nome do produto no painel (só leitura; usado para reconhecer troca de unidade). */
   product_name?: string | null;
+  sold_date?: string | null;
+  /** Última gravação de valores financeiros na linha (evidência de quando o custo foi registrado). */
+  financial_synced_at?: string | null;
 }
 
 export interface SaleFinancePatch {
@@ -99,12 +108,43 @@ export interface ReconcileCounts {
   rows_to_update: number;
   /** Linhas mantidas ativas porque a unidade foi trocada no pedido (mesmo modelo). */
   rows_swapped: number;
+  /** Linhas conciliadas cujos valores mudaram na origem e foram mantidos (viraram alerta). */
+  rows_protected: number;
+  /** Alertas gerados para revisão manual. */
+  alerts: number;
 }
+
+export type ReconcileAlertKind = 'retroactive_change' | 'model_swap' | 'unsafe_match' | 'history_without_row' | 'order_missing' | 'pending_too_long';
+
+/** Diferença que a conciliação não aplica sozinha: vai para revisão manual. */
+export interface ReconcileAlert {
+  kind: ReconcileAlertKind;
+  orderId: string;
+  externalId: string | null;
+  saleId: string | null;
+  soldDate: string | null;
+  current: Record<string, unknown> | null;
+  proposed: Record<string, unknown> | null;
+  hasEvidence: boolean | null;
+  detail: string;
+  /** Mesmo alerta nas execuções seguintes gera a mesma chave (não duplica). */
+  dedupeKey: string;
+}
+
+export interface ReconcileOptions {
+  /** Instante da conferência (padrão: agora). */
+  now?: Date;
+  /** Dias, a partir do lançamento da venda no painel, em que a origem ainda corrige valores sozinha. */
+  graceDays?: number;
+}
+
+export const DEFAULT_GRACE_DAYS = 3;
 
 export interface ReconcilePlan {
   updates: { id: string; externalId: string | null; patch: SaleFinancePatch }[];
   counts: ReconcileCounts;
   issues: ReconcileIssue[];
+  alerts: ReconcileAlert[];
 }
 
 const REMOVED_REASON = 'Item ausente na versão atual do pedido no MercadoPhone';
@@ -126,6 +166,11 @@ function sameMoney(a: unknown, b: unknown): boolean {
 
 export function isCancelledStatus(status: string | null | undefined): boolean {
   return /cancel|estorn/i.test(status ?? '');
+}
+
+/** Orçamento não é venda: não conta como lacuna nem como item faltante. */
+export function isQuoteStatus(status: string | null | undefined): boolean {
+  return /or[cç]amento/i.test(status ?? '');
 }
 
 function parseRef(externalId: string | null): { orderId: string; productId: string } | null {
@@ -238,6 +283,8 @@ function emptyCounts(): ReconcileCounts {
     history_orders_without_rows: 0,
     rows_to_update: 0,
     rows_swapped: 0,
+    rows_protected: 0,
+    alerts: 0,
   };
 }
 
@@ -245,10 +292,19 @@ function emptyCounts(): ReconcileCounts {
  * Planeja a conciliação de `sales` com o histórico de um período. `sales` deve conter todas as
  * linhas (qualquer `item_status`) dos pedidos do mesmo período consultado no histórico.
  */
-export function planFinancialReconcile(history: HistoricoFinanceItem[], sales: SaleFinanceRow[]): ReconcilePlan {
+export function planFinancialReconcile(
+  history: HistoricoFinanceItem[],
+  sales: SaleFinanceRow[],
+  options: ReconcileOptions = {}
+): ReconcilePlan {
   const counts = emptyCounts();
   const issues: ReconcileIssue[] = [];
+  const alerts: ReconcileAlert[] = [];
   const targets = new Map<string, SaleFinancePatch>();
+  const now = options.now ?? new Date();
+  const graceMs = (options.graceDays ?? DEFAULT_GRACE_DAYS) * 86_400_000;
+  const alertFor = (row: SaleFinanceRow | null, a: Omit<ReconcileAlert, 'externalId' | 'saleId' | 'soldDate'>) =>
+    alerts.push({ ...a, externalId: row?.external_id ?? null, saleId: row?.id ?? null, soldDate: row?.sold_date ?? null });
 
   const historyByOrder = new Map<string, HistoricoFinanceItem[]>();
   for (const item of history) {
@@ -270,9 +326,19 @@ export function planFinancialReconcile(history: HistoricoFinanceItem[], sales: S
   counts.orders_in_history = historyByOrder.size;
   counts.orders_in_sales = salesByOrder.size;
   for (const [orderId, items] of historyByOrder) {
-    // Venda cancelada que nunca chegou ao painel não é lacuna.
-    if (!salesByOrder.has(orderId) && !items.every((item) => isCancelledStatus(item.statusVenda))) {
+    // Venda cancelada ou orçamento que nunca chegou ao painel não é lacuna.
+    if (!salesByOrder.has(orderId) && !items.every((item) => isCancelledStatus(item.statusVenda) || isQuoteStatus(item.statusVenda))) {
       counts.history_orders_without_rows += 1;
+      const total = items.reduce((sum, item) => sum + (toMoney(item.valorTotal) ?? 0), 0);
+      alertFor(null, {
+        kind: 'order_missing',
+        orderId,
+        current: null,
+        proposed: { itens: items.length, receita: toMoney(total), dataVenda: (items[0] as { dataVenda?: string }).dataVenda ?? null },
+        hasEvidence: null,
+        detail: `Pedido ${orderId} concluído no MercadoPhone (${items.length} item(ns)) sem nenhuma linha no painel`,
+        dedupeKey: `order_missing|${orderId}`,
+      });
     }
   }
 
@@ -281,9 +347,11 @@ export function planFinancialReconcile(history: HistoricoFinanceItem[], sales: S
     const orderHistory = historyByOrder.get(orderId);
 
     if (!orderHistory || orderHistory.length === 0) {
-      // Resposta ausente não autoriza cancelar nem remover: só sinaliza.
+      // Resposta ausente não autoriza cancelar nem remover: só sinaliza. Linha já conciliada não é
+      // rebaixada (a ausência pode ser data editada na origem ou consulta incompleta).
       for (const row of orderRows) {
         if ((row.item_status ?? 'active') !== 'active') continue;
+        if (row.financial_status === 'ok') continue;
         targets.set(row.id, { financial_status: 'not_found', financial_note: 'Pedido não encontrado no histórico do MercadoPhone no período' });
       }
       issues.push({ orderId, kind: 'not_found', detail: `${orderRows.length} linha(s) sem pedido correspondente no histórico` });
@@ -361,18 +429,27 @@ export function planFinancialReconcile(history: HistoricoFinanceItem[], sales: S
       }
     }
 
-    // Troca de unidade: par único (linha sobrando × item sem linha) do mesmo modelo e quantidade.
+    // Linhas sobrando cujo produto ainda está no pedido são duplicatas/índices antigos → removed.
+    // Linhas cujo produto SAIU do pedido podem ter sido trocadas por outra unidade:
+    //  * mesmo modelo, par único → continua ativa com os valores da nova unidade (troca automática);
+    //  * outro modelo, par único (1 linha × 1 item, mesma quantidade) → continua ativa SEM mudar
+    //    valores e vira alerta `model_swap` (não apaga receita, não duplica);
+    //  * sem par único → continua ativa sem mudar valores e vira alerta `unsafe_match`;
+    //  * nenhum item sobrando no pedido → o produto foi retirado → removed.
     const swappedItems = new Set<HistoricoFinanceItem>();
+    const keepActive = new Set<SaleFinanceRow>();
+    const vanished = staleRows.filter((s) => (historyByProduct.get(s.productId)?.length ?? 0) === 0);
     if (!cancelled) {
-      for (const stale of staleRows) {
+      for (const stale of vanished) {
         const key = modelKey(stale.row.product_name);
         if (!key) continue;
         const sameModel = (item: HistoricoFinanceItem) => historyModelKey(item) === key && Number(item.quantidade) === stale.row.quantity;
         const items = unmatchedItems.filter((u) => !swappedItems.has(u.item) && sameModel(u.item));
-        const rivals = staleRows.filter((o) => o !== stale && modelKey(o.row.product_name) === key && o.row.quantity === stale.row.quantity);
+        const rivals = vanished.filter((o) => o !== stale && modelKey(o.row.product_name) === key && o.row.quantity === stale.row.quantity);
         if (items.length !== 1 || rivals.length > 0) continue;
         const { item, productId: newProduct } = items[0];
         swappedItems.add(item);
+        keepActive.add(stale.row);
         const fields = financialFieldsFromHistory(item);
         const note = `Unidade trocada no pedido: produto ${stale.productId} → ${newProduct} (mesmo modelo)`;
         targets.set(stale.row.id, {
@@ -384,29 +461,100 @@ export function planFinancialReconcile(history: HistoricoFinanceItem[], sales: S
         counts.rows_swapped += 1;
         issues.push({ orderId, kind: 'swapped', detail: `${stale.row.external_id}: ${note}` });
       }
+
+      // Só linhas ATIVAS entram em troca de outro modelo ou correspondência insegura: uma linha já
+      // removida nunca é reativada aqui (reativar duplicaria receita quando o item novo ainda não
+      // tem linha). Linhas removidas só voltam pela troca de mesmo modelo com par único (acima).
+      const leftRows = vanished.filter((s) => !keepActive.has(s.row) && (s.row.item_status ?? 'active') === 'active');
+      const leftItems = unmatchedItems.filter((u) => !swappedItems.has(u.item));
+      const describe = (item: HistoricoFinanceItem) => ({
+        produtoId: String(item.produtoId),
+        descricao: item.produtoDescricao ?? null,
+        quantidade: Number(item.quantidade),
+        ...financialFieldsFromHistory(item),
+      });
+      const currentOf = (row: SaleFinanceRow) => ({
+        produto: row.product_name ?? null,
+        quantidade: row.quantity,
+        revenue: toMoney(row.revenue),
+        cost: toMoney(row.cost),
+        profit: toMoney(row.profit),
+        financial_status: row.financial_status ?? null,
+      });
+      if (leftRows.length === 1 && leftItems.length === 1 && Number(leftItems[0].item.quantidade) === leftRows[0].row.quantity) {
+        const stale = leftRows[0];
+        const { item, productId: newProduct } = leftItems[0];
+        swappedItems.add(item);
+        keepActive.add(stale.row);
+        targets.set(stale.row.id, { item_status: 'active', status_reason: null });
+        alertFor(stale.row, {
+          kind: 'model_swap',
+          orderId,
+          current: currentOf(stale.row),
+          proposed: describe(item),
+          hasEvidence: null,
+          detail: `Produto ${stale.productId} (${stale.row.product_name ?? 'sem nome'}) foi trocado no pedido por ${newProduct} (${item.produtoDescricao ?? 'sem descrição'}), outro modelo: valores atuais mantidos até revisão`,
+          dedupeKey: `model_swap|${stale.row.external_id}|${newProduct}`,
+        });
+        issues.push({ orderId, kind: 'swapped', detail: `${stale.row.external_id}: troca para outro modelo (${newProduct}) — mantida para revisão` });
+      } else if (leftRows.length > 0 && leftItems.length > 0) {
+        for (const stale of leftRows) {
+          // Só sinaliza: a linha fica exatamente como está (nem removida, nem alterada).
+          keepActive.add(stale.row);
+          alertFor(stale.row, {
+            kind: 'unsafe_match',
+            orderId,
+            current: currentOf(stale.row),
+            proposed: { candidatos: leftItems.map((u) => describe(u.item)) },
+            hasEvidence: null,
+            detail: `Produto ${stale.productId} saiu do pedido e há ${leftItems.length} item(ns) sem linha: correspondência não é única, valores mantidos até revisão`,
+            dedupeKey: `unsafe_match|${stale.row.external_id}|${leftItems.map((u) => u.productId).sort().join(',')}`,
+          });
+        }
+      }
     }
     for (const { productId, row } of staleRows) {
-      if (targets.get(row.id)?.item_status === 'active') continue;
+      if (keepActive.has(row)) continue;
       targets.set(row.id, { item_status: 'removed', status_reason: REMOVED_REASON });
       if ((row.item_status ?? 'active') !== 'removed') {
         issues.push({ orderId, kind: 'removed', detail: `${row.external_id} (produto ${productId}) não está na versão atual do pedido` });
       }
     }
     if (!cancelled) {
-      const byProduct = new Map<string, number>();
-      for (const u of unmatchedItems) if (!swappedItems.has(u.item)) byProduct.set(u.productId, (byProduct.get(u.productId) ?? 0) + 1);
+      const byProduct = new Map<string, HistoricoFinanceItem[]>();
+      for (const u of unmatchedItems) {
+        if (swappedItems.has(u.item) || isQuoteStatus(u.item.statusVenda)) continue;
+        byProduct.set(u.productId, [...(byProduct.get(u.productId) ?? []), u.item]);
+      }
       for (const [productId, missing] of byProduct) {
         const rowCount = rowsByProduct.get(productId)?.length ?? 0;
-        counts.history_items_without_row += missing;
-        issues.push({ orderId, kind: 'history_without_row', detail: `produto ${productId}: ${missing + rowCount} no histórico, ${rowCount} em sales` });
+        counts.history_items_without_row += missing.length;
+        issues.push({ orderId, kind: 'history_without_row', detail: `produto ${productId}: ${missing.length + rowCount} no histórico, ${rowCount} em sales` });
+        // Já coberto por model_swap/unsafe_match quando há linha sobrando; senão é item faltando no painel.
+        if (vanished.some((v) => keepActive.has(v.row))) continue;
+        alertFor(null, {
+          kind: 'history_without_row',
+          orderId,
+          current: { linhas_no_painel: rowCount },
+          proposed: { produtoId: productId, itens: missing.length, receita: toMoney(missing.reduce((a, i) => a + (toMoney(i.valorTotal) ?? 0), 0)) },
+          hasEvidence: null,
+          detail: `Produto ${productId}: ${missing.length + rowCount} no MercadoPhone e ${rowCount} no painel`,
+          dedupeKey: `history_without_row|${orderId}|${productId}|${missing.length + rowCount}`,
+        });
       }
     }
   }
 
   const updates: ReconcilePlan['updates'] = [];
   for (const row of sales) {
-    const target = targets.get(row.id);
+    let target = targets.get(row.id);
     if (!target) continue;
+    const guarded = protectReconciled(row, target, now, graceMs);
+    if (guarded.alert) {
+      target = guarded.target;
+      counts.rows_protected += 1;
+      alertFor(row, { ...guarded.alert, orderId: parseRef(row.external_id)?.orderId ?? '?' });
+    }
     const finalStatus = target.item_status ?? row.item_status ?? 'active';
     const finalFinancial = target.financial_status ?? row.financial_status ?? 'pending';
     if (finalStatus === 'removed') counts.rows_removed += 1;
@@ -425,5 +573,73 @@ export function planFinancialReconcile(history: HistoricoFinanceItem[], sales: S
     if (Object.keys(patch).length > 0) updates.push({ id: row.id, externalId: row.external_id, patch });
   }
   counts.rows_to_update = updates.length;
-  return { updates, counts, issues };
+  counts.alerts = alerts.length;
+  return { updates, counts, issues, alerts };
+}
+
+/** Campos que definem receita, custo e lucro: protegidos depois do prazo. Valor pago pelo cliente e
+ * desconto são informativos (não entram no lucro) e continuam acompanhando a origem. */
+const MONEY_FIELDS = ['revenue', 'cost', 'profit_reported', 'profit'] as const;
+const PROTECTED_FIELDS = [...MONEY_FIELDS, 'financial_status', 'financial_note'] as const;
+const FIELD_LABEL: Record<string, string> = { revenue: 'receita', cost: 'custo', profit: 'lucro', profit_reported: 'lucro informado', financial_status: 'situação' };
+
+/**
+ * Fora do prazo de correção, receita ou custo já gravados não mudam sozinhos (em qualquer situação
+ * financeira) e linha conciliada não é rebaixada: devolve o alvo sem esses campos e o alerta. Campo
+ * vazio e custo zero podem ser preenchidos (se a receita gravada não mudar); cancelamento e remoção
+ * continuam valendo.
+ */
+function protectReconciled(
+  row: SaleFinanceRow,
+  target: SaleFinancePatch,
+  now: Date,
+  graceMs: number
+): { target: SaleFinancePatch; alert: Omit<ReconcileAlert, 'orderId' | 'externalId' | 'saleId' | 'soldDate'> | null } {
+  // Cancelamento/remoção muda a situação do item, não o valor: segue sem alerta.
+  if (target.item_status && target.item_status !== 'active') return { target, alert: null };
+  const launched = Date.parse(row.created_at);
+  if (Number.isFinite(launched) && now.getTime() - launched <= graceMs) return { target, alert: null };
+
+  // Campo vazio (nulo) pode ser preenchido; custo zero também (é custo não informado na origem).
+  // Valor já existente que muda é protegido, em qualquer situação financeira.
+  const t = target as Record<string, unknown>;
+  const has = (k: string) => k in t;
+  const revenueChanged = has('revenue') && toMoney(row.revenue) !== null && !sameMoney(row.revenue, t.revenue);
+  const currentCost = toMoney(row.cost);
+  const costChanged = has('cost') && currentCost !== null && currentCost !== 0 && !sameMoney(row.cost, t.cost);
+  const downgraded = row.financial_status === 'ok' && has('financial_status') && t.financial_status !== 'ok';
+  if (!revenueChanged && !costChanged && !downgraded) return { target, alert: null };
+
+  const record = row as unknown as Record<string, unknown>;
+  const changed = PROTECTED_FIELDS.filter((key) => {
+    if (key === 'financial_note') return false;
+    if (!(key in target)) return false;
+    const value = (target as Record<string, unknown>)[key];
+    return (MONEY_FIELDS as readonly string[]).includes(key) ? !sameMoney(record[key], value) : key === 'financial_status' && (record[key] ?? null) !== (value ?? null);
+  });
+
+  const kept: SaleFinancePatch = { ...target };
+  for (const key of PROTECTED_FIELDS) delete (kept as Record<string, unknown>)[key];
+  const synced = row.financial_synced_at ? Date.parse(row.financial_synced_at) : NaN;
+  const hasEvidence = Number.isFinite(synced) && Number.isFinite(launched) && synced - launched <= graceMs;
+  const pick = (source: Record<string, unknown>) =>
+    Object.fromEntries(['revenue', 'cost', 'profit', 'financial_status'].map((k) => [k, (MONEY_FIELDS as readonly string[]).includes(k) ? toMoney(source[k]) : source[k] ?? null]));
+  const proposed = pick({ ...record, ...(target as Record<string, unknown>) });
+  const merged = { ...record, ...(target as Record<string, unknown>) };
+  const what = changed
+    .map((k) => `${FIELD_LABEL[k] ?? k} ${k === 'financial_status' ? record[k] ?? '—' : toMoney(record[k])} → ${k === 'financial_status' ? merged[k] ?? '—' : toMoney(merged[k])}`)
+    .join(', ');
+  return {
+    target: kept,
+    alert: {
+      kind: 'retroactive_change',
+      current: { ...pick(record), financial_synced_at: row.financial_synced_at ?? null },
+      proposed,
+      hasEvidence,
+      detail: hasEvidence
+        ? `Mudou no MercadoPhone depois de conciliado (${what}); mantido o valor registrado logo após a venda`
+        : `Mudou no MercadoPhone depois de conciliado (${what}) e não há evidência do valor da época; mantido até revisão`,
+      dedupeKey: `retroactive_change|${row.external_id}|${proposed.revenue}|${proposed.cost}|${proposed.profit}|${proposed.financial_status}`,
+    },
+  };
 }

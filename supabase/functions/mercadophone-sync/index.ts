@@ -1,7 +1,7 @@
 import { createClient } from 'jsr:@supabase/supabase-js@2';
 import { fetchAllVendedores, fetchEstoqueSnapshot, fetchHistoricoVendas } from '../_shared/mercadophone.ts';
 import { mapItemSellers, planSellerUpdates, type SaleSellerRow } from '../_shared/itemSellers.ts';
-import { addDays, runFinancialSync, todayInStore } from '../_shared/financialSync.ts';
+import { pickReconcileDays, runFinancialSync, todayInStore } from '../_shared/financialSync.ts';
 import { planStockMovements, type IntervalSales, type LedgerSnapshotItem, type LevelRow } from '../_shared/stockLedger.ts';
 
 const RECONCILE_DAYS = 3;
@@ -245,19 +245,23 @@ Deno.serve(async (req) => {
       console.error('failed to reconcile item sellers', err);
     }
 
-    // Custo, lucro, cancelamentos e itens removidos dos últimos dias (o histórico completo é
-    // recuperado pela function mercadophone-financial-sync, por período).
+    // Custo, lucro, cancelamentos e itens removidos. Dias conferidos: os últimos dias de venda, as
+    // datas das vendas que CHEGARAM nos últimos dias (a loja lança com atraso e data retroativa) e
+    // as datas com itens ainda pendentes desde 01/09/2026 — até 12 dias (≈ 12 consultas, ~3 s cada) por
+    // execução, com vagas reservadas para pendências; se o MercadoPhone cair, a execução para e a próxima retoma.
+    // Cada dia é independente: falha num dia fica registrada e os outros seguem.
     let financial: unknown = null;
     try {
-      const today = todayInStore();
+      const days = await pickReconcileDays(supabase, { recentDays: RECONCILE_DAYS, maxDays: 12 });
       const result = await runFinancialSync(supabase, fetchHistoricoVendas, {
-        start: addDays(today, -RECONCILE_DAYS),
-        end: today,
+        start: [...days].sort()[0],
+        end: [...days].sort().at(-1)!,
+        days,
         mode: 'apply',
         trigger: 'cron',
         timeBudgetMs: 60_000,
       });
-      financial = result.counts;
+      financial = { ...result.counts, days_processed: result.days_processed, days_failed: result.days_failed };
     } catch (err) {
       console.error('failed to reconcile financial data', err);
     }
