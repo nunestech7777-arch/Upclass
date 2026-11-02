@@ -55,7 +55,10 @@
 .dv-sort { width: fit-content; padding-left: 12px; font-size: 13px; }
 .dv-rank-table .fin-pct-cell { min-width: 130px; }
 .dv-rank-table thead th { white-space: normal; line-height: 1.25; vertical-align: bottom; }
-.dv-conversion p { font-size: 13px; line-height: 1.5; }
+.dv-conversion .fin-tag { margin-left: 0; }
+.dv-conversion-pending td { opacity: 0.72; }
+.dv-conversion-loading { display: grid; gap: 8px; }
+.dv-skel.is-row { height: 44px; border-radius: 10px; }
 
 @media (max-width: 1400px) {
   .dv-kpis { grid-template-columns: repeat(3, minmax(0, 1fr)); }

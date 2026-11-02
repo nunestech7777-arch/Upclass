@@ -234,8 +234,8 @@ async function salesBetween(from: string, to: string, columns = SALE_COLUMNS): P
   }
 }
 
-function toFinanceSeller(s: { id: string; name: string; photo_url: string | null; active: boolean; show_in_ranking: boolean }): FinanceSeller {
-  return { id: s.id, name: s.name.trim(), photo_url: s.photo_url, active: s.active, show_in_ranking: s.show_in_ranking };
+function toFinanceSeller(s: { id: string; name: string; photo_url: string | null; active: boolean; show_in_ranking: boolean; kommo_user_id?: string | null }): FinanceSeller {
+  return { id: s.id, name: s.name.trim(), photo_url: s.photo_url, active: s.active, show_in_ranking: s.show_in_ranking, kommo_user_id: s.kommo_user_id ?? null };
 }
 
 function toGoal(row: Record<string, unknown>): ProfitGoal {

@@ -53,6 +53,8 @@ export interface FinanceSeller {
   photo_url: string | null;
   active: boolean;
   show_in_ranking: boolean;
+  /** Usuário do Kommo vinculado (Ranking de Conversão); ausente/null = sem vínculo. */
+  kommo_user_id?: string | null;
 }
 
 export interface ProfitGoal {

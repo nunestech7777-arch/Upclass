@@ -312,16 +312,10 @@ export interface SellerPerformance {
   sold: number;
   devicesSold: number;
   accessoriesSold: number;
-  conversion: number;
 }
 
-/** Sold units come from `sales`; conversion comes from `conversations` (0 when the seller has none yet). */
-export function computeSellerPerformance(
-  sellers: Seller[],
-  sales: Sale[],
-  conversations: Pick<Conversation, 'seller_id' | 'result_type'>[],
-  products?: Product[]
-): SellerPerformance[] {
+/** Unidades vendidas por vendedor (`sales`). Conversão: Ranking de Conversão (src/lib/finance/conversionRanking.ts). */
+export function computeSellerPerformance(sellers: Seller[], sales: Sale[], products?: Product[]): SellerPerformance[] {
   const soldBySeller = new Map<string, number>();
   const devicesSoldBySeller = new Map<string, number>();
   const accessoriesSoldBySeller = new Map<string, number>();
@@ -357,25 +351,12 @@ export function computeSellerPerformance(
     }
   }
 
-  const conversationStatsBySeller = new Map<string, { success: number; total: number }>();
-  for (const conv of conversations) {
-    if (!conv.seller_id) continue;
-    const stats = conversationStatsBySeller.get(conv.seller_id) ?? { success: 0, total: 0 };
-    stats.total += 1;
-    if (conv.result_type === 'success') stats.success += 1;
-    conversationStatsBySeller.set(conv.seller_id, stats);
-  }
-
-  return sellers.map((seller) => {
-    const stats = conversationStatsBySeller.get(seller.id);
-    return {
-      seller,
-      sold: soldBySeller.get(seller.id) ?? 0,
-      devicesSold: devicesSoldBySeller.get(seller.id) ?? 0,
-      accessoriesSold: accessoriesSoldBySeller.get(seller.id) ?? 0,
-      conversion: stats && stats.total > 0 ? Math.round((stats.success / stats.total) * 100) : 0,
-    };
-  });
+  return sellers.map((seller) => ({
+    seller,
+    sold: soldBySeller.get(seller.id) ?? 0,
+    devicesSold: devicesSoldBySeller.get(seller.id) ?? 0,
+    accessoriesSold: accessoriesSoldBySeller.get(seller.id) ?? 0,
+  }));
 }
 
 export function getMonthRange(date: Date): { start: Date; end: Date } {

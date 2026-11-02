@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { Link } from 'react-router-dom';
-import { ArrowDown, MessageSquareOff, Trophy } from 'lucide-react';
+import { ArrowDown, Trophy } from 'lucide-react';
 import { SellerAvatar } from '../SellerAvatar';
 import { EmptyState, PctWithBar } from '../finance/FinancePrimitives';
 import { RANK_SORT_LABELS, sortSellerRows, type DeviceRankRow, type RankSortKey, type SellerDashRow } from '../../lib/finance/dashboard';
@@ -170,18 +170,6 @@ export function SellerRankings({ rows, devices }: Props) {
           </table>
         </div>
       )}
-    </section>
-  );
-}
-
-/** Conversão depende de oportunidades com resultado (CRM): sem dados reais, não inventamos percentuais. */
-export function ConversionNotice() {
-  return (
-    <section className="fin-panel dv-conversion" aria-label="Ranking de conversão">
-      <h2 className="fin-panel-title">
-        <MessageSquareOff size={18} className="tone-warn" />
-        Ranking de Conversão
-      </h2>
     </section>
   );
 }

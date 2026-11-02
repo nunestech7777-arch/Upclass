@@ -8,7 +8,6 @@ import { SellerAvatar } from '../components/SellerAvatar';
 import {
   fetchSellerById,
   fetchSalesInRange,
-  fetchConversationsBySeller,
   fetchProducts,
   classifyProductCategory,
   getMonthRange,
@@ -16,13 +15,16 @@ import {
 import type { Seller } from '../lib/database.types';
 import './SellerReport.css';
 import { AnimatedText } from '../components/ui/AnimatedNumber';
+import { useConversionRanking } from '../components/dashboard/useConversionRanking';
+import { conversionText } from '../lib/finance/conversionRanking';
+import { firstDay, lastDay } from '../lib/finance/dates';
+import { int, pct } from '../lib/finance/format';
 
 interface ReportData {
   seller: Seller;
   productsSold: number;
   devicesSold: number;
   accessoriesSold: number;
-  conversionRate: number;
 }
 
 /**
@@ -35,6 +37,9 @@ export function SellerReport() {
   const [data, setData] = useState<ReportData | null>(null);
   // Competência vinda do ranking financeiro (?mes=AAAA-MM); sem parâmetro, mês atual.
   const { month } = useFinanceParams();
+  // Taxa de conversão do mês: a mesma conta e o mesmo número do Ranking de Conversão.
+  const conversion = useConversionRanking({ from: firstDay(month), to: lastDay(month) });
+  const conv = conversion.rows?.find((r) => r.seller.id === id);
 
   useEffect(() => {
     if (!id) return;
@@ -44,9 +49,8 @@ export function SellerReport() {
     Promise.all([
       fetchSellerById(id),
       fetchSalesInRange(start, end),
-      fetchConversationsBySeller(id),
       fetchProducts(),
-    ]).then(([seller, monthSales, conversations, products]) => {
+    ]).then(([seller, monthSales, products]) => {
       const productMap = new Map(products.map((p) => [p.id, p]));
       const sellerSales = monthSales.filter((s) => s.seller_id === id);
 
@@ -57,15 +61,11 @@ export function SellerReport() {
         .filter((s) => classifyProductCategory(productMap.get(s.product_id)?.name) === 'Acessórios' && Number(s.amount) > 0)
         .reduce((sum, s) => sum + s.quantity, 0);
 
-      const success = conversations.filter((c) => c.result_type === 'success').length;
-      const total = conversations.length;
-
       setData({
         seller,
         productsSold: devicesSold + accessoriesSold,
         devicesSold,
         accessoriesSold,
-        conversionRate: total > 0 ? Math.round((success / total) * 100) : 0,
       });
     });
   }, [id, month]);
@@ -142,9 +142,14 @@ export function SellerReport() {
         <div className="seller-kpi-card">
           <TrendingUp size={22} className="seller-kpi-icon" />
           <span className="seller-kpi-value">
-            <AnimatedText text={`${data?.conversionRate ?? 0}%`} />
+            <AnimatedText text={conversion.rows ? conversionText(conv, pct) : conversion.failed === 'pending' ? 'Ativação pendente' : conversion.failed ? 'Indisponível' : '…'} />
           </span>
           <span className="seller-kpi-label">CONVERSÃO</span>
+          {conv?.attendances != null && (
+            <span className="seller-kpi-origin">
+              {int(conv.attendances)} atendimentos · {int(conv.orders)} vendas
+            </span>
+          )}
         </div>
       </div>
 

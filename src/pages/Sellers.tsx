@@ -21,7 +21,6 @@ import { SellerPhotoModal } from '../components/SellerPhotoModal';
 import {
   fetchVisibleSellers,
   fetchSalesInRange,
-  fetchAllConversations,
   fetchProducts,
   computeSellerPerformance,
   type SellerPerformance,
@@ -29,6 +28,9 @@ import {
 import type { Seller } from '../lib/database.types';
 import './Sellers.css';
 import { AnimatedText } from '../components/ui/AnimatedNumber';
+import { useConversionRanking } from '../components/dashboard/useConversionRanking';
+import { conversionLeader, conversionText, sortByConversion } from '../lib/finance/conversionRanking';
+import { int, pct } from '../lib/finance/format';
 
 type RankingType = 'iphones' | 'accessories' | 'sales' | 'conversion';
 
@@ -56,11 +58,10 @@ export function Sellers() {
     Promise.all([
       fetchVisibleSellers(),
       fetchSalesInRange(start, end),
-      fetchAllConversations(),
       fetchProducts(),
     ])
-      .then(([sellers, sales, conversations, products]) => {
-        setPerformance(computeSellerPerformance(sellers, sales, conversations, products));
+      .then(([sellers, sales, products]) => {
+        setPerformance(computeSellerPerformance(sellers, sales, products));
       })
       .finally(() => setLoading(false));
   }, [range]);
@@ -81,13 +82,20 @@ export function Sellers() {
     return [...performance].sort((a, b) => b.sold - a.sold)[0];
   }, [performance]);
 
-  const leaderConversion = useMemo(() => {
-    if (performance.length === 0) return null;
-    return [...performance].sort((a, b) => b.conversion - a.conversion)[0];
-  }, [performance]);
+  // Atendimentos Kommo × pedidos MercadoPhone do mesmo período: a mesma conta do Dashboard.
+  const conversion = useConversionRanking(range);
+  const leaderConversion = useMemo(() => conversionLeader(conversion.rows), [conversion.rows]);
+  const conversionById = useMemo(() => new Map((conversion.rows ?? []).map((r) => [r.seller.id, r])), [conversion.rows]);
+  const conversionValue = (sellerId: string) =>
+    conversion.rows ? conversionText(conversionById.get(sellerId), pct) : conversion.failed === 'pending' ? 'Ativação pendente' : conversion.failed ? 'Indisponível' : '…';
 
-  // Ranked List based on active tab
+  // Ranked List based on active tab. "Por Conversão" usa a ordem e as posições do Ranking de Conversão
+  // (mesma função do Dashboard); quem não se classifica fica sem posição.
   const rankedSellers = useMemo(() => {
+    const byVolume = (a: SellerPerformance, b: SellerPerformance) => b.sold - a.sold;
+    if (rankingType === 'conversion') {
+      return sortByConversion(performance, conversion.rows ?? [], byVolume).map(({ item, position }) => ({ ...item, rank: position }));
+    }
     return [...performance]
       .sort((a, b) => {
         if (rankingType === 'iphones') {
@@ -96,15 +104,19 @@ export function Sellers() {
         if (rankingType === 'accessories') {
           return b.accessoriesSold - a.accessoriesSold || b.sold - a.sold;
         }
-        if (rankingType === 'conversion') {
-          return b.conversion - a.conversion || b.sold - a.sold;
-        }
-        return b.sold - a.sold;
+        return byVolume(a, b);
       })
-      .map((item, index) => ({ ...item, rank: index + 1 }));
-  }, [performance, rankingType]);
+      .map((item, index): SellerPerformance & { rank: number | null } => ({ ...item, rank: index + 1 }));
+  }, [performance, rankingType, conversion.rows]);
 
-  const getRankBadge = (rank: number) => {
+  const getRankBadge = (rank: number | null) => {
+    // Conversão ainda carregando: posição indefinida, não "sem posição".
+    if (rank == null && rankingType === 'conversion' && !conversion.rows) {
+      return { text: '…', color: 'var(--text-muted)', bg: 'var(--surface-subtle)', border: '1px solid var(--border-color)' };
+    }
+    if (rank == null) {
+      return { text: 'Sem posição', color: 'var(--text-muted)', bg: 'var(--surface-subtle)', border: '1px solid var(--border-color)' };
+    }
     const labelSuffix = 
       rankingType === 'iphones' ? 'em iPhones' :
       rankingType === 'accessories' ? 'em Acessórios' :
@@ -291,7 +303,15 @@ export function Sellers() {
             <span className="leader-label">Maior Conversão</span>
             <span className="leader-name">{leaderConversion ? leaderConversion.seller.name : '—'}</span>
             <span className="leader-score" style={{ color: 'var(--chart-3)' }}>
-              {leaderConversion ? `${leaderConversion.conversion}% taxa` : '0%'}
+              {leaderConversion
+                ? `${pct(leaderConversion.index)} por atendimento`
+                : conversion.rows
+                  ? 'Sem dados suficientes'
+                  : conversion.failed === 'pending'
+                    ? 'Ativação pendente'
+                    : conversion.failed
+                      ? 'Indisponível'
+                      : '…'}
             </span>
           </div>
         </div>
@@ -305,8 +325,9 @@ export function Sellers() {
 
       {/* Sellers Cards Grid */}
       <div className={`seller-grid uc-reload-scope ${loading ? 'is-reloading' : ''}`}>
-        {rankedSellers.map(({ seller, sold, devicesSold, accessoriesSold, conversion, rank }) => {
+        {rankedSellers.map(({ seller, sold, devicesSold, accessoriesSold, rank }) => {
           const badge = getRankBadge(rank);
+          const conv = conversionById.get(seller.id);
 
           return (
             <div 
@@ -331,7 +352,7 @@ export function Sellers() {
                   name={seller.name}
                   photoUrl={seller.photo_url}
                   size="xl"
-                  rank={rank}
+                  rank={rank ?? undefined}
                   editable
                   onEdit={() => setEditingPhotoSeller(seller)}
                 />
@@ -380,9 +401,15 @@ export function Sellers() {
                     Taxa de Conversão
                   </span>
                   <span className="seller-stat-val" style={{ color: 'var(--accent-text)' }}>
-                    <AnimatedText text={`${conversion}%`} />
+                    <AnimatedText text={conversionValue(seller.id)} />
                   </span>
                 </div>
+                {conv?.attendances != null && (
+                  <span className="seller-stat-origin">
+                    {int(conv.attendances)} atendimentos · {int(conv.orders)} vendas
+                    {conv.status === 'insufficient' ? ' · poucos atendimentos' : ''}
+                  </span>
+                )}
               </div>
 
               <Link 

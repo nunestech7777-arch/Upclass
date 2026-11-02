@@ -91,6 +91,13 @@
   transition: all 0.18s ease;
 }
 
+/* Origem da conversão ("830 atendimentos · 48 vendas"): sempre visível. */
+.seller-kpi-origin {
+  font-size: 11px;
+  color: var(--text-muted, var(--text-secondary));
+  margin-top: 4px;
+}
+
 .seller-kpi-card.clickable:hover .seller-kpi-hint {
   opacity: 1;
   transform: translateY(0);

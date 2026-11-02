@@ -12,7 +12,10 @@ import { invalidateFinanceCache } from '../lib/finance/readCache';
 import { GoalCards } from '../components/dashboard/GoalCards';
 import { SalesItemsDialog, TopProductCard, TopProductDialog } from '../components/dashboard/TopProducts';
 import { SalesEvolutionChart } from '../components/dashboard/SalesEvolutionChart';
-import { ConversionNotice, SellerRankings } from '../components/dashboard/SellerRankings';
+import { SellerRankings } from '../components/dashboard/SellerRankings';
+import { ConversionRanking } from '../components/dashboard/ConversionRanking';
+import { AttendanceCountPendingError, loadAttendedConversations, peekAttendedConversations } from '../lib/finance/conversionApi';
+import { buildConversionRanking, salesStillArriving } from '../lib/finance/conversionRanking';
 import { AnimatedNumber } from '../components/ui/AnimatedNumber';
 import { countDelay, useScrollReveal } from '../lib/motion';
 import { MigrationPendingError, type DashboardData, type DeviceGoal } from '../lib/finance/financeApi';
@@ -25,6 +28,7 @@ import {
   deviceItemsOf,
   dataRange,
   defaultMode,
+  formatRange,
   goalWindow,
   rangeCoverage,
   salesIn,
@@ -65,6 +69,24 @@ export function Dashboard() {
       alive = false;
     };
   }, [source, refMonth, nonce]);
+
+  // Atendimentos do Kommo do período (Ranking de Conversão): consulta própria, em cache; falha não derruba o painel.
+  const rangeKey = `${range.from}|${range.to}`;
+  const [attended, setAttended] = useState<{ key: string; value: Map<string, number> | null; failed: 'error' | 'pending' | null } | null>(null);
+  const attendedNonce = useRef(nonce);
+  useEffect(() => {
+    let alive = true;
+    // Só o clique em Atualizar ignora o cache; trocar de período depois dele volta a usar o cache.
+    const force = attendedNonce.current !== nonce;
+    attendedNonce.current = nonce;
+    loadAttendedConversations(range, { force })
+      .then((value) => alive && setAttended({ key: rangeKey, value, failed: null }))
+      .catch((err) => alive && setAttended({ key: rangeKey, value: null, failed: err instanceof AttendanceCountPendingError ? 'pending' : 'error' }));
+    return () => {
+      alive = false;
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [rangeKey, nonce]);
 
   // Uma consulta cobre período + janelas de meta; trocar o filtro dentro do intervalo já carregado não consulta de novo.
   useEffect(() => {
@@ -118,8 +140,13 @@ export function Dashboard() {
       ),
       series: buildSeries(data.sales, names, range, now),
       sellerNames: new Map(data.sellers.map((s) => [s.id, s.name])),
+      conversion: (() => {
+        const value = (attended?.key === `${range.from}|${range.to}` ? attended.value : null) ?? peekAttendedConversations(range);
+        return value ? buildConversionRanking(inRange, names, data.sellers, value) : null;
+      })(),
+      conversionFailed: attended?.key === `${range.from}|${range.to}` ? attended.failed : null,
     };
-  }, [data, need.from, need.to, range, today, goalsState]);
+  }, [data, need.from, need.to, range, today, goalsState, attended]);
 
   // Enquanto um período fora do intervalo carregado é consultado, o painel anterior fica na tela
   // (esmaecido) em vez de sumir: a recarga é discreta e os números contam do valor antigo ao novo.
@@ -196,7 +223,12 @@ export function Dashboard() {
             }}
           />
 
-          <ConversionNotice />
+          <ConversionRanking
+            rows={shown.conversion}
+            periodLabel={formatRange(range)}
+            failed={shown.conversionFailed}
+            salesArriving={salesStillArriving(range.to, today)}
+          />
         </div>
       )}
 

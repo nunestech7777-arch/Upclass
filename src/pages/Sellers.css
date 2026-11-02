@@ -385,6 +385,15 @@
   color: var(--text-dark);
 }
 
+/* Origem da taxa de conversão ("830 atendimentos · 48 vendas"). */
+.seller-stat-origin {
+  display: block;
+  text-align: right;
+  font-size: 11px;
+  color: var(--text-muted);
+  padding: 0 8px;
+}
+
 .seller-stat-row.highlight-metric .seller-stat-val {
   color: var(--accent-text);
   font-size: 14px;

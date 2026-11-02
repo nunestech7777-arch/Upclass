@@ -14,6 +14,7 @@ Consulte só a seção necessária (o resumo está em [CONTEXTO.md](CONTEXTO.md)
 9. [Testes e comandos](#9-testes-e-comandos)
 10. [Problemas conhecidos e decisões](#10-problemas-conhecidos-e-decisões)
 11. [Cache e carregamento](#11-cache-e-carregamento)
+12. [Ranking de Conversão (Dashboard)](#12-ranking-de-conversão-dashboard)
 
 ## 1. Endpoints, webhooks e funções
 Cliente da API v4 do Kommo: `supabase/functions/_shared/kommo.ts` (`call`, limitador ~7 req/s; secrets `KOMMO_SUBDOMAIN`, `KOMMO_API_TOKEN`).
@@ -105,3 +106,18 @@ Referências de regressão (calcule, não fixe no código): critério Kommo 239 
 - **Falha:** os dados anteriores continuam, com o aviso "Falha ao atualizar · dados de HH:MM" e o botão para tentar de novo (`SupervisorFreshness.tsx`).
 - **Medido em 01/11/2026 (Este mês, dev local):** 1º acesso 4–10,7 s → 0,9 s até os indicadores (2,4 s com o Kommo); volta em até 1 min 87 ms → 0,17 s e 0 requisições; volta após 2 min 1,5 s com tela em "carregando" e 24 requisições → 0,25 s com o dado guardado e 19 requisições em segundo plano.
 - **Limitações:** cada aba tem seu cache; dado corrigido no banco de um dia passado aparece em até 30 min (ou no botão); vendedor cadastrado/renomeado em outra tela aparece em até 10 min; o botão "Atualizar" refaz o período, não as avaliações salvas (5 min); cada atualização refaz o período inteiro (não há busca incremental).
+
+## 12. Ranking de Conversão (Dashboard)
+Fica só no Dashboard principal (não no Meu Supervisor). Aprovado em 02/11/2026.
+- **Índice:** vendas por atendimento = pedidos ÷ atendimentos × 100. **Não é taxa real de conversão:** a venda do MercadoPhone só traz `clienteNome` (sem telefone/CPF), então não há vínculo confiável conversa → venda; vendas de balcão também contam e o índice pode passar de 100%.
+- **Atendimento (Kommo):** conversa distinta com ≥1 mensagem `sender='seller'` com `sender_id` (autor, mesma regra do §4) em [início, fim) do período, UTC−3 — conta a mensagem no período, sem a janela de conversas candidatas do Supervisor (diferença mínima possível). Dois atendentes → conta para os dois. Bot, resposta pronta, envio pelo aparelho e responsável do lead não contam. Contado no banco: `kommo_attended_conversations(p_from, p_to)` (migração 0021, SECURITY INVOKER — RLS só admin) com índice parcial `idx_conversation_messages_human_author_sent` (sem ele, um mês levou 23 s e estoura o tempo limite da API; com ele, 0,1–0,4 s). Aplicada em produção em 02/11/2026 via `db query --linked -f` (não `db push`).
+- **Venda (MercadoPhone):** pedido distinto (`mp_order_id`) com ≥1 item ativo do vendedor do item que não seja brinde, por `sold_date`. Pedido com dois vendedores conta para os dois; cancelados fora.
+- **Vínculos:** vendedor do item = vendedor MercadoPhone (`sellers.external_id`); Kommo por `sellers.kommo_user_id` (nunca por nome). Sem vínculo Kommo → "Sem vínculo com o Kommo", atendimentos `—` (não zero).
+- **Elegíveis:** vendedores ativos e visíveis no ranking. Posição só com ≥ 30 atendimentos (`MIN_ATTENDANCES`); abaixo aparece sem posição. Desempate: pedidos, atendimentos, nome.
+- **Datas:** vendas pela data da venda (não do lançamento); a loja lança 1–6 dias depois com data retroativa → aviso "Vendas em lançamento" quando o período alcança os últimos 6 dias.
+- **Cache:** só memória, chave conta + período + live/past; TTL do §11; só o clique em Atualizar força; trocar de período reaproveita o valor em cache.
+- **Pedido sem `mp_order_id`:** cada linha conta como um pedido (não ocorreu em out/2026).
+- **Fonte única (02/11/2026):** a mesma conta alimenta o card do Dashboard, a tela Vendedores (aba "Por Conversão", "Maior Conversão", "Taxa de Conversão" de cada card, com "N atendimentos · N vendas") e o KPI CONVERSÃO do relatório do vendedor (mês do relatório). Funções: `buildConversionRanking` (cálculo), `sortByConversion` (ordem e posições dos cards; quem não se classifica fica "Sem posição"), `conversionLeader` (1º classificado; sem ele "Sem dados suficientes"), `conversionText` (texto; nunca "0%" para dado ausente). Hook `useConversionRanking` (vendas de `loadDashboard` + atendimentos da 0021, ambos em cache). A taxa antiga por `conversations.result_type` (nunca preenchido → 0%) saiu dessas telas; `computeSellerPerformance.conversion` só sobra no Painel TV, que não a exibe.
+- **Arquivos:** `src/lib/finance/conversionRanking.ts` (regra), `conversionApi.ts` (consulta/cache), `src/components/dashboard/ConversionRanking.tsx`, `useConversionRanking.ts`, `src/pages/Dashboard.tsx`, `Sellers.tsx`, `SellerReport.tsx`.
+- **Testes:** `src/lib/finance/conversionRanking.test.ts`, `supabase/tests/kommoAttendedConversations.integration.test.ts`.
+- **Diagnóstico out/2026:** Yasmim 1.132 atend./58 pedidos, Karen 830/48, Thuane 903/40, Caroline 754/36, Amanda 297/3; Graciane e Anderson sem vínculo Kommo; July vinculada sem mensagens desde 24/08; usuário "EMERSON SUPERVISOR" (381 conversas) sem vendedor vinculado.

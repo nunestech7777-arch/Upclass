@@ -296,6 +296,7 @@ export type Database = {
       my_access: { Args: Record<string, never>; Returns: MyAccessRow[] };
       seller_portal_sales: { Args: { p_from: string; p_to: string }; Returns: SellerPortalSaleRow[] };
       seller_portal_weekly_goals: { Args: { p_from: string; p_to: string }; Returns: { week_start: string; device_target: number }[] };
+      kommo_attended_conversations: { Args: { p_from: string; p_to: string }; Returns: { kommo_user_id: string; conversations: number }[] };
     };
   };
 };

@@ -19,7 +19,6 @@ import {
   fetchSalesInRange,
   fetchProducts,
   fetchVisibleSellers,
-  fetchAllConversations,
   computeSellerPerformance,
   classifyProductCategory,
   isDeviceProduct,
@@ -78,9 +77,8 @@ export function TVPanel() {
       fetchSalesInRange(start, end),
       fetchProducts(),
       fetchVisibleSellers(),
-      fetchAllConversations(),
     ])
-      .then(([goals, sales, products, sellers, conversations]) => {
+      .then(([goals, sales, products, sellers]) => {
         if (!isMounted) return;
 
         const productMap = new Map(products.map((p) => [p.id, p]));
@@ -99,7 +97,7 @@ export function TVPanel() {
         });
         const weeklyEvolution = buildWeeklyEvolution(start, dailyByDate, weeklyTarget, storeToday());
 
-        const performance = computeSellerPerformance(sellers, sales, conversations, products);
+        const performance = computeSellerPerformance(sellers, sales, products);
         // Um ranking por categoria; quem não vendeu nada na categoria não sobe ao pódio.
         const topDeviceSellers = performance
           .filter((p) => p.devicesSold > 0)

@@ -56,6 +56,7 @@ Sistema interno da loja (Upclass / Você de iPhone): React + TypeScript (Vite) n
 | Consultas e montagem do período | `src/lib/supervisor/supervisorApi.ts` (`loadPeriod`, `derivePeriodSummary`) |
 | Cache em memória (stale-while-revalidate) | `src/lib/supervisor/swrStore.ts`, `cachePolicy.ts`; hook `usePeriodSummary` em `src/components/supervisor/useSupervisor.ts` — ver REFERENCIA §11 |
 | Análise IA | `src/lib/supervisor/aiEvaluation.ts`, `aiCriteria.ts` |
+| Ranking de Conversão (Dashboard) | `src/lib/finance/conversionRanking.ts`, `conversionApi.ts`; migração 0021 — ver REFERENCIA §12 |
 | Telas | `src/pages/supervisor/*`, `src/components/supervisor/*` |
 | Integração | `supabase/functions/kommo-*`, `supabase/functions/_shared/kommo*.ts` |
 
