@@ -1,5 +1,6 @@
 /* Barra de navegação inferior do celular — flutuante, com Meu Supervisor num botão circular elevado. */
 .bn-bar,
+.bn-underlay,
 .bn-sheet,
 .bn-backdrop {
   display: none;
@@ -8,8 +9,9 @@
 @media (max-width: 760px) {
   :root {
     --bn-height: 76px;
-    /* Distância da base: acima do indicador de início do iPhone; 12px quando não há safe area. */
-    --bn-bottom: max(12px, calc(env(safe-area-inset-bottom, 0px) + 4px));
+    /* Distância da base: logo acima do indicador de início do iPhone (que ocupa só os ~13px de baixo
+       dos 34px de safe area); 12px quando não há safe area. */
+    --bn-bottom: max(12px, calc(env(safe-area-inset-bottom, 0px) - 20px));
     /* Folga extra acima da barra (o círculo fica dentro dela). */
     --bn-fab-rise: 4px;
     /* Espaço que o conteúdo reserva no fim da página para a barra não cobrir nada. */
@@ -32,6 +34,25 @@
     box-shadow: 0 14px 30px -12px rgba(0, 2, 41, 0.26), 0 6px 12px -8px rgba(0, 2, 41, 0.12);
     transition: transform 0.28s var(--ease-out), opacity 0.2s ease;
   }
+  /* Faixa opaca na cor do fundo das páginas, atrás da barra e acima do conteúdo: começa na metade da
+     barra (escondida atrás dela) e vai até a borda de baixo da tela, com a área segura. O topo esmaece
+     para não formar linha ao lado da barra. */
+  .bn-underlay {
+    display: block;
+    position: fixed;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    z-index: 939;
+    height: calc(var(--bn-bottom) + var(--bn-height) / 2);
+    background: linear-gradient(to bottom, transparent, var(--surface-page) 14px);
+    pointer-events: none;
+    transition: opacity 0.2s ease;
+  }
+  .bn-underlay.is-hidden {
+    opacity: 0;
+  }
+
   .bn-bar.is-hidden {
     transform: translateY(calc(100% + var(--bn-bottom) + var(--bn-fab-rise)));
     opacity: 0;
@@ -56,6 +77,9 @@
     overflow: visible;
     transition: transform 0.42s cubic-bezier(0.3, 1.15, 0.5, 1);
     will-change: transform;
+  }
+  .bn-bg-well {
+    fill: var(--surface-page);
   }
   .bn-bg-fill {
     fill: var(--surface-card);
@@ -278,6 +302,7 @@
 
 @media (max-width: 760px) and (prefers-reduced-motion: reduce) {
   .bn-orb,
+  .bn-underlay,
   .bn-bg svg,
   .bn-orb-circle svg,
   .bn-tab > svg,

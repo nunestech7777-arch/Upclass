@@ -79,8 +79,9 @@ export function BottomNav() {
       bg.setAttribute('width', String(2 * w));
       bg.setAttribute('height', String(h));
       bg.setAttribute('viewBox', `0 0 ${2 * w} ${h}`);
-      bg.children[0]?.setAttribute('d', fill);
-      bg.children[1]?.setAttribute('d', line);
+      bg.children[0]?.setAttribute('d', `M0,0 H${2 * w} V${h} H0 Z`);
+      bg.children[1]?.setAttribute('d', fill);
+      bg.children[2]?.setAttribute('d', line);
       orb.style.opacity = tab ? '1' : '0';
       if (!tab) return;
       const cx = tab.offsetLeft + tab.offsetWidth / 2;
@@ -169,9 +170,13 @@ export function BottomNav() {
         </div>
       )}
 
+      {/* Cobre o conteúdo da página entre a barra e a borda de baixo da tela (área segura incluída). */}
+      <div className={`bn-underlay ${typing ? 'is-hidden' : ''}`} aria-hidden="true" />
       <nav ref={barRef} className={`bn-bar ${typing ? 'is-hidden' : ''}`} aria-label="Navegação principal">
         <span className="bn-bg" aria-hidden="true">
           <svg ref={bgRef}>
+            {/* Por baixo do branco: a cavidade mostra a cor do fundo, não o conteúdo da página. */}
+            <path className="bn-bg-well" />
             <path className="bn-bg-fill" />
             <path className="bn-bg-line" />
           </svg>
