@@ -21,7 +21,7 @@
  */
 import { classifyProductCategory } from '../productClassifier.ts';
 import { APPLE_TYPES, classifyAppleLine, isOtherBrandPhone, type AppleType, type ReviewReason } from './appleProducts.ts';
-import type { MonthContext } from './calc.ts';
+import { isReconciled, type FinanceSale, type MonthContext } from './calc.ts';
 
 export interface UnitSale {
   seller_id: string;
@@ -34,6 +34,7 @@ export interface UnitSale {
   revenue?: number | string | null;
   financial_status?: string | null;
   profit?: number | string | null;
+  cost?: number | string | null;
   /** Id da venda (pedido) no MercadoPhone — base do "atendimento" (ticket médio e PA). */
   mp_order_id?: string | null;
   external_id?: string | null;
@@ -75,9 +76,15 @@ export const METRIC_LABELS: Record<ForecastMetric, string> = { units: 'Quantidad
 
 const toCents = (v: number | string | null | undefined): number => Math.round((Number(v) || 0) * 100);
 
-/** Faturamento da linha disponível? Mesmo critério do Dashboard (`isReconciled` em calc.ts): status ok e lucro calculado. */
-export function hasRevenue(sale: Pick<UnitSale, 'financial_status' | 'profit'>): boolean {
-  return sale.financial_status === 'ok' && sale.profit != null;
+/** Faturamento da linha disponível? Mesmo critério do Dashboard (`isReconciled` em calc.ts). */
+export function hasRevenue(sale: Pick<UnitSale, 'financial_status' | 'profit' | 'amount' | 'cost' | 'product_type'>): boolean {
+  return isReconciled({
+    financial_status: sale.financial_status as FinanceSale['financial_status'] | null | undefined,
+    profit: sale.profit == null ? null : Number(sale.profit),
+    cost: sale.cost == null ? null : Number(sale.cost),
+    amount: sale.amount,
+    product_type: sale.product_type,
+  });
 }
 
 export function isCountedSale(sale: Pick<UnitSale, 'item_status'>): boolean {

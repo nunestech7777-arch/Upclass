@@ -10,8 +10,20 @@
  *   aparece como resultado parcial, nunca como zero.
  * - Vendas únicas = pedidos distintos (`mp_order_id`); uma venda pode ter vários itens.
  */
-import { classifyProductCategory, isDeviceProduct } from '../productClassifier.ts';
-import { financeCategory, isActive, isReconciled, type Coverage, type FinanceSale, type FinanceSeller } from './calc.ts';
+import { isDeviceProduct } from '../productClassifier.ts';
+import {
+  PENDING_REASONS,
+  PENDING_REASON_LABEL,
+  emptyPendingCounts,
+  financeCategory,
+  isActive,
+  isReconciled,
+  pendingReason,
+  type Coverage,
+  type FinanceSale,
+  type FinanceSeller,
+  type PendingReason,
+} from './calc.ts';
 import { addDays, firstDay, formatDateBR, lastDay, longDateBR, monthOf, monthTitle, wallClock } from './dates.ts';
 
 export type PeriodPreset = 'today' | 'yesterday' | 'week' | 'lastWeek' | 'month' | 'lastMonth' | 'custom';
@@ -174,22 +186,23 @@ export function summarizeMoney(sales: FinanceSale[]): MoneySummary {
 }
 
 /** Cobertura financeira do período (mesmo formato do módulo financeiro). */
-export function rangeCoverage(sales: FinanceSale[], names: Names): Coverage {
-  const pending: Coverage['pending'] = { pending: 0, mismatch: 0, ambiguous: 0, not_found: 0 };
+export function rangeCoverage(sales: FinanceSale[], now = Date.now()): Coverage {
+  const pending = emptyPendingCounts();
+  const missingCost = new Set<string>();
   let items = 0;
   let reconciled = 0;
   let revenueKnown = 0;
   let amountPending = 0;
-  let zeroCostDevices = 0;
   for (const s of sales) {
     if (!isActive(s)) continue;
     items += 1;
     if (isReconciled(s)) {
       reconciled += 1;
       revenueKnown += cents(s.revenue ?? 0);
-      if (s.cost === 0 && classifyProductCategory(names.get(s.product_id)) === 'Aparelhos') zeroCostDevices += 1;
     } else {
-      pending[s.financial_status === 'ok' ? 'pending' : s.financial_status] += 1;
+      const reason = pendingReason(s, now);
+      pending[reason] += 1;
+      if (reason === 'missing_cost' && s.mp_order_id) missingCost.add(s.mp_order_id);
       amountPending += cents(Number(s.amount) || 0);
     }
   }
@@ -201,7 +214,7 @@ export function rangeCoverage(sales: FinanceSale[], names: Names): Coverage {
     amountPending: amountPending / 100,
     complete: items === reconciled,
     completeUntilCutoff: items === reconciled,
-    zeroCostDevices,
+    missingCostOrders: [...missingCost].sort(),
   };
 }
 
@@ -214,17 +227,14 @@ export interface CoverageSummary {
   pct: number | null;
   revenueKnown: number;
   amountPending: number;
-  zeroCostDevices: number;
-  reasons: { label: string; count: number }[];
+  missingCostOrders: string[];
+  reasons: { reason: PendingReason; label: string; count: number }[];
 }
 
 export function coverageSummary(c: Coverage): CoverageSummary {
-  const reasons = [
-    { label: 'Aguardando conciliação', count: c.pending.pending },
-    { label: 'Correspondência ambígua', count: c.pending.ambiguous },
-    { label: 'Sem pedido no histórico do Mercado Phone', count: c.pending.not_found },
-    { label: 'Lucro divergente do informado pela origem', count: c.pending.mismatch },
-  ].filter((r) => r.count > 0);
+  const reasons = PENDING_REASONS.map((reason) => ({ reason, label: PENDING_REASON_LABEL[reason], count: c.pending[reason] })).filter(
+    (r) => r.count > 0
+  );
   return {
     total: c.items,
     reconciled: c.reconciled,
@@ -232,7 +242,7 @@ export function coverageSummary(c: Coverage): CoverageSummary {
     pct: c.items > 0 ? (c.reconciled / c.items) * 100 : null,
     revenueKnown: c.revenueKnown,
     amountPending: c.amountPending,
-    zeroCostDevices: c.zeroCostDevices,
+    missingCostOrders: c.missingCostOrders,
     reasons,
   };
 }

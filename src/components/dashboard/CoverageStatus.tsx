@@ -23,7 +23,7 @@ export function CoverageStatus({ coverage }: { coverage: Coverage | null }) {
         onClick={() => setOpen(true)}
         disabled={!summary}
         aria-haspopup="dialog"
-        title={hasPending ? `${summary!.pending} item(ns) aguardando conciliação` : 'Custos conciliados'}
+        title={hasPending ? `${summary!.pending} item(ns) pendente(s) de conciliação` : 'Custos conciliados'}
       >
         {hasPending ? <AlertTriangle size={15} /> : <CheckCircle2 size={15} />}
         Conciliação{hasPending ? ` (${int(summary!.pending)})` : ''}
@@ -105,16 +105,14 @@ function CoverageDialog({ summary, onClose }: { summary: ReturnType<typeof cover
             {summary.reasons.length > 0 && (
               <ul className="fin-msg-list">
                 {summary.reasons.map((r) => (
-                  <li key={r.label}>
+                  <li key={r.reason}>
                     {r.label}: {int(r.count)}
+                    {r.reason === 'missing_cost' && summary.missingCostOrders.length > 0 && (
+                      <span className="fin-muted fin-small"> · pedidos {summary.missingCostOrders.join(', ')}</span>
+                    )}
                   </li>
                 ))}
               </ul>
-            )}
-            {summary.zeroCostDevices > 0 && (
-              <p className="fin-muted fin-small">
-                {int(summary.zeroCostDevices)} iPhone(s) com custo zero informado pela origem — confira o cadastro de custo no Mercado Phone.
-              </p>
             )}
           </>
         )}

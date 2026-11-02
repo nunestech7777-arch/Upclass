@@ -1,7 +1,18 @@
 import React, { useMemo, useState } from 'react';
 import { attainmentTone } from '../../lib/finance/ui';
 import { ChevronDown, ChevronRight, Loader2 } from 'lucide-react';
-import { financeCategory, isActive, isReconciled, type FinanceSale, type MonthContext, type SellerFinance } from '../../lib/finance/calc';
+import {
+  MISSING_COST_NOTE,
+  MISSING_REVENUE_NOTE,
+  PENDING_REASON_LABEL,
+  financeCategory,
+  isActive,
+  isReconciled,
+  pendingReason,
+  type FinanceSale,
+  type MonthContext,
+  type SellerFinance,
+} from '../../lib/finance/calc';
 import { brl, int, pct } from '../../lib/finance/format';
 import { formatDateBR } from '../../lib/finance/dates';
 import type { SaleOrderDetails } from '../../lib/saleDetails';
@@ -18,12 +29,14 @@ interface Props {
   sellerNames: Map<string, string>;
 }
 
-const STATUS_TEXT: Record<string, string> = {
-  pending: 'Aguardando conciliação',
-  mismatch: 'Lucro divergente',
-  ambiguous: 'Correspondência ambígua',
-  not_found: 'Sem pedido no histórico',
-};
+const pendingText = (sale: FinanceSale) => PENDING_REASON_LABEL[pendingReason(sale)];
+
+/** Situação do item: motivo da pendência + nota da origem quando acrescenta algo. */
+function situationText(sale: FinanceSale): string {
+  if (isReconciled(sale)) return sale.financial_note ?? 'Conciliado';
+  const note = sale.financial_note && sale.financial_note !== MISSING_COST_NOTE && sale.financial_note !== MISSING_REVENUE_NOTE ? sale.financial_note : null;
+  return note ? `${pendingText(sale)} · ${note}` : pendingText(sale);
+}
 
 function Metric({ label, value, tone, hint }: { label: string; value: string; tone?: string; hint?: string }) {
   return (
@@ -172,7 +185,7 @@ function ItemRow({ sale, productName, sellerNames }: { sale: FinanceSale; produc
         <td className="align-right num">{reconciled ? brl(sale.revenue) : <span className="fin-muted">{brl(sale.amount)}*</span>}</td>
         <td className="align-right num">{reconciled ? brl(sale.cost) : <span className="fin-muted">—</span>}</td>
         <td className={`align-right num strong ${!reconciled ? '' : (sale.profit ?? 0) < 0 ? 'tone-deficit' : 'tone-profit'}`}>
-          {reconciled ? brl(sale.profit) : <span className="tone-warn fin-small">{STATUS_TEXT[sale.financial_status] ?? 'Pendente'}</span>}
+          {reconciled ? brl(sale.profit) : <span className="tone-warn fin-small">{pendingText(sale)}</span>}
         </td>
       </tr>
       {open && (
@@ -230,7 +243,7 @@ function OrderDetail({ sale, sellerNames }: { sale: FinanceSale; sellerNames: Ma
         </span>
         <span>
           <em>Situação financeira</em>
-          {sale.financial_note ?? (isReconciled(sale) ? 'Conciliado' : STATUS_TEXT[sale.financial_status] ?? 'Pendente')}
+          {situationText(sale)}
         </span>
       </div>
       {state.loading ? (

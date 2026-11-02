@@ -6,6 +6,10 @@
  *   Não é lucro líquido contábil: despesas da operação não são deduzidas.
  * - Somas financeiras usam só linhas ativas com `financial_status = 'ok'`; o restante aparece
  *   como cobertura parcial, nunca como zero.
+ * - Produto Apple vendido com custo 0 na origem é custo não cadastrado no MercadoPhone: fica fora
+ *   das somas como pendência "sem custo no Mercado Phone", nunca como lucro (ver `hasZeroSourceCost`).
+ * - Pendência tem motivo (`pendingReason`): falta de valor na origem é separada de atraso normal do
+ *   histórico e de falha real de sincronização.
  * - Unidades seguem a regra comercial existente (productClassifier): iPhone é aparelho; demais
  *   produtos com valor pago > 0 são acessórios; valor zero é brinde e não conta como venda — mas o
  *   custo do brinde entra no lucro.
@@ -37,6 +41,10 @@ export interface FinanceSale {
   financial_note: string | null;
   customer_name: string | null;
   product_type: string | null;
+  /** Entrada da linha no painel: início da espera pela conciliação. */
+  created_at?: string | null;
+  /** Resultado da última tentativa de conciliação do pedido (financial_reconcile_attempts). */
+  last_attempt?: string | null;
 }
 
 export interface FinanceSeller {
@@ -69,6 +77,8 @@ export interface IphoneBaseline {
 export interface MonthFinanceInput {
   month: string;
   today?: string;
+  /** Instante da leitura (ms), base do prazo de espera pela origem. Padrão: agora. */
+  now?: number;
   sellers: FinanceSeller[];
   productNames: Map<string, string>;
   sales: FinanceSale[];
@@ -96,14 +106,15 @@ export interface Coverage {
   items: number;
   reconciled: number;
   /** Linhas não conciliadas por motivo. */
-  pending: Record<Exclude<FinancialStatus, 'ok'>, number>;
+  pending: Record<PendingReason, number>;
   revenueKnown: number;
   /** Receita das linhas pendentes, pelo valor pago (amount), para dimensionar a lacuna. */
   amountPending: number;
   complete: boolean;
   /** Cobertura completa nos dias usados pela projeção (até o corte). */
   completeUntilCutoff: boolean;
-  zeroCostDevices: number;
+  /** Pedidos com item sem custo no MercadoPhone (para corrigir o cadastro lá). */
+  missingCostOrders: string[];
 }
 
 export interface Aggregate {
@@ -236,8 +247,94 @@ export function isActive(sale: Pick<FinanceSale, 'item_status'>): boolean {
   return (sale.item_status ?? 'active') === 'active';
 }
 
-export function isReconciled(sale: Pick<FinanceSale, 'financial_status' | 'profit'>): boolean {
-  return sale.financial_status === 'ok' && sale.profit != null;
+type ReconcileFields = {
+  financial_status?: FinancialStatus | null;
+  profit?: number | null;
+  cost?: number | null;
+  amount?: number | string | null;
+  product_type?: string | null;
+};
+
+/** Produto Apple vendido com custo 0 na origem: custo não cadastrado no MercadoPhone (serviços e brindes têm custo 0 legítimo). */
+export function hasZeroSourceCost(sale: ReconcileFields): boolean {
+  return (
+    sale.financial_status === 'ok' &&
+    sale.cost != null &&
+    Number(sale.cost) === 0 &&
+    Number(sale.amount) > 0 &&
+    /PRODUTO APPLE/i.test(sale.product_type ?? '')
+  );
+}
+
+export function isReconciled(sale: ReconcileFields): boolean {
+  return sale.financial_status === 'ok' && sale.profit != null && !hasZeroSourceCost(sale);
+}
+
+/** Notas gravadas pela conciliação quando a origem não informa o valor (financialReconcile.ts). */
+export const MISSING_COST_NOTE = 'Custo não informado pela origem';
+export const MISSING_REVENUE_NOTE = 'Receita não informada pela origem';
+/** Primeiro dia que a rotina de conciliação confere (SWEEP_SINCE em financialSync.ts). */
+export const RECONCILE_SINCE = '2026-09-01';
+/** Espera normal pelo histórico do MercadoPhone; depois disso a pendência é falha de sincronização. */
+export const AWAITING_SOURCE_MS = 2 * 60 * 60 * 1000;
+const FAILED_ATTEMPTS = new Set(['api_error', 'apply_error']);
+
+export type PendingReason =
+  | 'missing_cost'
+  | 'missing_revenue'
+  | 'sync_failure'
+  | 'awaiting_source'
+  | 'not_found'
+  | 'ambiguous'
+  | 'mismatch'
+  | 'not_swept';
+
+export const PENDING_REASONS: PendingReason[] = [
+  'missing_cost',
+  'missing_revenue',
+  'sync_failure',
+  'awaiting_source',
+  'not_found',
+  'ambiguous',
+  'mismatch',
+  'not_swept',
+];
+
+/** Rótulo do motivo (modal, detalhe do item). */
+export const PENDING_REASON_LABEL: Record<PendingReason, string> = {
+  missing_cost: 'Sem custo no Mercado Phone',
+  missing_revenue: 'Sem receita no Mercado Phone',
+  sync_failure: 'Falha de sincronização',
+  awaiting_source: 'Aguardando o Mercado Phone',
+  not_found: 'Sem pedido no histórico',
+  ambiguous: 'Correspondência ambígua',
+  mismatch: 'Lucro divergente',
+  not_swept: 'Antes do início da conciliação',
+};
+
+export function emptyPendingCounts(): Record<PendingReason, number> {
+  return Object.fromEntries(PENDING_REASONS.map((r) => [r, 0])) as Record<PendingReason, number>;
+}
+
+/**
+ * Motivo de uma linha não conciliada. Valor ausente na origem vem antes de tudo (não se resolve
+ * sozinho); sem nota, a linha só está "aguardando" dentro do prazo normal do histórico — depois dele,
+ * ou com erro na última tentativa, é falha de sincronização.
+ */
+export function pendingReason(
+  sale: ReconcileFields & Partial<Pick<FinanceSale, 'financial_note' | 'sold_date' | 'created_at' | 'last_attempt'>>,
+  now = Date.now()
+): PendingReason {
+  if (hasZeroSourceCost(sale) || sale.financial_note === MISSING_COST_NOTE) return 'missing_cost';
+  if (sale.financial_note === MISSING_REVENUE_NOTE) return 'missing_revenue';
+  if (sale.financial_status === 'not_found' || sale.financial_status === 'ambiguous' || sale.financial_status === 'mismatch') {
+    return sale.financial_status;
+  }
+  if (sale.sold_date && sale.sold_date < RECONCILE_SINCE) return 'not_swept';
+  if (sale.last_attempt && FAILED_ATTEMPTS.has(sale.last_attempt)) return 'sync_failure';
+  const entered = sale.created_at ? Date.parse(sale.created_at) : NaN;
+  if (Number.isFinite(entered) && now - entered > AWAITING_SOURCE_MS) return 'sync_failure';
+  return 'awaiting_source';
 }
 
 export function buildContext(month: string, today = storeToday()): MonthContext {
@@ -422,20 +519,21 @@ export function buildMonthFinance(input: MonthFinanceInput): MonthFinance {
   const consolidatedWorst = sumNullable(input.goals.map((g) => g.worst_case_target));
 
   // Cobertura
-  const pending: Coverage['pending'] = { pending: 0, mismatch: 0, ambiguous: 0, not_found: 0 };
+  const pending = emptyPendingCounts();
+  const missingCost = new Set<string>();
+  const now = input.now ?? Date.now();
   let reconciled = 0;
   let revenueKnown = 0;
   let amountPending = 0;
   let completeUntilCutoff = true;
-  let zeroCostDevices = 0;
   for (const s of active) {
     if (isReconciled(s)) {
       reconciled += 1;
       revenueKnown += cents(s.revenue ?? 0);
-      if (s.cost === 0 && categoryOf(s) === 'Aparelhos') zeroCostDevices += 1;
     } else {
-      const key = s.financial_status === 'ok' ? 'pending' : s.financial_status;
-      pending[key] += 1;
+      const reason = pendingReason(s, now);
+      pending[reason] += 1;
+      if (reason === 'missing_cost' && s.mp_order_id) missingCost.add(s.mp_order_id);
       amountPending += cents(Number(s.amount) || 0);
       if (ctx.cutoffDate && s.sold_date <= ctx.cutoffDate) completeUntilCutoff = false;
     }
@@ -448,7 +546,7 @@ export function buildMonthFinance(input: MonthFinanceInput): MonthFinance {
     amountPending: fromCents(amountPending),
     complete: reconciled === active.length,
     completeUntilCutoff,
-    zeroCostDevices,
+    missingCostOrders: [...missingCost].sort(),
   };
 
   const baseline = input.iphoneBaseline ?? null;
@@ -649,7 +747,8 @@ function buildPlan(
 
 /** Lucro médio por iPhone de um conjunto de linhas (base da equivalência em aparelhos). */
 export function computeIphoneBaseline(
-  sales: Pick<FinanceSale, 'product_id' | 'quantity' | 'amount' | 'item_status' | 'financial_status' | 'profit'>[],
+  sales: (Pick<FinanceSale, 'product_id' | 'quantity' | 'amount' | 'item_status' | 'financial_status' | 'profit'> &
+    Partial<Pick<FinanceSale, 'cost' | 'product_type'>>)[],
   productNames: Map<string, string>,
   from: string,
   to: string

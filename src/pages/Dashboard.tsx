@@ -102,7 +102,7 @@ export function Dashboard() {
       inRange,
       units: summarizeUnits(inRange, names),
       money: summarizeMoney(inRange),
-      coverage: rangeCoverage(inRange, names),
+      coverage: rangeCoverage(inRange),
       week: unitGoalProgress(data.sales, names, weekWindow, { devices: data.targets.weekly_devices_target, accessories: data.targets.weekly_accessories_target }),
       month: unitGoalProgress(data.sales, names, monthWindow, { devices: data.targets.monthly_devices_target, accessories: data.targets.monthly_accessories_target }),
       topDevice: topProduct(inRange, names, 'devices'),

@@ -131,11 +131,10 @@ describe('financeiro', () => {
   });
   it('cobertura aponta pendências', () => {
     const c = rangeCoverage(
-      [sale({ seller_id: 'a', product_id: 'i15', sold_date: '2026-10-05' }), sale({ seller_id: 'a', product_id: 'i15', sold_date: '2026-10-05', financial_status: 'pending', profit: null })],
-      names
+      [sale({ seller_id: 'a', product_id: 'i15', sold_date: '2026-10-05' }), sale({ seller_id: 'a', product_id: 'i15', sold_date: '2026-10-05', financial_status: 'pending', profit: null })]
     );
     assert.equal(c.complete, false);
-    assert.equal(c.pending.pending, 1);
+    assert.equal(c.pending.awaiting_source, 1);
   });
 });
 
@@ -329,17 +328,20 @@ describe('resumo da conciliação (botão e modal)', () => {
     sale({ seller_id: 'a', product_id: 'i15', sold_date: '2026-10-05', item_status: 'cancelled', financial_status: 'pending', profit: null }),
   ];
   it('pendentes = itens − conciliados, e não conta linhas canceladas', () => {
-    const s = coverageSummary(rangeCoverage(sales, names));
+    const s = coverageSummary(rangeCoverage(sales));
     assert.equal(s.total, 6);
     assert.equal(s.reconciled, 4);
     assert.equal(s.pending, 2);
     assert.ok(Math.abs(s.pct! - (4 / 6) * 100) < 1e-9);
     assert.equal(s.revenueKnown, 3600);
     assert.equal(s.amountPending, 860);
-    assert.deepEqual(s.reasons, [{ label: 'Aguardando conciliação', count: 1 }, { label: 'Correspondência ambígua', count: 1 }]);
+    assert.deepEqual(s.reasons, [
+      { reason: 'awaiting_source', label: 'Aguardando o Mercado Phone', count: 1 },
+      { reason: 'ambiguous', label: 'Correspondência ambígua', count: 1 },
+    ]);
   });
   it('é exatamente a cobertura que alimentava o aviso antigo', () => {
-    const c = rangeCoverage(sales, names);
+    const c = rangeCoverage(sales);
     const s = coverageSummary(c);
     assert.equal(s.total, c.items);
     assert.equal(s.reconciled, c.reconciled);
@@ -347,9 +349,9 @@ describe('resumo da conciliação (botão e modal)', () => {
     assert.equal(s.amountPending, c.amountPending);
   });
   it('tudo conciliado: zero pendências, 100%; sem itens: percentual indisponível', () => {
-    assert.equal(coverageSummary(rangeCoverage(sales.slice(0, 4), names)).pending, 0);
-    assert.equal(coverageSummary(rangeCoverage(sales.slice(0, 4), names)).pct, 100);
-    assert.equal(coverageSummary(rangeCoverage([], names)).pct, null);
+    assert.equal(coverageSummary(rangeCoverage(sales.slice(0, 4))).pending, 0);
+    assert.equal(coverageSummary(rangeCoverage(sales.slice(0, 4))).pct, 100);
+    assert.equal(coverageSummary(rangeCoverage([])).pct, null);
   });
 });
 

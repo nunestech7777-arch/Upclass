@@ -54,6 +54,8 @@ export type Sale = {
   profit?: number | null;
   financial_status?: 'pending' | 'ok' | 'mismatch' | 'ambiguous' | 'not_found';
   customer_name?: string | null;
+  /** tipoProdutoDescricao do histórico ("PRODUTO APPLE", "BRINDES"...). */
+  product_type?: string | null;
 };
 
 /** Meta mensal de lucro por vendedor (`month` = primeiro dia do mês). */

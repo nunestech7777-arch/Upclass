@@ -4,6 +4,7 @@ import { TopNav } from './TopNav';
 import { PeriodBar } from './PeriodBar';
 import { BottomNav } from './BottomNav';
 import { usePageMotion } from '../lib/motion';
+import { PageNoticesProvider } from '../lib/notices/PageNotices';
 
 export function Layout() {
   const pageRef = useRef<HTMLDivElement>(null);
@@ -12,6 +13,7 @@ export function Layout() {
   usePageMotion(pageRef);
 
   return (
+    <PageNoticesProvider>
     <div className="app-container">
       <TopNav />
       <main className="main-content">
@@ -22,5 +24,6 @@ export function Layout() {
       </main>
       <BottomNav />
     </div>
+    </PageNoticesProvider>
   );
 }

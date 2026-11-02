@@ -15,6 +15,8 @@ import {
   financeCategory,
   isActive,
   isReconciled,
+  PENDING_REASON_LABEL,
+  pendingReason,
   type DayFinance,
   type FinanceCategory,
   type FinanceSale,
@@ -441,7 +443,7 @@ export function DayDetail({
                                 {brl(sale.revenue)} − {brl(sale.cost)} = <b className={(sale.profit ?? 0) < 0 ? 'tone-deficit' : 'tone-profit'}>{brl(sale.profit)}</b>
                               </>
                             ) : (
-                              <span className="tone-warn">não conciliado</span>
+                              <span className="tone-warn">{PENDING_REASON_LABEL[pendingReason(sale)]}</span>
                             )}
                           </span>
                         </li>

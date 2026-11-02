@@ -1,12 +1,12 @@
 /**
- * Acesso a dados do módulo financeiro. Usa só `sales`, `sellers`, `products`, metas de lucro e o
- * registro de sincronização — nenhuma consulta a conversas/Kommo, para que uma falha no CRM não
+ * Acesso a dados do módulo financeiro. Usa só `sales`, `sellers`, `products`, metas de lucro e os
+ * registros de sincronização e de tentativas de conciliação — nenhuma consulta a conversas/Kommo, para que uma falha no CRM não
  * impeça abrir os resultados.
  */
 import { supabase } from '../supabaseClient';
 import { fetchGoals, fetchProducts, fetchSaleOrderDetails, fetchSellers, updateSellerRankingVisibility } from '../api';
 import type { SaleOrderDetails } from '../saleDetails';
-import { computeIphoneBaseline, type FinanceSale, type FinanceSeller, type IphoneBaseline, type ProfitGoal } from './calc';
+import { RECONCILE_SINCE, computeIphoneBaseline, isActive, isReconciled, type FinanceSale, type FinanceSeller, type IphoneBaseline, type ProfitGoal } from './calc';
 import { addDays, firstDay, lastDay, storeToday } from './dates';
 import type { UnitTargets } from './dashboard';
 
@@ -139,11 +139,13 @@ export class MigrationPendingError extends Error {
 }
 
 const SALE_COLUMNS =
-  'id, seller_id, product_id, quantity, amount, sold_at, sold_date, external_id, mp_order_id, item_status, revenue, cost, profit, profit_reported, financial_status, financial_note, customer_name, product_type';
+  'id, seller_id, product_id, quantity, amount, sold_at, sold_date, external_id, mp_order_id, item_status, revenue, cost, profit, profit_reported, financial_status, financial_note, customer_name, product_type, created_at';
 
 /** Dias anteriores usados para o lucro médio por iPhone do plano de ação. */
 export const IPHONE_BASELINE_DAYS = 90;
 const PAGE = 1000;
+/** Pedidos por consulta de tentativas (≈ 1 linha a cada 6 h por pedido pendente: folga até 1000). */
+const ATTEMPT_BATCH = 25;
 
 function raise(error: { message: string; code?: string } | null) {
   if (!error) return;
@@ -175,7 +177,43 @@ function toFinanceSale(row: Record<string, unknown>): FinanceSale {
     financial_note: (row.financial_note as string) ?? null,
     customer_name: (row.customer_name as string) ?? null,
     product_type: (row.product_type as string) ?? null,
+    created_at: (row.created_at as string) ?? null,
   };
+}
+
+/**
+ * Última tentativa de conciliação de cada pedido pendente (financial_reconcile_attempts): separa
+ * falha da API/gravação de simples espera pelo histórico. Só leitura; sem acesso (não admin) ou
+ * com erro, as linhas seguem sem esse dado e o motivo usa só o tempo de espera.
+ */
+async function withLastAttempts(sales: FinanceSale[]): Promise<FinanceSale[]> {
+  const orders = [
+    ...new Set(
+      sales
+        .filter((s) => isActive(s) && !isReconciled(s) && s.financial_status === 'pending' && !s.financial_note && s.sold_date >= RECONCILE_SINCE)
+        .map((s) => s.mp_order_id)
+        .filter((id): id is string => !!id)
+    ),
+  ];
+  if (orders.length === 0) return sales;
+  const last = new Map<string, string>();
+  try {
+    // Lotes pequenos: cada pedido pode ter várias tentativas e a resposta tem teto de 1000 linhas.
+    for (let i = 0; i < orders.length; i += ATTEMPT_BATCH) {
+      const { data, error } = await supabase
+        .from('financial_reconcile_attempts')
+        .select('mp_order_id, outcome, created_at')
+        .in('mp_order_id', orders.slice(i, i + ATTEMPT_BATCH))
+        .order('created_at', { ascending: false });
+      if (error) return sales;
+      for (const a of (data ?? []) as { mp_order_id: string; outcome: string }[]) {
+        if (!last.has(a.mp_order_id)) last.set(a.mp_order_id, a.outcome);
+      }
+    }
+  } catch {
+    return sales;
+  }
+  return sales.map((s) => (s.mp_order_id && last.has(s.mp_order_id) ? { ...s, last_attempt: last.get(s.mp_order_id)! } : s));
 }
 
 async function salesBetween(from: string, to: string, columns = SALE_COLUMNS): Promise<FinanceSale[]> {
@@ -221,7 +259,7 @@ export const supabaseFinanceSource: FinanceSource = {
       fetchProducts(),
       salesBetween(firstDay(month), lastDay(month)),
       supabaseFinanceSource.loadGoals(month),
-      salesBetween(baselineFrom, baselineTo, 'id, seller_id, product_id, quantity, amount, sold_at, sold_date, item_status, financial_status, profit'),
+      salesBetween(baselineFrom, baselineTo, 'id, seller_id, product_id, quantity, amount, sold_at, sold_date, item_status, financial_status, profit, cost, product_type'),
       supabase
         .from('financial_sync_runs')
         .select('*')
@@ -235,7 +273,7 @@ export const supabaseFinanceSource: FinanceSource = {
       month,
       sellers: sellers.map(toFinanceSeller),
       productNames,
-      sales,
+      sales: await withLastAttempts(sales),
       goals,
       iphoneBaseline: computeIphoneBaseline(baselineRows, productNames, baselineFrom, baselineTo),
       lastSync: ((lastSync.data as unknown as FinancialSyncRun[] | null) ?? [])[0] ?? null,
@@ -326,7 +364,7 @@ export const supabaseFinanceSource: FinanceSource = {
       range: { from, to },
       sellers: sellers.map(toFinanceSeller),
       productNames: new Map(products.map((p) => [p.id, p.name])),
-      sales,
+      sales: await withLastAttempts(sales),
       targets: {
         weekly_devices_target: goals.weekly_devices_target,
         weekly_accessories_target: goals.weekly_accessories_target,

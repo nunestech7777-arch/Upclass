@@ -1,8 +1,7 @@
 import React from 'react';
 import { AlertTriangle, CheckCircle2, Clock, Info, MinusCircle, TrendingDown } from 'lucide-react';
-import type { Coverage, PaceStatus } from '../../lib/finance/calc';
-import { int, pct } from '../../lib/finance/format';
-import { dayLabel } from '../../lib/finance/dates';
+import type { PaceStatus } from '../../lib/finance/calc';
+import { pct } from '../../lib/finance/format';
 import { AnimatedText, CountUpValue } from '../ui/AnimatedNumber';
 import { AnimatedBar } from '../ui/AnimatedBar';
 
@@ -83,42 +82,6 @@ export function PaceLabel({ status }: { status: PaceStatus }) {
   );
 }
 
-/** Aviso de resultado parcial: itens sem custo conciliado nunca viram lucro zero. */
-export function CoverageNotice({ coverage, lastSyncAt }: { coverage: Coverage; lastSyncAt?: string | null }) {
-  if (coverage.items === 0) return null;
-  const missing = coverage.items - coverage.reconciled;
-  const reasons = [
-    coverage.pending.pending && `${int(coverage.pending.pending)} aguardando conciliação`,
-    coverage.pending.ambiguous && `${int(coverage.pending.ambiguous)} ambíguos`,
-    coverage.pending.not_found && `${int(coverage.pending.not_found)} sem pedido no histórico`,
-    coverage.pending.mismatch && `${int(coverage.pending.mismatch)} com lucro divergente`,
-  ].filter(Boolean);
-
-  if (missing === 0) {
-    return (
-      <div className="fin-notice is-ok" role="status">
-        <CheckCircle2 size={16} />
-        <span>
-          Conciliado: {int(coverage.items)} de {int(coverage.items)} itens
-          {lastSyncAt ? ` · ${lastSyncAt}` : ''}
-          {coverage.zeroCostDevices > 0 && ` · ${int(coverage.zeroCostDevices)} iPhone(s) com custo zero`}
-        </span>
-      </div>
-    );
-  }
-  return (
-    <div className="fin-notice is-partial" role="status">
-      <AlertTriangle size={16} />
-      <span>
-        <strong>
-          Resultado parcial — {int(coverage.reconciled)} de {int(coverage.items)} itens conciliados.
-        </strong>{' '}
-        {reasons.join(', ')}.
-      </span>
-    </div>
-  );
-}
-
 export function EmptyState({ title, children }: { title: string; children?: React.ReactNode }) {
   return (
     <div className="fin-empty">
@@ -131,17 +94,3 @@ export function EmptyState({ title, children }: { title: string; children?: Reac
   );
 }
 
-/** Dias completos sem nenhuma venda: pode ser loja fechada ou importação atrasada. */
-export function EmptyDaysNotice({ days, lastSaleAt }: { days: string[]; lastSaleAt: string | null }) {
-  if (days.length === 0) return null;
-  const recent = days.slice(-6).map(dayLabel).join(', ');
-  return (
-    <div className="fin-notice is-partial" role="status">
-      <AlertTriangle size={16} />
-      <span>
-        <strong>{int(days.length)} dia(s) sem vendas registradas</strong> ({recent}
-        {days.length > 6 ? ', …' : ''}).{lastSaleAt ? ` Última venda: ${lastSaleAt}.` : ''}
-      </span>
-    </div>
-  );
-}

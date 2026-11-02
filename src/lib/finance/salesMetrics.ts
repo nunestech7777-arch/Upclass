@@ -61,6 +61,7 @@ export interface SalesMetrics {
 
 type Row = Pick<FinanceSale, 'id' | 'product_id' | 'quantity' | 'amount' | 'sold_at' | 'item_status' | 'revenue' | 'cost' | 'profit' | 'financial_status' | 'seller_id'> & {
   mp_order_id?: string | null;
+  product_type?: string | null;
 };
 
 export function computeSalesMetrics(rows: Row[], productNames: Map<string, string>): SalesMetrics {

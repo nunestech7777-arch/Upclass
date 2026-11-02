@@ -27,6 +27,7 @@ import {
   getDayRange,
 } from '../lib/api';
 import type { Sale, Product, Seller } from '../lib/database.types';
+import { isReconciled } from '../lib/finance/calc';
 import { formatDateBR, formatWallDateTime, wallClock } from '../lib/finance/dates';
 import './SoldProductsModal.css';
 import { AnimatedText } from './ui/AnimatedNumber';
@@ -273,7 +274,7 @@ export function SoldProductsModal({
 
       // Custo histórico e lucro conciliados com o MercadoPhone (módulo financeiro). `products.price`
       // é preço de venda do cadastro e nunca é usado como custo.
-      const reconciled = sale.financial_status === 'ok' && sale.cost != null && sale.profit != null;
+      const reconciled = sale.cost != null && isReconciled(sale);
       const totalCost = reconciled ? Number(sale.cost) : null;
       const unitCost = totalCost != null && sale.quantity > 0 ? totalCost / sale.quantity : null;
       const profit = reconciled ? Number(sale.profit) : null;

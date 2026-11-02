@@ -5,6 +5,7 @@ import { NAV_ITEMS, isActivePath, type NavItem } from './navItems';
 import { BrandLogo } from './brand/BrandLogo';
 import { ThemeToggle } from './ThemeToggle';
 import { UserMenu } from './UserMenu';
+import { NoticeCenter } from './notices/NoticeCenter';
 import { usePrefersReducedMotion } from '../lib/motion';
 import './TopNav.css';
 
@@ -252,6 +253,7 @@ export function TopNav() {
         <div className="tn-actions" style={enter()}>
           <ThemeToggle />
           <span className="tn-divider" aria-hidden="true" />
+          <NoticeCenter />
           <UserMenu />
         </div>
       </div>

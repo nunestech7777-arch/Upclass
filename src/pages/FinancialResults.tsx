@@ -23,12 +23,14 @@ import { formatInstantBR } from '../lib/finance/dates';
 import { MigrationPendingError } from '../lib/finance/financeApi';
 import { useFinanceParams, useMonthFinance } from '../components/finance/useFinance';
 import { MonthPicker } from '../components/finance/MonthPicker';
-import { CoverageNotice, EmptyDaysNotice, EmptyState, KpiCard, SectionEyebrow } from '../components/finance/FinancePrimitives';
+import { EmptyState, KpiCard, SectionEyebrow } from '../components/finance/FinancePrimitives';
+import { useFinanceNotices } from '../components/finance/useFinanceNotices';
 import { ProfitRankingTable } from '../components/finance/ProfitRankingTable';
 import { MonthEvolutionChart, SellerComparisonChart } from '../components/finance/FinanceCharts';
 import { SellerFinanceDrawer } from '../components/finance/SellerFinanceDrawer';
 import { GoalsTransferActions } from '../components/finance/GoalsTransfer';
 import { FinancialSyncDialog } from '../components/finance/FinancialSyncDialog';
+import { notifyFinancialUpdated } from '../lib/notices/noticesApi';
 import '../components/finance/finance.css';
 
 function csvCell(value: string | number | null): string {
@@ -65,6 +67,8 @@ export function FinancialResults() {
     // sold_at guarda o horário da loja como UTC: exibe a parte de data/hora sem converter fuso.
     return last ? `${last.slice(8, 10)}/${last.slice(5, 7)}/${last.slice(0, 4)} ${last.slice(11, 16)}` : null;
   }, [data]);
+  // Resultado parcial e dias sem vendas ficam na Central de Avisos (sino), não fixos na tela.
+  useFinanceNotices(data, finance, lastSaleAt);
   const openRow = finance?.sellers.find((s) => s.seller.id === sellerId) ?? null;
   const hiddenCount = finance ? finance.sellers.filter((s) => !s.seller.show_in_ranking).length : 0;
 
@@ -230,12 +234,6 @@ export function FinancialResults() {
             />
           </div>
 
-          <CoverageNotice
-            coverage={finance.coverage}
-            lastSyncAt={data?.lastSync?.finished_at ? formatInstantBR(data.lastSync.finished_at) : null}
-          />
-          <EmptyDaysNotice days={finance.emptyCompleteDays} lastSaleAt={lastSaleAt} />
-
           <section className="fin-panel fin-ranking" aria-label="Ranking da equipe">
             <SectionEyebrow>Resultado por vendedor</SectionEyebrow>
             <div className="fin-ranking-head">
@@ -286,7 +284,7 @@ export function FinancialResults() {
           onVisibilityChanged={reload}
         />
       )}
-      {syncOpen && <FinancialSyncDialog month={month} onClose={() => setSyncOpen(false)} onApplied={reload} />}
+      {syncOpen && <FinancialSyncDialog month={month} onClose={() => setSyncOpen(false)} onApplied={() => (reload(), notifyFinancialUpdated())} />}
     </div>
   );
 }

@@ -1,6 +1,17 @@
 import { describe, it } from 'node:test';
 import assert from 'node:assert/strict';
-import { buildContext, buildMonthFinance, computeIphoneBaseline, goalProgress, type FinanceSale, type FinanceSeller } from './calc.ts';
+import {
+  AWAITING_SOURCE_MS,
+  buildContext,
+  buildMonthFinance,
+  computeIphoneBaseline,
+  goalProgress,
+  hasZeroSourceCost,
+  isReconciled,
+  pendingReason,
+  type FinanceSale,
+  type FinanceSeller,
+} from './calc.ts';
 
 const sellers: FinanceSeller[] = [
   { id: 'ana', name: 'Ana', photo_url: null, active: true, show_in_ranking: true },
@@ -138,7 +149,7 @@ describe('buildMonthFinance', () => {
     const m = buildMonthFinance({ month: '2026-10', today, sellers, productNames, sales, goals, iphoneBaseline: baseline });
     assert.equal(m.coverage.complete, false);
     assert.equal(m.coverage.completeUntilCutoff, false);
-    assert.equal(m.coverage.pending.pending, 1);
+    assert.equal(m.coverage.pending.awaiting_source, 1);
     assert.equal(m.days[1].status, 'partial');
     assert.equal(m.plan.devicesEquivalent, null);
     assert.match(m.plan.devicesReason!, /sem custo conciliado/);
@@ -180,5 +191,60 @@ describe('computeIphoneBaseline', () => {
     assert.deepEqual(computeIphoneBaseline(rows, productNames, 'a', 'b'), { from: 'a', to: 'b', profit: 800, units: 1, complete: true });
     rows.push(sale({ seller_id: 'ana', product_id: 'iphone', sold_date: '2026-09-12', financial_status: 'pending', profit: null }));
     assert.equal(computeIphoneBaseline(rows, productNames, 'a', 'b').complete, false);
+  });
+});
+
+describe('motivo da pendência (origem × sincronização)', () => {
+  const now = Date.parse('2026-11-02T17:00:00Z');
+  const entered = (msAgo: number) => new Date(now - msAgo).toISOString();
+  const pending = (o: Partial<FinanceSale> = {}) =>
+    sale({ seller_id: 'a', product_id: 'i15', sold_date: '2026-10-31', amount: 3920, financial_status: 'pending', revenue: null, cost: null, profit: null, ...o });
+
+  it('produto Apple com custo 0 na origem não é conciliado: é "sem custo no Mercado Phone"', () => {
+    const s = sale({ seller_id: 'a', product_id: 'i15', sold_date: '2026-10-05', amount: 1300, revenue: 1300, cost: 0, profit: 1300, product_type: 'PRODUTO APPLE', financial_note: 'Custo zero informado pela origem' });
+    assert.equal(hasZeroSourceCost(s), true);
+    assert.equal(isReconciled(s), false);
+    assert.equal(pendingReason(s, now), 'missing_cost');
+  });
+
+  it('serviço, brinde e acessório com custo 0 continuam conciliados', () => {
+    const seguro = sale({ seller_id: 'a', product_id: 'seg', sold_date: '2026-10-05', amount: 100, revenue: 100, cost: 0, profit: 100, product_type: 'ACESSORIOS' });
+    const brinde = sale({ seller_id: 'a', product_id: 'capa', sold_date: '2026-10-05', amount: 0, revenue: 0, cost: 0, profit: 0, product_type: 'PRODUTO APPLE' });
+    assert.equal(isReconciled(seguro), true);
+    assert.equal(isReconciled(brinde), true);
+  });
+
+  it('custo vazio informado pela origem é "sem custo", mesmo dentro do prazo', () => {
+    assert.equal(pendingReason(pending({ financial_note: 'Custo não informado pela origem', created_at: entered(60_000) }), now), 'missing_cost');
+    assert.equal(pendingReason(pending({ financial_note: 'Receita não informada pela origem' }), now), 'missing_revenue');
+  });
+
+  it('sem nota: aguardando dentro do prazo, falha de sincronização depois dele ou com erro na tentativa', () => {
+    assert.equal(pendingReason(pending({ created_at: entered(24 * 60_000), last_attempt: 'empty_history' }), now), 'awaiting_source');
+    assert.equal(pendingReason(pending({ created_at: entered(AWAITING_SOURCE_MS + 1) }), now), 'sync_failure');
+    assert.equal(pendingReason(pending({ created_at: entered(60_000), last_attempt: 'api_error' }), now), 'sync_failure');
+    assert.equal(pendingReason(pending({ created_at: entered(60_000), last_attempt: 'apply_error' }), now), 'sync_failure');
+  });
+
+  it('status da conciliação e período fora da rotina têm motivo próprio', () => {
+    assert.equal(pendingReason(pending({ financial_status: 'not_found' }), now), 'not_found');
+    assert.equal(pendingReason(pending({ financial_status: 'ambiguous' }), now), 'ambiguous');
+    assert.equal(pendingReason(pending({ sold_date: '2026-08-31', created_at: entered(60 * 86_400_000) }), now), 'not_swept');
+  });
+
+  it('cobertura do mês separa os motivos e lista os pedidos sem custo', () => {
+    const sales = [
+      sale({ seller_id: 'a', product_id: 'i15', sold_date: '2026-10-05', amount: 1000, revenue: 900, cost: 700, profit: 200, product_type: 'PRODUTO APPLE' }),
+      sale({ seller_id: 'a', product_id: 'i15', sold_date: '2026-10-05', amount: 1300, revenue: 1300, cost: 0, profit: 1300, product_type: 'PRODUTO APPLE', mp_order_id: '8881664' }),
+      pending({ created_at: entered(10 * 60_000), mp_order_id: '8884421' }),
+      pending({ created_at: entered(5 * 3_600_000), mp_order_id: '8800000' }),
+    ];
+    const m = buildMonthFinance({ month: '2026-10', today: '2026-11-02', now, sellers, productNames, sales, goals: [] });
+    assert.equal(m.coverage.reconciled, 1);
+    assert.equal(m.coverage.pending.missing_cost, 1);
+    assert.equal(m.coverage.pending.awaiting_source, 1);
+    assert.equal(m.coverage.pending.sync_failure, 1);
+    assert.deepEqual(m.coverage.missingCostOrders, ['8881664']);
+    assert.equal(m.totals.profit, 200, 'custo zero não vira lucro');
   });
 });

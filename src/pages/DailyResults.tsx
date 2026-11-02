@@ -5,7 +5,8 @@ import { formatInstantBR } from '../lib/finance/dates';
 import { MigrationPendingError } from '../lib/finance/financeApi';
 import { useFinanceParams, useMonthFinance } from '../components/finance/useFinance';
 import { MonthPicker } from '../components/finance/MonthPicker';
-import { CoverageNotice, EmptyDaysNotice, EmptyState, SectionEyebrow } from '../components/finance/FinancePrimitives';
+import { EmptyState, SectionEyebrow } from '../components/finance/FinancePrimitives';
+import { useFinanceNotices } from '../components/finance/useFinanceNotices';
 import { DailyProfitChart, MonthEvolutionChart } from '../components/finance/FinanceCharts';
 import { ActionPlanPanel, DailyIndicators, DailyResultsTable, DayDetail, MonthTimeline } from '../components/finance/DailyBlocks';
 import { SellerFinanceDrawer } from '../components/finance/SellerFinanceDrawer';
@@ -21,6 +22,8 @@ export function DailyResults() {
     // sold_at guarda o horário da loja como UTC: exibe a parte de data/hora sem converter fuso.
     return last ? `${last.slice(8, 10)}/${last.slice(5, 7)}/${last.slice(0, 4)} ${last.slice(11, 16)}` : null;
   }, [data]);
+  // Resultado parcial e dias sem vendas ficam na Central de Avisos (sino), não fixos na tela.
+  useFinanceNotices(data, finance, lastSaleAt);
   const planRows = useMemo(
     () =>
       (finance?.sellers ?? [])
@@ -63,8 +66,6 @@ export function DailyResults() {
       ) : (
         <div className={`uc-reload-scope ${loading ? 'is-reloading' : ''}`}>
           <DailyIndicators finance={finance} />
-          <CoverageNotice coverage={finance.coverage} />
-          <EmptyDaysNotice days={finance.emptyCompleteDays} lastSaleAt={lastSaleAt} />
           <ActionPlanPanel finance={finance} rows={planRows} onOpenSeller={openSeller} />
           <MonthEvolutionChart finance={finance} />
           <MonthTimeline days={finance.days} selected={selectedDay} onSelect={selectDay} />
