@@ -1,44 +1,12 @@
 import React, { useEffect, useId, useLayoutEffect, useRef, useState } from 'react';
 import { NavLink, useLocation } from 'react-router-dom';
-import {
-  BrainCircuit,
-  CalendarDays,
-  ChevronDown,
-  CircleDollarSign,
-  LayoutDashboard,
-  MonitorPlay,
-  Package,
-  Receipt,
-  Settings,
-  Target,
-  TrendingUp,
-  Users,
-} from 'lucide-react';
+import { ChevronDown } from 'lucide-react';
+import { NAV_ITEMS, isActivePath, type NavItem } from './navItems';
 import { BrandLogo } from './brand/BrandLogo';
 import { ThemeToggle } from './ThemeToggle';
 import { UserMenu } from './UserMenu';
 import { usePrefersReducedMotion } from '../lib/motion';
 import './TopNav.css';
-
-type NavItem = { path: string; label: string; icon: typeof LayoutDashboard; group: string; openInNewTab?: boolean };
-
-// Mesmas rotas e mesma ordem do antigo menu lateral; o grupo só aparece no menu "Mais".
-const NAV_ITEMS: NavItem[] = [
-  { path: '/', label: 'Dashboard', icon: LayoutDashboard, group: 'Operação' },
-  { path: '/forecast', label: 'Forecast', icon: TrendingUp, group: 'Operação' },
-  { path: '/vendas', label: 'Vendas', icon: Receipt, group: 'Operação' },
-  { path: '/vendedores', label: 'Vendedores', icon: Users, group: 'Desempenho e equipe' },
-  { path: '/supervisor', label: 'Meu Supervisor', icon: BrainCircuit, group: 'Desempenho e equipe' },
-  { path: '/resultado-financeiro', label: 'Resultado financeiro', icon: CircleDollarSign, group: 'Desempenho e equipe' },
-  { path: '/resultados-diarios', label: 'Resultados diários', icon: CalendarDays, group: 'Desempenho e equipe' },
-  { path: '/estoque', label: 'Estoque', icon: Package, group: 'Desempenho e equipe' },
-  { path: '/metas', label: 'Metas', icon: Target, group: 'Desempenho e equipe' },
-  { path: '/painel-loja', label: 'Painel da Loja', icon: MonitorPlay, group: 'Administração', openInNewTab: true },
-  { path: '/configuracoes', label: 'Configurações', icon: Settings, group: 'Administração' },
-];
-
-const isActivePath = (item: NavItem, pathname: string) =>
-  !item.openInNewTab && (item.path === '/' ? pathname === '/' : pathname === item.path || pathname.startsWith(`${item.path}/`));
 
 // Espaço extra do item selecionado (ícone + espaçamento) e intervalo entre itens no trilho.
 const ICON_EXTRA = 24;

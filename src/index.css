@@ -248,6 +248,14 @@ button {
   box-sizing: border-box;
 }
 
+/* Área da rota atual (dentro de .main-content, abaixo da barra de período). */
+.page-host {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+}
+
 @media (max-width: 1024px) {
   .app-container {
     flex-direction: column;
@@ -599,7 +607,7 @@ table tbody tr { transition: background-color var(--dur-fast) ease; }
 /* Movimento reduzido */
 @media (prefers-reduced-motion: reduce) {
   /* Sem entrada nenhuma (os atrasos da cascata não devem esconder o conteúdo). */
-  .main-content > *, .app-topnav, .app-topnav * { animation: none !important; }
+  .main-content > *, .page-host > *, .app-topnav, .app-topnav * { animation: none !important; }
   .uc-reload-scope.is-reloading::before { background-size: 100% 100%; }
   *, *::before, *::after {
     animation-duration: 0.01ms !important;

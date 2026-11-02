@@ -260,7 +260,7 @@ function revealTitle(title: HTMLElement, delay: number): void {
 }
 
 /**
- * Liga a entrada em cascata no container das páginas (`.main-content`). Observa o que o React
+ * Liga a entrada em cascata no container das páginas (`.page-host`). Observa o que o React
  * adiciona: a primeira leva de uma rota e o conteúdo que chega depois do carregamento entram em
  * sequência; o que já foi animado (mesmo nó do DOM) não anima de novo em re-renderizações.
  */

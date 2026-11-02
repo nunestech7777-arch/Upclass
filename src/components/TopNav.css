@@ -197,20 +197,17 @@
   .tn-link, .tn-more-btn { padding: 0 12px; }
 }
 
-/* Celular: logo e controles na primeira linha; páginas numa segunda linha do mesmo cabeçalho. */
+/* Celular: só logo e controles; as páginas ficam na barra inferior (BottomNav). */
 @media (max-width: 760px) {
-  :root { --topnav-height: 112px; }
+  :root { --topnav-height: 56px; }
   .tn-row {
     grid-template-columns: minmax(0, 1fr) auto;
-    grid-template-areas: 'brand actions' 'nav nav';
-    row-gap: 8px;
-    padding: 10px 14px 10px;
+    grid-template-areas: 'brand actions';
+    padding: 10px 14px;
     min-height: 0;
   }
   .tn-logo { height: 28px; }
-  .tn-nav { justify-content: stretch; }
-  .tn-track { width: 100%; justify-content: space-between; }
-  .tn-link, .tn-more-btn { height: 36px; padding: 0 12px; font-size: 13px; }
+  .tn-nav { display: none; }
   .tn-actions { gap: 6px; }
   .tn-divider { display: none; }
   .tn-actions .uc-user-name, .tn-actions .uc-user-chevron { display: none; }

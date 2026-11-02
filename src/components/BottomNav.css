@@ -1,0 +1,292 @@
+/* Barra de navegação inferior do celular — flutuante, com Meu Supervisor num botão circular elevado. */
+.bn-bar,
+.bn-sheet,
+.bn-backdrop {
+  display: none;
+}
+
+@media (max-width: 760px) {
+  :root {
+    --bn-height: 76px;
+    /* Distância da base: acima do indicador de início do iPhone; 12px quando não há safe area. */
+    --bn-bottom: max(12px, calc(env(safe-area-inset-bottom, 0px) + 4px));
+    /* Folga extra acima da barra (o círculo fica dentro dela). */
+    --bn-fab-rise: 4px;
+    /* Espaço que o conteúdo reserva no fim da página para a barra não cobrir nada. */
+    --bn-space: calc(var(--bn-height) + var(--bn-bottom) + 12px);
+  }
+
+  .bn-bar {
+    position: fixed;
+    left: max(14px, env(safe-area-inset-left, 0px));
+    right: max(14px, env(safe-area-inset-right, 0px));
+    bottom: var(--bn-bottom);
+    z-index: 950;
+    display: flex;
+    align-items: stretch;
+    height: var(--bn-height);
+    padding: 0 12px;
+    border-radius: 22px;
+    /* Fundo e borda de cima vêm do SVG de .bn-bg (com a cavidade); a sombra fica só para baixo, para
+       não sombrear a abertura da cavidade. */
+    box-shadow: 0 14px 30px -12px rgba(0, 2, 41, 0.26), 0 6px 12px -8px rgba(0, 2, 41, 0.12);
+    transition: transform 0.28s var(--ease-out), opacity 0.2s ease;
+  }
+  .bn-bar.is-hidden {
+    transform: translateY(calc(100% + var(--bn-bottom) + var(--bn-fab-rise)));
+    opacity: 0;
+    pointer-events: none;
+  }
+
+  /* Fundo da barra: desenho com o dobro da largura e a cavidade no meio, recortado com os cantos
+     arredondados; desliza (transform) junto com o círculo. */
+  .bn-bg {
+    position: absolute;
+    inset: 0;
+    z-index: 0;
+    overflow: hidden;
+    border-radius: inherit;
+    pointer-events: none;
+  }
+  .bn-bg svg {
+    position: absolute;
+    left: 0;
+    top: 0;
+    display: block;
+    overflow: visible;
+    transition: transform 0.42s cubic-bezier(0.3, 1.15, 0.5, 1);
+    will-change: transform;
+  }
+  .bn-bg-fill {
+    fill: var(--surface-card);
+  }
+  .bn-bg-line {
+    fill: none;
+    stroke: var(--border-subtle);
+    stroke-width: 1.5;
+  }
+
+  /* Círculo da aba ativa, inteiro dentro da barra e acomodado na cavidade (centro 22px abaixo da
+     borda de cima, como ORB_Y em BottomNav.tsx). */
+  .bn-orb {
+    position: absolute;
+    left: 0;
+    top: 1px;
+    z-index: 2;
+    width: 42px;
+    height: 42px;
+    margin-left: -21px;
+    pointer-events: none;
+    transition: transform 0.42s cubic-bezier(0.3, 1.15, 0.5, 1), opacity 0.2s ease;
+    will-change: transform;
+  }
+  .bn-orb-circle {
+    position: absolute;
+    inset: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    border-radius: 50%;
+    background: var(--action-primary);
+    color: #fff;
+    box-shadow: 0 8px 18px -6px rgba(6, 63, 241, 0.55);
+  }
+  .bn-orb-circle svg {
+    animation: bn-orb-icon 0.32s cubic-bezier(0.34, 1.4, 0.64, 1);
+  }
+
+  .bn-tab {
+    position: relative;
+    z-index: 1;
+    flex: 1 1 0;
+    min-width: 44px;
+    min-height: 44px;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: flex-end;
+    gap: 4px;
+    padding: 0 2px 10px;
+    border: none;
+    background: transparent;
+    color: var(--text-secondary);
+    font: inherit;
+    font-size: 11px;
+    font-weight: 600;
+    letter-spacing: 0.01em;
+    text-decoration: none;
+    cursor: pointer;
+    -webkit-tap-highlight-color: transparent;
+    transition: color 0.25s ease;
+  }
+  /* Meu Supervisor tem o rótulo mais longo: a aba do centro é um pouco mais larga. */
+  .bn-tab-center {
+    flex-grow: 1.35;
+  }
+  .bn-label-short {
+    display: none;
+  }
+  .bn-label-long {
+    letter-spacing: -0.015em;
+  }
+  .bn-tab span {
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    max-width: 100%;
+  }
+  /* O ícone da aba ativa vai para o círculo; o da aba some com ele, e o rótulo fica em destaque. */
+  .bn-tab > svg {
+    transition: transform 0.3s cubic-bezier(0.34, 1.4, 0.64, 1), opacity 0.2s ease;
+  }
+  .bn-tab.is-active {
+    color: var(--accent-text);
+  }
+  .bn-tab.is-active > svg {
+    opacity: 0;
+    transform: translateY(-10px) scale(0.6);
+  }
+  /* Resposta imediata ao toque. */
+  .bn-tab:active > svg {
+    transform: scale(0.86);
+    transition-duration: 0.1s;
+  }
+  .bn-tab:focus-visible {
+    outline: 2px solid var(--accent-text);
+    outline-offset: -2px;
+    border-radius: 18px;
+  }
+
+  /* Folha "Mais" */
+  .bn-backdrop {
+    display: block;
+    position: fixed;
+    inset: 0;
+    z-index: 940;
+    background: rgba(2, 6, 23, 0.35);
+    backdrop-filter: blur(2px);
+    -webkit-backdrop-filter: blur(2px);
+    animation: bn-fade 0.22s ease;
+  }
+  .bn-sheet {
+    display: block;
+    position: fixed;
+    left: max(12px, env(safe-area-inset-left, 0px));
+    right: max(12px, env(safe-area-inset-right, 0px));
+    bottom: calc(var(--bn-space) + var(--bn-fab-rise));
+    z-index: 945;
+    padding: 10px;
+    border-radius: 24px;
+    background: var(--surface-card);
+    border: 1px solid var(--border-subtle);
+    box-shadow: 0 18px 40px -14px rgba(0, 2, 41, 0.35);
+    transform-origin: 90% 100%;
+    animation: bn-sheet-in 0.32s var(--ease-out);
+  }
+  .bn-sheet-grid {
+    display: grid;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: 6px;
+  }
+  .bn-sheet-item {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 6px;
+    min-height: 76px;
+    padding: 10px 4px;
+    border-radius: 16px;
+    color: var(--text-secondary);
+    font-size: 12px;
+    font-weight: 600;
+    text-align: center;
+    text-decoration: none;
+    line-height: 1.2;
+    -webkit-tap-highlight-color: transparent;
+    transition: background 0.2s ease, color 0.2s ease, transform 0.1s ease;
+  }
+  .bn-sheet-item:active {
+    transform: scale(0.96);
+  }
+  .bn-sheet-icon {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 40px;
+    height: 40px;
+    border-radius: 14px;
+    background: var(--surface-muted);
+    color: var(--text-primary);
+  }
+  .bn-sheet-item.active {
+    color: var(--text-primary);
+  }
+  .bn-sheet-item.active .bn-sheet-icon {
+    background: var(--action-primary-soft);
+    color: var(--accent-text);
+  }
+
+  /* Conteúdo e aviso de instalação ficam acima da barra. */
+  .main-content {
+    padding-bottom: calc(var(--bn-space) + var(--bn-fab-rise)) !important;
+  }
+  .install-prompt {
+    bottom: calc(var(--bn-space) + var(--bn-fab-rise)) !important;
+  }
+}
+
+/* Abaixo de 410px "Meu Supervisor" não cabe inteiro na aba: usa "Supervisor". */
+@media (max-width: 409px) {
+  .bn-label-long {
+    display: none;
+  }
+  .bn-label-short {
+    display: inline;
+  }
+}
+
+/* Celulares estreitos (iPhone SE, 320–360px): rótulos menores para caberem inteiros. */
+@media (max-width: 360px) {
+  .bn-tab-center {
+    flex-grow: 1;
+  }
+  .bn-tab {
+    font-size: 10px;
+    letter-spacing: -0.01em;
+    padding-left: 0;
+    padding-right: 0;
+  }
+}
+
+@keyframes bn-orb-icon {
+  from {
+    opacity: 0;
+    transform: scale(0.5) rotate(-12deg);
+  }
+}
+@keyframes bn-fade {
+  from {
+    opacity: 0;
+  }
+}
+@keyframes bn-sheet-in {
+  from {
+    opacity: 0;
+    transform: translateY(12px) scale(0.96);
+  }
+}
+
+@media (max-width: 760px) and (prefers-reduced-motion: reduce) {
+  .bn-orb,
+  .bn-bg svg,
+  .bn-orb-circle svg,
+  .bn-tab > svg,
+  .bn-bar {
+    transition: none;
+  }
+  .bn-sheet,
+  .bn-backdrop,
+  .bn-orb-circle svg {
+    animation: none;
+  }
+}

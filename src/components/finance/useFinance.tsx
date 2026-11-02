@@ -4,9 +4,10 @@ import { chartThemeFor } from '../../lib/chartTheme';
 import { useTheme } from '../../context/ThemeContext';
 import { buildMonthFinance, type MonthFinance } from '../../lib/finance/calc';
 import { usePeriod } from '../../context/PeriodContext';
+import { invalidateFinanceCache, withReadCache } from '../../lib/finance/readCache';
 import { supabaseFinanceSource, type FinanceSource, type MonthFinanceData } from '../../lib/finance/financeApi';
 
-const FinanceSourceContext = createContext<FinanceSource>(supabaseFinanceSource);
+const FinanceSourceContext = createContext<FinanceSource>(withReadCache(supabaseFinanceSource));
 
 export function FinanceSourceProvider({ source, children }: { source: FinanceSource; children: React.ReactNode }) {
   return <FinanceSourceContext.Provider value={source}>{children}</FinanceSourceContext.Provider>;
@@ -103,7 +104,16 @@ export function useMonthFinance(month: string): MonthFinanceState {
     [data]
   );
 
-  return { data, finance, loading: loading || (!!data && data.month !== month), error, reload: () => setNonce((n) => n + 1) };
+  return {
+    data,
+    finance,
+    loading: loading || (!!data && data.month !== month),
+    error,
+    reload: () => {
+      invalidateFinanceCache();
+      setNonce((n) => n + 1);
+    },
+  };
 }
 
 /** Cores do módulo financeiro, coerentes entre cards, gráficos e legendas. */

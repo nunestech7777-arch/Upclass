@@ -8,6 +8,7 @@ import { EmptyState, KpiCard, SectionEyebrow } from '../components/finance/Finan
 import { CoverageStatus } from '../components/dashboard/CoverageStatus';
 import { useFinanceSource } from '../components/finance/useFinance';
 import { usePeriod } from '../context/PeriodContext';
+import { invalidateFinanceCache } from '../lib/finance/readCache';
 import { GoalCards } from '../components/dashboard/GoalCards';
 import { SalesItemsDialog, TopProductCard, TopProductDialog } from '../components/dashboard/TopProducts';
 import { SalesEvolutionChart } from '../components/dashboard/SalesEvolutionChart';
@@ -143,7 +144,10 @@ export function Dashboard() {
           <h1 className="fin-title">Dashboard</h1>
         </div>
         <div className="dv-head-actions">
-          <button type="button" className="fin-btn" onClick={() => setNonce((n) => n + 1)} disabled={loading}>
+          <button type="button" className="fin-btn" onClick={() => {
+              invalidateFinanceCache();
+              setNonce((n) => n + 1);
+            }} disabled={loading}>
             <RefreshCw size={15} className={loading ? 'fin-spin' : ''} /> Atualizar
           </button>
           <CoverageStatus coverage={view?.coverage ?? null} />

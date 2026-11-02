@@ -1,4 +1,5 @@
 import { supabase } from './supabaseClient';
+import { invalidateFinanceCache } from './finance/readCache';
 import { classifyProductCategory } from './productClassifier';
 import { parseSaleExternalId, parseSaleOrderDetails } from './saleDetails';
 import type { SaleOrderDetails, SaleOrderEventRow } from './saleDetails';
@@ -77,6 +78,7 @@ export async function fetchVisibleSellers(): Promise<Seller[]> {
 }
 
 export async function updateSellerRankingVisibility(id: string, show_in_ranking: boolean): Promise<void> {
+  invalidateFinanceCache();
   const { error } = await supabase.from('sellers').update({ show_in_ranking }).eq('id', id);
   if (error) throw error;
 }
@@ -89,6 +91,7 @@ export async function fetchKommoUsers(): Promise<KommoUser[]> {
 }
 
 export async function updateSellerKommoMapping(id: string, kommo_user_id: string | null): Promise<void> {
+  invalidateFinanceCache();
   const { error } = await supabase.from('sellers').update({ kommo_user_id }).eq('id', id);
   if (error) throw error;
 }
@@ -112,6 +115,7 @@ export async function insertProduct(input: {
   imei: string | null;
   battery_health: string | null;
 }): Promise<Product> {
+  invalidateFinanceCache();
   const code = `EST-${Date.now().toString(36).toUpperCase()}`;
   const { data, error } = await supabase
     .from('products')
@@ -124,6 +128,7 @@ export async function insertProduct(input: {
 }
 
 export async function updateProductStock(id: string, stock: number): Promise<void> {
+  invalidateFinanceCache();
   const { error } = await supabase.from('products').update({ stock }).eq('id', id);
   if (error) throw error;
   cache.delete('products');
@@ -270,6 +275,7 @@ export async function fetchGoals(): Promise<Goals> {
 }
 
 export async function updateGoals(patch: Partial<Omit<Goals, 'id' | 'updated_at'>>): Promise<void> {
+  invalidateFinanceCache();
   const { error } = await supabase
     .from('goals')
     .update({ ...patch, updated_at: new Date().toISOString() })
@@ -286,6 +292,7 @@ export async function fetchPanelSettings(): Promise<PanelSettings> {
 export async function updatePanelSettings(
   patch: Partial<Omit<PanelSettings, 'id' | 'updated_at'>>
 ): Promise<void> {
+  invalidateFinanceCache();
   const { error } = await supabase
     .from('panel_settings')
     .update({ ...patch, updated_at: new Date().toISOString() })
@@ -394,6 +401,7 @@ export function getDayRange(date: Date): { start: Date; end: Date } {
 
 /** Atualiza a URL da foto do vendedor na tabela `sellers` */
 export async function updateSellerPhoto(sellerId: string, photo_url: string | null): Promise<void> {
+  invalidateFinanceCache();
   const { error } = await supabase.from('sellers').update({ photo_url }).eq('id', sellerId);
   if (error) throw error;
 }
