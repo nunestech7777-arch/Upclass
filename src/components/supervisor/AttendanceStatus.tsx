@@ -47,10 +47,11 @@ export function AttendanceStatusPanel({
   linkTo,
 }: {
   totals: AttendanceTotals;
-  responsibles: 'ok' | 'failed' | 'none' | 'historical';
+  responsibles: 'ok' | 'failed' | 'none' | 'historical' | 'pending';
   linkTo: (f: AttendanceFilter) => string;
 }) {
   const distributionUnknown = responsibles === 'failed' || responsibles === 'historical';
+  const distributionValue = responsibles === 'pending' ? '…' : distributionUnknown ? '—' : null;
   return (
     <>
       <div className="sv-status-grid">
@@ -64,14 +65,16 @@ export function AttendanceStatusPanel({
                 <span>{filterLabel(f)}</span>
               </span>
               <strong>
-                <AnimatedText text={f === 'aguardando_distribuicao' && distributionUnknown ? '—' : int(n)} />
+                <AnimatedText text={f === 'aguardando_distribuicao' && distributionValue ? distributionValue : int(n)} />
               </strong>
               <small>
                 {f !== 'aguardando_distribuicao'
                   ? `${pct(share)} das conversas`
                   : responsibles === 'historical'
                     ? 'Só para períodos que incluem hoje'
-                    : 'Situação atual · não soma no total'}
+                    : responsibles === 'pending'
+                      ? 'Consultando o Kommo…'
+                      : 'Situação atual · não soma no total'}
               </small>
             </Link>
           );

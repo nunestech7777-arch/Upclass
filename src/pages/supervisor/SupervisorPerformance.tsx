@@ -7,13 +7,12 @@ import { KpiCard } from '../../components/finance/FinancePrimitives';
 import { SellerAvatar } from '../../components/SellerAvatar';
 import { EmptyState, ErrorBlock, LoadingBlock, Panel } from '../../components/supervisor/SupervisorPrimitives';
 import { usePeriodSummary, useSupervisor } from '../../components/supervisor/useSupervisor';
-import { fetchKommoUsers } from '../../lib/api';
 import { tooltipStyle, useChartTheme } from '../../lib/chartTheme';
 import type { KommoUser } from '../../lib/database.types';
 import { dayLabel, formatInstantBR } from '../../lib/finance/dates';
 import { int } from '../../lib/finance/format';
 import { formatSeconds } from '../../lib/supervisor/metrics';
-import { fetchAnalyzedConversations, type AnalyzedConversation } from '../../lib/supervisor/supervisorApi';
+import { fetchAnalyzedConversations, fetchKommoUsersCached, type AnalyzedConversation } from '../../lib/supervisor/supervisorApi';
 import { AnimatedText } from '../../components/ui/AnimatedNumber';
 
 export function SupervisorPerformance() {
@@ -117,7 +116,7 @@ function SellerDetail({ sellerId }: { sellerId: string }) {
   const [historyError, setHistoryError] = useState<string | null>(null);
 
   useEffect(() => {
-    fetchKommoUsers().then(setKommoUsers).catch(() => setKommoUsers([]));
+    fetchKommoUsersCached().then(setKommoUsers).catch(() => setKommoUsers([]));
   }, []);
   // Histórico de avaliações por AUTOR das mensagens (usuário do Kommo do vendedor), não pelo dono do lead.
   const sellerKommoId = seller?.kommo_user_id ?? null;

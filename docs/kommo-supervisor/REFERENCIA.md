@@ -13,6 +13,7 @@ Consulte só a seção necessária (o resumo está em [CONTEXTO.md](CONTEXTO.md)
 8. [Auditoria de 28/10/2026](#8-auditoria-de-28102026)
 9. [Testes e comandos](#9-testes-e-comandos)
 10. [Problemas conhecidos e decisões](#10-problemas-conhecidos-e-decisões)
+11. [Cache e carregamento](#11-cache-e-carregamento)
 
 ## 1. Endpoints, webhooks e funções
 Cliente da API v4 do Kommo: `supabase/functions/_shared/kommo.ts` (`call`, limitador ~7 req/s; secrets `KOMMO_SUBDOMAIN`, `KOMMO_API_TOKEN`).
@@ -84,7 +85,7 @@ Crons (`cron.job`, criados no banco a partir de `supabase/cron.kommo.sql.example
 Referências de regressão (calcule, não fixe no código): critério Kommo 239 (Yasmin 75, Caroline 30, Karen 30, Thuane 26, Amanda 9, Robô 69 = Salesbot 59 + Instagram 4 + WhatsApp Lite 3 + WhatsApp Business 3, em 67 talks distintos); Emerson 0; enviadas 1.400 (Cloud API 936, Instagram 430, Lite 34); recebidas 1.180 distintas (painel do Kommo: 1.181 eventos — a mensagem `e0bc59d5…` do Instagram veio em 2 eventos); conversas únicas 191; não atendidas 28; 2+ atendentes 17; clientes sem resposta 58. Conferir eventos: `kommo-talk-probe?chat_events_day=2026-10-28`.
 
 ## 9. Testes e comandos
-- Lógica: `src/lib/supervisor/{attendance,aiEvaluation,supervisor,kommoUsers}.test.ts`; integração: `supabase/functions/_shared/{kommoMessage,kommoTalkMessages,sellerBackfill}.test.ts`.
+- Lógica: `src/lib/supervisor/{attendance,aiEvaluation,supervisor,kommoUsers,swrStore}.test.ts` (`swrStore` = cache e política, seção 11); integração: `supabase/functions/_shared/{kommoMessage,kommoTalkMessages,sellerBackfill}.test.ts`.
 - `npm test` (todos), `node --test src/lib/supervisor/*.test.ts`, `npx tsc -b`, `npx oxlint src supabase/functions`, `npx vite build`.
 - SQL só leitura: `npx supabase db query --linked -o csv -f arquivo.sql`. Deploy: `npx supabase functions deploy <fn> --project-ref kcbjaknpaezmjiafdgpe` (só com autorização). Nunca `db push`.
 
@@ -94,3 +95,13 @@ Referências de regressão (calcule, não fixe no código): critério Kommo 239 
 - **Decisão:** envio pelo aparelho com texto único = humano não identificado (o Kommo põe no Robô); mostramos os dois números.
 - Responsável histórico do lead não existe no banco; só o atual (Edge Function, cache de 5 min, tempo limite de 12 s).
 - Se a CLI do Supabase der 403, ela pode estar logada em outra conta.
+
+## 11. Cache e carregamento
+- **Onde:** só na memória da aba (`swrStore.ts`, sem biblioteca), nunca em localStorage/IndexedDB; nada de token no cache. Some ao fechar ou recarregar a aba.
+- **O quê / chave:** `supervisorApi.ts` guarda os dados-base do período (conversas, mensagens sem texto, classificação) com a chave `conta:papel|de|até|canal|live/past` (`cachePolicy.periodCacheKey`; a marca muda na virada do dia, e o dia que fechou é buscado de novo, completo), no máximo 10 períodos na memória. O filtro de atendente é aplicado em memória (`derivePeriodSummary`, memorizado por base + atendente). Também em cache: vendedores e usuários do Kommo (10 min), avaliações salvas (5 min), respostas prontas do canal (10 min) e responsáveis dos leads (5 min).
+- **Prazo:** período com hoje 2 min; só dias passados 30 min (`cachePolicy.ts`). Vencido, a tela mostra o dado guardado na hora e atualiza em segundo plano (stale-while-revalidate). Revalida ao abrir e ao voltar para a aba; sozinho, a cada 3 min, só com hoje num período de até 7 dias e a aba visível (cada ciclo refaz o período inteiro — períodos longos só pelo botão ou ao voltar).
+- **Duas etapas:** o banco responde primeiro e a tela aparece; o responsável atual dos leads (Kommo, ~2 s) chega depois e só completa "aguardando distribuição" (`responsibles = 'pending'` → "…").
+- **Invalidação:** botão de atualizar no topo (ignora o prazo; reaproveita busca em andamento); mudança de vínculo vendedor ↔ Kommo ou sincronização de usuários (`invalidateSupervisorData`); logout, troca de conta ou de papel apagam tudo (`setSupervisorCacheScope` no `SupervisorLayout` + `onAuthStateChange`), e respostas de buscas iniciadas antes são descartadas.
+- **Falha:** os dados anteriores continuam, com o aviso "Falha ao atualizar · dados de HH:MM" e o botão para tentar de novo (`SupervisorFreshness.tsx`).
+- **Medido em 01/11/2026 (Este mês, dev local):** 1º acesso 4–10,7 s → 0,9 s até os indicadores (2,4 s com o Kommo); volta em até 1 min 87 ms → 0,17 s e 0 requisições; volta após 2 min 1,5 s com tela em "carregando" e 24 requisições → 0,25 s com o dado guardado e 19 requisições em segundo plano.
+- **Limitações:** cada aba tem seu cache; dado corrigido no banco de um dia passado aparece em até 30 min (ou no botão); vendedor cadastrado/renomeado em outra tela aparece em até 10 min; o botão "Atualizar" refaz o período, não as avaliações salvas (5 min); cada atualização refaz o período inteiro (não há busca incremental).

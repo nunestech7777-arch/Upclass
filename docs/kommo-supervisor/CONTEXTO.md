@@ -29,6 +29,7 @@ Sistema interno da loja (Upclass / Você de iPhone): React + TypeScript (Vite) n
 - "Aguardando distribuição" usava o responsável de hoje em dias passados → oculto em períodos históricos.
 - Período escolhido por `occurred_at` perdia conversas continuadas depois → conversa entra se tem mensagem do cliente ou humana no período (candidatas com 7 dias de folga).
 - A Análise IA filtrava avaliações por `seller_id` → agora por autor (`fetchAnalyzedConversations(kommoUserId)`).
+- Lentidão: a tela esperava a consulta ao Kommo (responsáveis) e rebuscava tudo após 1 min → cache em memória por conta/período/canal e responsáveis numa 2ª etapa (REFERENCIA §11).
 
 ## 6. Análise IA (preparada, DESATIVADA)
 - Nenhuma chamada de IA existe: `aiEvaluation.ts` e `aiCriteria.ts` são puros (sem rede/banco) e um teste falha se eles ou `SupervisorAiAnalysis.tsx` ganharem chamada de rede. A página só lê o banco como o resto do Supervisor.
@@ -52,7 +53,8 @@ Sistema interno da loja (Upclass / Você de iPhone): React + TypeScript (Vite) n
 |---|---|
 | Classificação e critério Kommo | `src/lib/supervisor/attendance.ts` |
 | Métricas, período, tempo de resposta | `src/lib/supervisor/metrics.ts` |
-| Consultas e montagem do período | `src/lib/supervisor/supervisorApi.ts` (`loadPeriodBase`, `loadPeriodSummary`) |
+| Consultas e montagem do período | `src/lib/supervisor/supervisorApi.ts` (`loadPeriod`, `derivePeriodSummary`) |
+| Cache em memória (stale-while-revalidate) | `src/lib/supervisor/swrStore.ts`, `cachePolicy.ts`; hook `usePeriodSummary` em `src/components/supervisor/useSupervisor.ts` — ver REFERENCIA §11 |
 | Análise IA | `src/lib/supervisor/aiEvaluation.ts`, `aiCriteria.ts` |
 | Telas | `src/pages/supervisor/*`, `src/components/supervisor/*` |
 | Integração | `supabase/functions/kommo-*`, `supabase/functions/_shared/kommo*.ts` |

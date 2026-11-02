@@ -102,7 +102,15 @@ export function SupervisorConversations() {
             <button key={f} type="button" className={status === f ? 'is-active' : ''} aria-pressed={status === f} onClick={() => setStatus(f)}>
               {f === 'all' ? 'Todas' : filterLabel(f)}
               {data && f !== 'all'
-                ? ` · ${f === 'aguardando_distribuicao' && (data.responsibles === 'historical' || data.responsibles === 'failed') ? '—' : int(data.totals[f])}`
+                ? ` · ${
+                    f !== 'aguardando_distribuicao'
+                      ? int(data.totals[f])
+                      : data.responsibles === 'pending'
+                        ? '…'
+                        : data.responsibles === 'historical' || data.responsibles === 'failed'
+                          ? '—'
+                          : int(data.totals[f])
+                  }`
                 : ''}
             </button>
           ))}
@@ -129,6 +137,8 @@ export function SupervisorConversations() {
           <EmptyState title="Não disponível para períodos passados.">
             O Kommo só informa com quem o lead está agora, o que não comprova a situação daquele dia. Escolha um período que inclua hoje.
           </EmptyState>
+        ) : rows.length === 0 && status === 'aguardando_distribuicao' && data.responsibles === 'pending' ? (
+          <LoadingBlock label="Consultando os responsáveis dos leads no Kommo…" />
         ) : rows.length === 0 && status === 'aguardando_distribuicao' && data.responsibles === 'failed' ? (
           <EmptyState title="Responsáveis dos leads indisponíveis.">
             Não foi possível consultar o Kommo agora, então este filtro não pode ser calculado. Tente recarregar em instantes.

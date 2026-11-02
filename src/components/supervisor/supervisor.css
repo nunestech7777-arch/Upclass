@@ -18,6 +18,17 @@
 }
 .sv-title { font-size: 24px; font-weight: 800; letter-spacing: -0.02em; line-height: 1.15; }
 .sv-subtitle { color: var(--fin-muted); font-size: 14px; margin-top: 2px; }
+.sv-header-meta { display: flex; align-items: center; justify-content: flex-end; flex-wrap: wrap; gap: 8px; }
+.sv-freshness {
+  display: inline-flex; align-items: center; gap: 6px; font-size: 12px; color: var(--fin-muted, var(--text-secondary));
+  white-space: nowrap;
+}
+.sv-freshness.is-failed { color: var(--fin-deficit, #c2410c); }
+.sv-freshness button {
+  display: inline-flex; align-items: center; justify-content: center; width: 26px; height: 26px; padding: 0;
+  border: 1px solid var(--fin-border); border-radius: 999px; background: var(--fin-surface); color: inherit; cursor: pointer;
+}
+.sv-freshness button:disabled { cursor: default; opacity: 0.7; }
 .sv-range-chip {
   font-size: 12px; font-weight: 600; color: var(--fin-accent); background: var(--action-primary-soft);
   border-radius: 999px; padding: 6px 12px; white-space: nowrap;

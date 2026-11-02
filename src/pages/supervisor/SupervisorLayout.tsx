@@ -3,10 +3,12 @@ import { Navigate, NavLink, Outlet, useLocation } from 'react-router-dom';
 import { BarChart3, BrainCircuit, FileText, LayoutGrid, MessagesSquare, Settings2, Sparkles } from 'lucide-react';
 import '../../components/finance/finance.css';
 import '../../components/supervisor/supervisor.css';
-import { fetchKommoUsers, fetchSellers } from '../../lib/api';
+import { useAuth } from '../../context/AuthContext';
 import type { KommoUser, Seller } from '../../lib/database.types';
 import { formatRange } from '../../lib/finance/dashboard';
+import { fetchKommoUsersCached, fetchSupervisorSellers, setSupervisorCacheScope } from '../../lib/supervisor/supervisorApi';
 import { SupervisorFiltersBar } from '../../components/supervisor/SupervisorFiltersBar';
+import { SupervisorFreshness } from '../../components/supervisor/SupervisorFreshness';
 import { useSupervisorFilters, type SupervisorContext } from '../../components/supervisor/useSupervisor';
 
 const SECTIONS = [
@@ -20,6 +22,9 @@ const SECTIONS = [
 
 /** Área "Meu Supervisor": Kommo, conversas e supervisão comercial num só lugar. */
 export function SupervisorLayout() {
+  const { user, access } = useAuth();
+  // Antes de as seções montarem as chaves: cache de outra conta ou de outro papel é descartado.
+  setSupervisorCacheScope(user ? `${user.id}:${access?.role ?? '?'}` : null);
   const filtersState = useSupervisorFilters();
   const [sellers, setSellers] = useState<Seller[]>([]);
   const [kommoUsers, setKommoUsers] = useState<KommoUser[]>([]);
@@ -27,14 +32,20 @@ export function SupervisorLayout() {
   const section = location.pathname.replace(/^\/supervisor\/?/, '').split('/')[0];
   const showFilters = section !== 'configuracoes' && section !== 'relatorios';
 
+  // Listas em cache (10 min): voltar ao Supervisor não as busca de novo.
   useEffect(() => {
-    fetchSellers()
-      .then((list) => setSellers([...list].sort((a, b) => Number(b.active) - Number(a.active) || a.name.localeCompare(b.name, 'pt-BR'))))
-      .catch(() => setSellers([]));
-    fetchKommoUsers()
-      .then(setKommoUsers)
-      .catch(() => setKommoUsers([]));
-  }, []);
+    // Resposta que chega depois de trocar de conta é ignorada.
+    let alive = true;
+    fetchSupervisorSellers()
+      .then((list) => alive && setSellers([...list].sort((a, b) => Number(b.active) - Number(a.active) || a.name.localeCompare(b.name, 'pt-BR'))))
+      .catch(() => alive && setSellers([]));
+    fetchKommoUsersCached()
+      .then((list) => alive && setKommoUsers(list))
+      .catch(() => alive && setKommoUsers([]));
+    return () => {
+      alive = false;
+    };
+  }, [user?.id]);
 
   const { filters, preset, today, update, search } = filtersState;
   const context = useMemo<SupervisorContext>(() => {
@@ -74,7 +85,12 @@ export function SupervisorLayout() {
             <p className="sv-subtitle">Conversas do Kommo, supervisão comercial e desempenho da equipe.</p>
           </div>
         </div>
-        {showFilters && <span className="sv-range-chip">{formatRange(filtersState.filters.range)}</span>}
+        {showFilters && (
+          <div className="sv-header-meta">
+            <SupervisorFreshness filters={filtersState.filters} />
+            <span className="sv-range-chip">{formatRange(filtersState.filters.range)}</span>
+          </div>
+        )}
       </header>
 
       <nav className="sv-tabs" aria-label="Seções do Meu Supervisor">

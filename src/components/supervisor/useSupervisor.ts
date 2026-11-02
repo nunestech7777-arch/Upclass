@@ -1,10 +1,12 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useSyncExternalStore } from 'react';
 import { useOutletContext, useSearchParams } from 'react-router-dom';
 import { usePeriod } from '../../context/PeriodContext';
+import { storeToday } from '../../lib/finance/dates';
+import { AUTO_REFRESH_MAX_DAYS, AUTO_REFRESH_MS, includesToday } from '../../lib/supervisor/cachePolicy';
 import { isChannelFilter } from '../../lib/supervisor/channels';
-import type { SupervisorFilters } from '../../lib/supervisor/filters';
+import { daysOf, type SupervisorFilters } from '../../lib/supervisor/filters';
 import type { Seller } from '../../lib/database.types';
-import { loadPeriodSummary, type PeriodSummaryResult } from '../../lib/supervisor/supervisorApi';
+import { derivePeriodSummary, loadPeriod, peekPeriod, periodKeyOf, subscribePeriod, type PeriodSummaryResult } from '../../lib/supervisor/supervisorApi';
 
 /** Filtros do Meu Supervisor: período = filtro geral do sistema; atendente e canal ficam na URL. */
 export function useSupervisorFilters() {
@@ -42,34 +44,74 @@ export function useSupervisorFilters() {
   return { filters, preset, today, update, search: params.toString() };
 }
 
-export function usePeriodSummary(filters: SupervisorFilters) {
-  const [state, setState] = useState<{ data: PeriodSummaryResult | null; error: string | null; loading: boolean }>({
-    data: null,
-    error: null,
-    loading: true,
-  });
-  const [nonce, setNonce] = useState(0);
-  // Só o clique em "recarregar" fura o cache; trocas de filtro seguintes voltam a usá-lo.
-  const forceNext = useRef(false);
+/** Estado do cache de um período (assina as mudanças: dados novos, responsáveis, erro, logout). */
+function usePeriodEntry(filters: SupervisorFilters) {
+  const key = periodKeyOf(filters);
+  const subscribe = useCallback((onChange: () => void) => subscribePeriod(key, onChange), [key]);
+  // Cada mudança no cache cria um objeto novo: a identidade basta para o React saber que mudou.
+  const entry = useSyncExternalStore(subscribe, () => peekPeriod(key));
+  return { key, entry };
+}
 
+/**
+ * Busca o período se o cache venceu (ao abrir e ao voltar para a aba). Com hoje num período de até
+ * 7 dias, refaz também a cada AUTO_REFRESH_MS com a aba visível; períodos longos, que custam mais
+ * consultas, só atualizam ao voltar ou pelo botão.
+ */
+function useRevalidate(filters: SupervisorFilters, key: string) {
+  const filtersRef = useRef(filters);
+  filtersRef.current = filters;
+  const auto = includesToday(filters.range, storeToday()) && daysOf(filters.range).length <= AUTO_REFRESH_MAX_DAYS;
   useEffect(() => {
-    let alive = true;
-    const force = forceNext.current;
-    forceNext.current = false;
-    setState((s) => ({ ...s, loading: true, error: null }));
-    loadPeriodSummary(filters, force)
-      .then((data) => alive && setState({ data, error: null, loading: false }))
-      .catch((err: Error) => alive && setState({ data: null, error: err.message, loading: false }));
-    return () => {
-      alive = false;
+    const revalidate = () => {
+      if (document.visibilityState === 'visible') loadPeriod(filtersRef.current).catch(() => undefined);
     };
-  }, [filters, nonce]);
+    revalidate();
+    document.addEventListener('visibilitychange', revalidate);
+    const timer = auto ? setInterval(revalidate, AUTO_REFRESH_MS) : undefined;
+    return () => {
+      document.removeEventListener('visibilitychange', revalidate);
+      if (timer) clearInterval(timer);
+    };
+  }, [key, auto]);
+}
 
+/**
+ * Indicadores do período com cache em memória (stale-while-revalidate): com dados guardados a tela
+ * aparece na hora e atualiza em segundo plano; sem eles, mostra o período anterior esmaecido até chegar.
+ */
+export function usePeriodSummary(filters: SupervisorFilters) {
+  const { key, entry } = usePeriodEntry(filters);
+  useRevalidate(filters, key);
+
+  const current = entry?.data ? derivePeriodSummary(entry.data, filters, entry.at ?? 0) : null;
+  // Último resultado exibido, para trocar de filtro sem tela vazia — nunca de outra conta (escopo na chave).
+  const shown = useRef<{ key: string; data: PeriodSummaryResult } | null>(null);
+  if (current) shown.current = { key, data: current };
+  const previous = shown.current && shown.current.key.split('|')[0] === key.split('|')[0] ? shown.current.data : null;
+
+  const error = !current && entry?.error ? entry.error : null;
   return {
-    ...state,
+    data: current ?? (error ? null : previous),
+    error,
+    /** Sem dados deste período ainda (a tela mostra o anterior esmaecido ou "carregando"). */
+    loading: !current && !error,
     reload: () => {
-      forceNext.current = true;
-      setNonce((n) => n + 1);
+      loadPeriod(filters, { force: true }).catch(() => undefined);
+    },
+  };
+}
+
+/** Situação da atualização do período atual, para o aviso discreto no topo do Meu Supervisor. */
+export function usePeriodFreshness(filters: SupervisorFilters) {
+  const { entry } = usePeriodEntry(filters);
+  return {
+    loadedAt: entry?.data ? (entry.at ?? null) : null,
+    refreshing: !!entry?.inflight || entry?.data?.responsibles === 'pending',
+    /** Falha na última atualização, com dados anteriores ainda na tela. */
+    failed: !!(entry?.error && entry.data),
+    refresh: () => {
+      loadPeriod(filters, { force: true }).catch(() => undefined);
     },
   };
 }

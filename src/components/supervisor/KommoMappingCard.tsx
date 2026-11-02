@@ -4,7 +4,7 @@ import { fetchKommoUsers, fetchSellers, updateSellerKommoMapping } from '../../l
 import type { KommoUser, Seller } from '../../lib/database.types';
 import { formatInstantBR } from '../../lib/finance/dates';
 import { buildKommoUserOptions, lastSyncOf, matchesSearch, missingUserIds } from '../../lib/supervisor/kommoUsers';
-import { syncKommoUsersNow } from '../../lib/supervisor/supervisorApi';
+import { invalidateSupervisorData, syncKommoUsersNow } from '../../lib/supervisor/supervisorApi';
 
 /**
  * Vínculo vendedor (MercadoPhone, tabela sellers) ↔ usuário do Kommo (kommo_users). Grava só
@@ -46,7 +46,10 @@ export function KommoMappingCard() {
       return;
     }
     setSellers((prev) => prev.map((s) => (s.id === seller.id ? { ...s, kommo_user_id: nextValue } : s)));
-    updateSellerKommoMapping(seller.id, nextValue).catch((err: Error) => {
+    updateSellerKommoMapping(seller.id, nextValue)
+      // Quem atendeu depende do vínculo: os indicadores em cache são refeitos na próxima visita.
+      .then(invalidateSupervisorData)
+      .catch((err: Error) => {
       setSellers((prev) => prev.map((s) => (s.id === seller.id ? { ...s, kommo_user_id: before } : s)));
       setSaveError(`Não foi possível salvar o vínculo de ${seller.name}: ${err.message}`);
     });
@@ -57,6 +60,7 @@ export function KommoMappingCard() {
     try {
       const before = new Set(kommoUsers.map((u) => u.id));
       const n = await syncKommoUsersNow();
+      invalidateSupervisorData();
       const fresh = await fetchKommoUsers();
       setKommoUsers(fresh);
       const added = fresh.filter((u) => !before.has(u.id)).map((u) => u.name);

@@ -1,7 +1,9 @@
 import { supabase } from '../supabaseClient';
-import { fetchAllRows, fetchSellers } from '../api';
+import { fetchAllRows, fetchKommoUsers, fetchSellers } from '../api';
 import { storeToday } from '../finance/dates';
-import type { Conversation } from '../database.types';
+import type { Conversation, KommoUser, Seller } from '../database.types';
+import { LISTS_TTL_MS, periodCacheKey, periodTtlMs } from './cachePolicy';
+import { createSwrStore } from './swrStore';
 import { CHANNEL_ORIGINS, KNOWN_ORIGINS } from './channels';
 import { daysOf, rangeToInstants, type StoreRange, type SupervisorFilters } from './filters';
 import { attendantKeys, classifyConversations, conversationsInPeriod, summarize, type PeriodConversation, type PeriodMessage, type SupervisorSummary } from './metrics';
@@ -198,7 +200,7 @@ export async function fetchLeadResponsibles(leadIds: string[]): Promise<Map<stri
 }
 
 /** Tudo do período e canal; o filtro de vendedor é aplicado depois, sobre quem atendeu. */
-interface PeriodBase {
+export interface PeriodBase {
   conversations: PeriodConversation[];
   messages: PeriodMessage[];
   attendance: Map<string, ConversationAttendance>;
@@ -207,14 +209,25 @@ interface PeriodBase {
   /**
    * O sinal "aguardando distribuição" depende do responsável ATUAL do lead: 'ok' | 'failed' |
    * 'none' (nada a consultar) | 'historical' (período que não inclui hoje — o Kommo só informa o
-   * responsável de agora, que não prova a situação daquele dia; não é consultado nem exibido).
+   * responsável de agora, que não prova a situação daquele dia; não é consultado nem exibido) |
+   * 'pending' (consulta ao Kommo em andamento: o resto da tela já aparece, só esse sinal espera).
    */
-  responsibles: 'ok' | 'failed' | 'none' | 'historical';
+  responsibles: 'ok' | 'failed' | 'none' | 'historical' | 'pending';
   /** "Conversas processadas" no critério do painel do Kommo (só mensagens do período). */
   kommoProcessed: KommoProcessed;
+  /** Leads sem resposta humana cujo responsável atual falta consultar (responsibles = 'pending'). */
+  pendingLeads: string[];
+  /** Fim exclusivo do período e vendedores vinculados ativos, para completar a distribuição depois. */
+  toIso: string;
+  linkedKommoUsers: Set<string>;
 }
 
-async function loadPeriodBase(f: SupervisorFilters): Promise<PeriodBase> {
+/**
+ * 1ª etapa: só banco (conversas, mensagens, respostas prontas, vendedores). O responsável atual dos
+ * leads vem do Kommo e demora; ele só muda o sinal "aguardando distribuição" e é completado depois
+ * (completeResponsibles), sem segurar a tela.
+ */
+async function loadPeriodCore(f: SupervisorFilters): Promise<PeriodBase> {
   const { toIso } = rangeToInstants(f.range);
   const candidates = await fetchPeriodConversations(f);
   const [messages, lookbackTexts, sellers] = await Promise.all([
@@ -223,7 +236,7 @@ async function loadPeriodBase(f: SupervisorFilters): Promise<PeriodBase> {
       f.range
     ),
     fetchChannelAuthoredTexts(f.range),
-    fetchSellers(),
+    fetchSellersCached(),
   ]);
 
   // Respostas prontas: textos repetidos nos últimos 14 dias OU dentro do próprio período.
@@ -245,24 +258,27 @@ async function loadPeriodBase(f: SupervisorFilters): Promise<PeriodBase> {
   const toMs = Date.parse(toIso);
   const kommoProcessed = kommoProcessedConversations(messages.filter((m) => Date.parse(m.sent_at) < toMs));
 
-  // 1ª passada sem responsável: só as conversas sem resposta humana precisam dele (distribuição).
-  const draft = classifyConversations(conversations, messages, toIso, { linkedKommoUsers });
-  const needResponsible = conversations
-    .filter((c) => c.kommo_lead_id && (draft.get(c.id)?.status === 'nao_atendida' || draft.get(c.id)?.status === 'automatico'))
+  // Sem responsável: só as conversas sem resposta humana precisam dele (distribuição). O status não
+  // depende do responsável — ele só acrescenta o sinal "aguardando distribuição".
+  const attendance = classifyConversations(conversations, messages, toIso, { linkedKommoUsers });
+  const pendingLeads = conversations
+    .filter((c) => c.kommo_lead_id && (attendance.get(c.id)?.status === 'nao_atendida' || attendance.get(c.id)?.status === 'automatico'))
     .map((c) => c.kommo_lead_id as string);
+  const historical = f.range.to < storeToday();
+  const responsibles: PeriodBase['responsibles'] = historical ? 'historical' : pendingLeads.length ? 'pending' : 'none';
+  return { conversations, messages, attendance, sellerByKommoUser, responsibles, kommoProcessed, pendingLeads: historical ? [] : pendingLeads, toIso, linkedKommoUsers };
+}
 
-  let responsibleByLead: Map<string, string | null> | undefined;
-  let responsibles: PeriodBase['responsibles'] = f.range.to < storeToday() ? 'historical' : 'none';
-  if (needResponsible.length && responsibles !== 'historical') {
-    try {
-      responsibleByLead = await fetchLeadResponsibles(needResponsible);
-      responsibles = 'ok';
-    } catch {
-      responsibles = 'failed';
-    }
+/** 2ª etapa: responsável atual dos leads sem resposta humana (Kommo) → sinal "aguardando distribuição". */
+async function completeResponsibles(base: PeriodBase): Promise<PeriodBase> {
+  if (base.responsibles !== 'pending') return base;
+  try {
+    const responsibleByLead = await fetchLeadResponsibles(base.pendingLeads);
+    const attendance = classifyConversations(base.conversations, base.messages, base.toIso, { linkedKommoUsers: base.linkedKommoUsers, responsibleByLead });
+    return { ...base, attendance, responsibles: 'ok', pendingLeads: [] };
+  } catch {
+    return { ...base, responsibles: 'failed', pendingLeads: [] };
   }
-  const attendance = responsibleByLead ? classifyConversations(conversations, messages, toIso, { linkedKommoUsers, responsibleByLead }) : draft;
-  return { conversations, messages, attendance, sellerByKommoUser, responsibles, kommoProcessed };
 }
 
 export interface PeriodSummaryResult {
@@ -279,28 +295,112 @@ export interface PeriodSummaryResult {
   loadedAt: number;
 }
 
-const CACHE_TTL_MS = 60_000;
-const baseCache = new Map<string, { at: number; promise: Promise<PeriodBase> }>();
+/*
+ * Cache do Meu Supervisor — só na memória desta aba (nada em localStorage/IndexedDB). Chave = conta
+ * logada + período + canal (cachePolicy.ts); some no logout, na troca de conta ou de papel
+ * (setSupervisorCacheScope) e quando o vínculo vendedor ↔ Kommo muda (invalidateSupervisorData).
+ */
+// Cada período guarda todas as mensagens dele: poucos na memória (os mais antigos saem primeiro).
+const periodStore = createSwrStore<PeriodBase>(Date.now, 10);
+const sellersStore = createSwrStore<Seller[]>();
+const kommoUsersStore = createSwrStore<KommoUser[]>();
+const analyzedStore = createSwrStore<AnalyzedConversation[]>();
+const ANALYZED_TTL_MS = 5 * 60_000;
+let cacheScope = 'anon';
+/** Bases cujo responsável já está sendo completado (evita duas consultas ao Kommo para a mesma base). */
+let completing = new WeakSet<PeriodBase>();
 
-function loadPeriodBaseCached(f: SupervisorFilters, force: boolean): { promise: Promise<PeriodBase>; at: number } {
-  const key = `${f.range.from}|${f.range.to}|${f.channel}`;
-  const hit = baseCache.get(key);
-  if (!force && hit && Date.now() - hit.at < CACHE_TTL_MS) return hit;
-  const entry = { at: Date.now(), promise: loadPeriodBase(f) };
-  baseCache.set(key, entry);
-  entry.promise.catch(() => {
-    if (baseCache.get(key)?.promise === entry.promise) baseCache.delete(key);
-  });
-  return entry;
+/**
+ * Conta (e papel) dona dos dados em cache. Mudou → apaga tudo: dados de uma conta nunca aparecem para outra.
+ * Chamado pelo AuthContext a cada login, logout ou troca de papel.
+ */
+export function setSupervisorCacheScope(scope: string | null): void {
+  const next = scope ?? 'anon';
+  if (next === cacheScope) return;
+  cacheScope = next;
+  clearSupervisorCache();
+}
+
+// Logout ou outra conta em qualquer tela (mesmo fora do Supervisor): o cache não sobrevive.
+supabase.auth.onAuthStateChange((event, session) => {
+  if (event === 'SIGNED_OUT' || !session) setSupervisorCacheScope(null);
+  else if (!cacheScope.startsWith(`${session.user.id}:`)) setSupervisorCacheScope(`${session.user.id}:?`);
+});
+
+export function clearSupervisorCache(): void {
+  periodStore.clear();
+  sellersStore.clear();
+  kommoUsersStore.clear();
+  analyzedStore.clear();
+  completing = new WeakSet();
+  templateCache.clear();
+  responsiblesCache.clear();
+}
+
+/** Vínculo vendedor ↔ Kommo ou lista de usuários mudou: a atribuição depende disso. */
+export function invalidateSupervisorData(): void {
+  sellersStore.invalidate();
+  kommoUsersStore.invalidate();
+  periodStore.invalidate();
+  analyzedStore.invalidate();
+}
+
+function fetchSellersCached(): Promise<Seller[]> {
+  return sellersStore.load(cacheScope, fetchSellers, { ttlMs: LISTS_TTL_MS });
+}
+
+export function fetchKommoUsersCached(): Promise<KommoUser[]> {
+  return kommoUsersStore.load(cacheScope, fetchKommoUsers, { ttlMs: LISTS_TTL_MS });
+}
+
+/** Vendedores para o Meu Supervisor (mesma lista em cache que a montagem do período usa). */
+export function fetchSupervisorSellers(): Promise<Seller[]> {
+  return fetchSellersCached();
+}
+
+export function periodKeyOf(f: Pick<SupervisorFilters, 'range' | 'channel'>): string {
+  return periodCacheKey(cacheScope, f, storeToday());
+}
+
+export function peekPeriod(key: string) {
+  return periodStore.peek(key);
+}
+
+export function subscribePeriod(key: string, listener: () => void): () => void {
+  return periodStore.subscribe(key, listener);
 }
 
 /**
- * Indicadores do período; reaproveita a consulta por 1 min ao trocar de seção ou de vendedor.
- * Filtro de vendedor = conversas em que ele RESPONDEU; "none" = sem atendente identificado.
+ * Dados-base do período: devolve o cache se ainda vale e, se não, busca no banco (uma busca por chave,
+ * mesmo com várias telas pedindo juntas). O responsável dos leads chega depois, pelo mesmo cache.
  */
-export async function loadPeriodSummary(f: SupervisorFilters, force = false): Promise<PeriodSummaryResult> {
-  const entry = loadPeriodBaseCached(f, force);
-  const base = await entry.promise;
+export function loadPeriod(f: SupervisorFilters, opts: { force?: boolean } = {}): Promise<PeriodBase> {
+  const key = periodKeyOf(f);
+  const promise = periodStore.load(key, () => loadPeriodCore(f), { ttlMs: periodTtlMs(f.range, storeToday()), force: opts.force });
+  return promise.then((base) => {
+    // Só a base que está no cache (não uma resposta de antes de recarga/logout) e uma vez por base.
+    if (base.responsibles === 'pending' && periodStore.peek(key)?.data === base && !completing.has(base)) {
+      completing.add(base);
+      completeResponsibles(base).then((full) => {
+        if (periodStore.peek(key)?.data === base) periodStore.set(key, full);
+      });
+    }
+    return base;
+  });
+}
+
+const derived = new WeakMap<PeriodBase, Map<string, PeriodSummaryResult>>();
+
+/**
+ * Indicadores do período a partir dos dados-base, com o filtro de vendedor aplicado em memória.
+ * Filtro de vendedor = conversas em que ele RESPONDEU; "none" = sem atendente identificado.
+ * Resultado guardado por base + vendedor: voltar a uma seção não recalcula nada.
+ */
+export function derivePeriodSummary(base: PeriodBase, f: SupervisorFilters, loadedAt: number): PeriodSummaryResult {
+  const memo = derived.get(base) ?? new Map<string, PeriodSummaryResult>();
+  derived.set(base, memo);
+  const hit = memo.get(f.seller);
+  if (hit) return hit;
   const keyOf = (id: string) => base.sellerByKommoUser.get(id) ?? `kommo:${id}`;
   const focus = f.seller === 'all' ? undefined : f.seller === 'none' ? null : f.seller;
   const conversations =
@@ -312,7 +412,9 @@ export async function loadPeriodSummary(f: SupervisorFilters, force = false): Pr
     periodEnd: rangeToInstants(f.range).toIso,
   });
   const totals = attendanceTotals(conversations.map((c) => base.attendance.get(c.id)).filter((a): a is ConversationAttendance => !!a));
-  return { conversations, summary, attendance: base.attendance, totals, attendantKeyOf: keyOf, responsibles: base.responsibles, kommoProcessed: base.kommoProcessed, loadedAt: entry.at };
+  const result = { conversations, summary, attendance: base.attendance, totals, attendantKeyOf: keyOf, responsibles: base.responsibles, kommoProcessed: base.kommoProcessed, loadedAt };
+  memo.set(f.seller, result);
+  return result;
 }
 
 export type ConversationDetail = Omit<Conversation, 'raw_payload'> & { origin: string | null };
@@ -361,7 +463,12 @@ async function fetchConversationAttendants(conversationIds: string[]): Promise<M
  * Filtro por AUTOR: `kommoUserId` = usuário do Kommo que enviou mensagem na conversa — nunca
  * conversations.seller_id (responsável do lead), que pode ser quem só distribuiu o lead.
  */
-export async function fetchAnalyzedConversations(kommoUserId: string | null, limit = 50): Promise<AnalyzedConversation[]> {
+export function fetchAnalyzedConversations(kommoUserId: string | null, limit = 50): Promise<AnalyzedConversation[]> {
+  // Avaliações só mudam quando a Análise IA gravar (hoje desativada): 5 min em cache, por conta.
+  return analyzedStore.load(`${cacheScope}|${kommoUserId ?? 'all'}|${limit}`, () => loadAnalyzedConversations(kommoUserId, limit), { ttlMs: ANALYZED_TTL_MS });
+}
+
+async function loadAnalyzedConversations(kommoUserId: string | null, limit: number): Promise<AnalyzedConversation[]> {
   const { data, error } = await supabase
     .from('conversations')
     .select('id, client_name, occurred_at, score, summary, sentiment, strengths, improvements')
