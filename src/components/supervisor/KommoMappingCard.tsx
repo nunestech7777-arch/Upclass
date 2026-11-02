@@ -82,9 +82,7 @@ export function KommoMappingCard() {
   return (
     <div className="sv-mapping">
       <p className="sv-muted">
-        Vincule cada vendedor (cadastro de vendas) ao usuário correspondente no Kommo para que as conversas apareçam no vendedor certo.
-        Vendas, metas e logins não são alterados.
-        {loaded && ` ${linked} de ${sellers.length} vendedores vinculados · ${kommoUsers.length} usuários do Kommo${lastSync ? ` · última sincronização ${formatInstantBR(lastSync)}` : ''}.`}
+        {loaded && `${linked} de ${sellers.length} vendedores vinculados · ${kommoUsers.length} usuários do Kommo${lastSync ? ` · última sincronização ${formatInstantBR(lastSync)}` : ''}.`}
       </p>
 
       <div className="sv-mapping-tools">

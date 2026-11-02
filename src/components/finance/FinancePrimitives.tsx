@@ -1,7 +1,7 @@
 import React from 'react';
 import { AlertTriangle, CheckCircle2, Clock, Info, MinusCircle, TrendingDown } from 'lucide-react';
 import type { Coverage, PaceStatus } from '../../lib/finance/calc';
-import { brl, int, pct } from '../../lib/finance/format';
+import { int, pct } from '../../lib/finance/format';
 import { dayLabel } from '../../lib/finance/dates';
 import { CountUpValue } from '../ui/AnimatedNumber';
 
@@ -97,10 +97,9 @@ export function CoverageNotice({ coverage, lastSyncAt }: { coverage: Coverage; l
       <div className="fin-notice is-ok" role="status">
         <CheckCircle2 size={16} />
         <span>
-          Custos conciliados com o Mercado Phone: {int(coverage.items)} de {int(coverage.items)} itens
-          {lastSyncAt ? ` · última conciliação ${lastSyncAt}` : ''}.
-          {coverage.zeroCostDevices > 0 &&
-            ` ${int(coverage.zeroCostDevices)} iPhone(s) com custo zero informado pela origem — confira o cadastro de custo no Mercado Phone.`}
+          Conciliado: {int(coverage.items)} de {int(coverage.items)} itens
+          {lastSyncAt ? ` · ${lastSyncAt}` : ''}
+          {coverage.zeroCostDevices > 0 && ` · ${int(coverage.zeroCostDevices)} iPhone(s) com custo zero`}
         </span>
       </div>
     );
@@ -112,8 +111,7 @@ export function CoverageNotice({ coverage, lastSyncAt }: { coverage: Coverage; l
         <strong>
           Resultado parcial — {int(coverage.reconciled)} de {int(coverage.items)} itens conciliados.
         </strong>{' '}
-        {reasons.join(', ')}. Receita conciliada {brl(coverage.revenueKnown)}; valor pago dos itens pendentes{' '}
-        {brl(coverage.amountPending)}. Lucro, margem e projeção consideram apenas os itens conciliados.
+        {reasons.join(', ')}.
       </span>
     </div>
   );
@@ -139,9 +137,8 @@ export function EmptyDaysNotice({ days, lastSaleAt }: { days: string[]; lastSale
     <div className="fin-notice is-partial" role="status">
       <AlertTriangle size={16} />
       <span>
-        <strong>{int(days.length)} dia(s) completo(s) sem nenhuma venda registrada</strong> ({recent}
-        {days.length > 6 ? ', …' : ''}).{lastSaleAt ? ` Última venda importada: ${lastSaleAt}.` : ''} Se houve vendas nesses dias, a importação
-        do Mercado Phone pode estar atrasada — a projeção e o ritmo os contam como zero.
+        <strong>{int(days.length)} dia(s) sem vendas registradas</strong> ({recent}
+        {days.length > 6 ? ', …' : ''}).{lastSaleAt ? ` Última venda: ${lastSaleAt}.` : ''}
       </span>
     </div>
   );

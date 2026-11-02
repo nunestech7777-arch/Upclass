@@ -483,10 +483,10 @@ export function Sales() {
   // Faturamento: só itens pagos pendentes mudam o total. Lucro: brinde pendente também (custo desconhecido).
   const revenuePendingNote =
     metrics.pendingPaidItems > 0
-      ? `Parcial: ${metrics.pendingPaidItems} item(ns) pago(s) ainda não conciliado(s) (${formatCurrency(metrics.pendingAmount)}) fora da soma`
+      ? `Parcial: ${metrics.pendingPaidItems} item(ns) a conciliar (${formatCurrency(metrics.pendingAmount)})`
       : null;
   const pendingNote =
-    metrics.pendingItems > 0 ? `Parcial: ${metrics.pendingItems} item(ns) ainda não conciliado(s) (custo/receita pendentes) fora da soma` : null;
+    metrics.pendingItems > 0 ? `Parcial: ${metrics.pendingItems} item(ns) a conciliar` : null;
 
   // Vendas consideradas no modal de Ranking:
   // Respeita todos os filtros da página (período, produto, vendedor, busca),
@@ -586,9 +586,6 @@ export function Sales() {
       <div className="sales-header">
         <div className="sales-header-left">
           <h1 className="sales-header-title">Vendas</h1>
-          <p className="sales-header-subtitle">
-            Gerencie as vendas realizadas na plataforma, acompanhe o desempenho dos vendedores e consulte o histórico por período.
-          </p>
         </div>
 
       </div>
@@ -597,7 +594,7 @@ export function Sales() {
       <StickyFilterBar
         summary={
           <>
-            <strong>{filteredSales.length}</strong> {filteredSales.length === 1 ? 'item' : 'itens'} · {filterScope} · os indicadores e a listagem seguem estes filtros
+            <strong>{filteredSales.length}</strong> {filteredSales.length === 1 ? 'item' : 'itens'}
           </>
         }
       >
@@ -668,7 +665,7 @@ export function Sales() {
           badge="Volume"
           label="Produtos vendidos"
           value={`${metrics.units.toLocaleString('pt-BR')} ${metrics.units === 1 ? 'unidade' : 'unidades'}`}
-          caption={`${metrics.devices} ${metrics.devices === 1 ? 'aparelho' : 'aparelhos'} · ${metrics.accessories} ${metrics.accessories === 1 ? 'acessório' : 'acessórios'} · ${metrics.orders} ${metrics.orders === 1 ? 'venda' : 'vendas'}${metrics.gifts > 0 ? ` · ${metrics.gifts} brinde(s) fora` : ''}`}
+          caption={`${metrics.devices} ${metrics.devices === 1 ? 'aparelho' : 'aparelhos'} · ${metrics.accessories} ${metrics.accessories === 1 ? 'acessório' : 'acessórios'} · ${metrics.orders} ${metrics.orders === 1 ? 'venda' : 'vendas'}`}
           loading={isLoading}
           onOpen={() => {
             setRankingCategoryFilter('all');
@@ -681,7 +678,7 @@ export function Sales() {
           badge={topRank?.category === 'Acessórios' ? 'Acessório' : 'Ranking'}
           label="Produto mais vendido"
           value={topRank ? topRank.name : 'Sem vendas'}
-          caption={topRank ? `${topRank.units} ${topRank.units === 1 ? 'unidade vendida' : 'unidades vendidas'}` : 'Nenhum produto nos filtros'}
+          caption={topRank ? `${topRank.units} ${topRank.units === 1 ? 'unidade' : 'unidades'}` : undefined}
           loading={isLoading}
           onOpen={() => {
             setRankingCategoryFilter('all');
@@ -694,7 +691,7 @@ export function Sales() {
           badge="Faturamento"
           label="Faturamento"
           value={formatCurrency(metrics.revenue)}
-          caption="Valor de venda dos itens (valorTotal do Mercado Phone)"
+          caption="Valor de vendas"
           partial={revenuePendingNote}
           loading={isLoading}
           onOpen={() => setMetricDetail('revenue')}
@@ -705,7 +702,7 @@ export function Sales() {
           badge="Lucro"
           label="Lucro bruto"
           value={formatCurrency(metrics.profit)}
-          caption={metrics.revenue > 0 ? `Margem ${((metrics.profit / metrics.revenue) * 100).toLocaleString('pt-BR', { maximumFractionDigits: 1 })}% · faturamento − custo` : 'Faturamento − custo dos produtos'}
+          caption={metrics.revenue > 0 ? `Margem: ${((metrics.profit / metrics.revenue) * 100).toLocaleString('pt-BR', { maximumFractionDigits: 1 })}%` : undefined}
           partial={pendingNote}
           loading={isLoading}
           onOpen={() => setMetricDetail('profit')}
@@ -716,8 +713,8 @@ export function Sales() {
           badge="Média"
           label="Lucro médio por venda"
           value={metrics.avgProfitPerOrder != null ? formatCurrency(metrics.avgProfitPerOrder) : '—'}
-          caption={`${metrics.reconciledOrders.length} ${metrics.reconciledOrders.length === 1 ? 'venda conciliada' : 'vendas conciliadas'}`}
-          partial={metrics.pendingOrders > 0 ? `Parcial: ${metrics.pendingOrders} venda(s) com item a conciliar fora da média` : null}
+          caption={`Vendas conciliadas: ${metrics.reconciledOrders.length}`}
+          partial={metrics.pendingOrders > 0 ? `Parcial: ${metrics.pendingOrders} venda(s) a conciliar` : null}
           loading={isLoading}
           onOpen={() => setMetricDetail('avg')}
         />

@@ -105,7 +105,7 @@ function soldExtras(metric: ForecastMetric, row: SellerUnitRow) {
 
 // ---------------------------------------------------------------------------
 
-export function TeamSummaryCards({ kind, metric, team, ctx, sellersCount }: { kind: UnitKind; metric: ForecastMetric; team: TeamUnitSummary; ctx: MonthContext; sellersCount: number }) {
+export function TeamSummaryCards({ kind, metric, team, ctx }: { kind: UnitKind; metric: ForecastMetric; team: TeamUnitSummary; ctx: MonthContext; sellersCount: number }) {
   const copy = UNIT_COPY[kind];
   const mc = metricCopy(kind, metric);
   const money = metric === 'revenue';
@@ -121,14 +121,14 @@ export function TeamSummaryCards({ kind, metric, team, ctx, sellersCount }: { ki
         icon={money ? <CircleDollarSign size={18} /> : kind === 'devices' ? <Smartphone size={18} /> : <Headphones size={18} />}
         tone="profit"
         highlight
-        caption={`${sellersCount} vendedor(es) · ${mc.soldHint}${money && team.pendingItems > 0 ? ` · ${int(team.pendingItems)} item(ns) a conciliar fora da soma` : ''}`}
+        caption={money && team.pendingItems > 0 ? `Parcial: ${int(team.pendingItems)} a conciliar` : undefined}
       />
       <KpiCard
         label="Meta total da equipe"
         value={team.target != null ? show(team.target) : 'Sem meta'}
         icon={<Target size={18} />}
         tone="goal"
-        caption={team.pct != null ? `${team.pct.toLocaleString('pt-BR', { maximumFractionDigits: 1 })}% da meta atingida` : money ? `Cadastre as metas de faturamento de ${copy.many}` : `Cadastre as metas de ${copy.many}`}
+        caption={team.pct != null ? `${team.pct.toLocaleString('pt-BR', { maximumFractionDigits: 1 })}% da meta` : undefined}
         progress={team.pct}
       />
       <KpiCard
@@ -136,21 +136,19 @@ export function TeamSummaryCards({ kind, metric, team, ctx, sellersCount }: { ki
         value={projectionValue != null ? show(projectionValue) : 'Indisponível'}
         icon={<TrendingUp size={18} />}
         tone={projectionTone}
-        caption={projectionNote(ctx)}
       />
       <KpiCard
         label="Faltam para a meta"
         value={team.remaining == null ? '—' : team.remaining === 0 ? 'Meta batida' : money ? formatMoney(team.remaining) : `${int(team.remaining)} ${copy.many}`}
         icon={<Flag size={18} />}
         tone={team.remaining ? 'deficit' : team.remaining === 0 ? 'profit' : 'neutral'}
-        caption={team.remaining == null ? 'Sem meta cadastrada' : 'Meta geral − vendido por quem tem meta'}
       />
       <KpiCard
         label="Ritmo necessário"
         value={pace.value}
         icon={<CalendarClock size={18} />}
         tone={pace.state === 'reached' ? 'profit' : pace.state === 'missed' ? 'deficit' : 'neutral'}
-        caption={pace.caption}
+        caption={pace.state === 'pace' ? `${ctx.remainingDays} ${ctx.remainingDays === 1 ? 'dia restante' : 'dias restantes'}` : undefined}
       />
     </div>
   );
@@ -372,7 +370,7 @@ export function RatioSummaryCards({ metric, team, rows }: { metric: RatioMetric;
       value={best ? ratioValue(metric, best) : '—'}
       icon={<Award size={18} />}
       tone="goal"
-      caption={best ? `${best.name} · ${int(best.attendances)} atendimento(s)` : 'Nenhum atendimento com acessório pago'}
+      caption={best ? best.name : undefined}
     />
   );
   const attendancesCard = (
@@ -381,7 +379,6 @@ export function RatioSummaryCards({ metric, team, rows }: { metric: RatioMetric;
       value={int(team.attendances)}
       icon={<Users size={18} />}
       tone="neutral"
-      caption="Vendas distintas por vendedor com acessório pago (sem brindes)"
     />
   );
   if (metric === 'ticket') {
@@ -393,14 +390,13 @@ export function RatioSummaryCards({ metric, team, rows }: { metric: RatioMetric;
           icon={<Receipt size={18} />}
           tone="profit"
           highlight
-          caption="Faturamento total ÷ atendimentos totais (não é média dos tickets)"
         />
         <KpiCard
           label="Faturamento conciliado"
           value={formatMoney(team.revenue)}
           icon={<CircleDollarSign size={18} />}
           tone="neutral"
-          caption={`Base do ticket · ${int(team.revenueAttendances)} atendimento(s) com todos os acessórios conciliados`}
+          caption={`${int(team.revenueAttendances)} atendimentos`}
         />
         {attendancesCard}
         {bestCard}
@@ -409,7 +405,6 @@ export function RatioSummaryCards({ metric, team, rows }: { metric: RatioMetric;
           value={team.pendingAttendances > 0 ? int(team.pendingAttendances) : 'Nenhum'}
           icon={<Clock size={18} />}
           tone={team.pendingAttendances > 0 ? 'warn' : 'neutral'}
-          caption="Atendimentos fora do ticket até a sincronização financeira"
         />
       </div>
     );
@@ -423,9 +418,8 @@ export function RatioSummaryCards({ metric, team, rows }: { metric: RatioMetric;
         icon={<Layers size={18} />}
         tone="profit"
         highlight
-        caption="peças/atendimento · peças totais ÷ atendimentos totais"
       />
-      <KpiCard label="Acessórios vendidos" value={int(team.units)} icon={<Headphones size={18} />} tone="neutral" caption="Peças pagas (quantidade de cada item)" />
+      <KpiCard label="Acessórios vendidos" value={int(team.units)} icon={<Headphones size={18} />} tone="neutral" />
       {attendancesCard}
       {bestCard}
       <KpiCard
@@ -433,7 +427,7 @@ export function RatioSummaryCards({ metric, team, rows }: { metric: RatioMetric;
         value={int(team.multiPiece)}
         icon={<BarChart3 size={18} />}
         tone="neutral"
-        caption={multiPct != null ? `${multiPct.toLocaleString('pt-BR', { maximumFractionDigits: 1 })}% dos atendimentos` : 'Sem atendimentos'}
+        caption={multiPct != null ? `${multiPct.toLocaleString('pt-BR', { maximumFractionDigits: 1 })}% dos atendimentos` : undefined}
       />
     </div>
   );
@@ -544,7 +538,6 @@ export function AppleSummaryCards({
   team,
   teamTypes,
   ctx,
-  sellersCount,
   reviewCount,
 }: {
   metric: ForecastMetric;
@@ -559,7 +552,7 @@ export function AppleSummaryCards({
   const iphone = teamTypes.find((t) => t.type === 'iPhone')?.team.sold ?? 0;
   const others = teamTypes.filter((t) => t.type !== 'iPhone');
   const othersTotal = money ? others.reduce((a, t) => a + Math.round(t.team.sold * 100), 0) / 100 : others.reduce((a, t) => a + t.team.sold, 0);
-  const share = (v: number) => (team.sold > 0 ? ` · ${((v / team.sold) * 100).toLocaleString('pt-BR', { maximumFractionDigits: 1 })}% do total` : '');
+  const share = (v: number) => (team.sold > 0 ? `${((v / team.sold) * 100).toLocaleString('pt-BR', { maximumFractionDigits: 1 })}% do total` : '');
   return (
     <div className="fc-kpis">
       <KpiCard
@@ -568,29 +561,27 @@ export function AppleSummaryCards({
         icon={<Apple size={18} />}
         tone="profit"
         highlight
-        caption={`${sellersCount} vendedor(es) · ${teamTypes.length} tipo(s)${money && team.pendingItems > 0 ? ` · ${int(team.pendingItems)} item(ns) a conciliar fora da soma` : ''}`}
+        caption={money && team.pendingItems > 0 ? `Parcial: ${int(team.pendingItems)} a conciliar` : undefined}
       />
       <KpiCard
         label={ctx.phase === 'past' ? 'Fechamento da equipe' : 'Projeção total'}
         value={team.projection != null ? show(money ? Math.round(team.projection * 100) / 100 : roundUnits(team.projection)) : 'Indisponível'}
         icon={<TrendingUp size={18} />}
         tone="neutral"
-        caption={projectionNote(ctx)}
       />
-      <KpiCard label="iPhone" value={show(iphone)} icon={<Smartphone size={18} />} tone="neutral" caption={`Mesma regra da aba Aparelhos${share(iphone)}`} />
+      <KpiCard label="iPhone" value={show(iphone)} icon={<Smartphone size={18} />} tone="neutral" caption={share(iphone) || undefined} />
       <KpiCard
         label="Outros produtos Apple"
         value={show(othersTotal)}
         icon={<Layers size={18} />}
         tone="neutral"
-        caption={others.length > 0 ? others.map((t) => `${t.type} ${show(t.team.sold)}`).join(' · ') : 'Nenhum além de iPhone no período'}
+        caption={others.length > 0 ? others.map((t) => `${t.type} ${show(t.team.sold)}`).join(' · ') : undefined}
       />
       <KpiCard
         label="Para revisão"
         value={reviewCount > 0 ? int(reviewCount) : 'Nenhum'}
         icon={<AlertTriangle size={18} />}
         tone={reviewCount > 0 ? 'warn' : 'neutral'}
-        caption="Itens que o sistema não classificou por segurança (lista abaixo da tabela)"
       />
     </div>
   );
@@ -793,10 +784,6 @@ export function AppleReviewPanel({ items, sellerName }: { items: AppleReviewItem
           </tbody>
         </table>
       </div>
-      <p className="fin-muted fin-small">
-        Estes itens seguem a regra anterior do Forecast (contam em Acessórios quando pagos). Para que sejam reconhecidos, corrija o nome do produto no Mercado Phone
-        (ex.: “iPhone 15 Plus…”, “MacBook Air…”).
-      </p>
     </details>
   );
 }

@@ -151,9 +151,6 @@ export function Sellers() {
             <Trophy size={26} color="var(--accent-text)" />
             Ranking de Vendedores
           </h1>
-          <p className="text-muted" style={{ marginTop: '4px' }}>
-            Acompanhe o desempenho individual dividido por iPhones, Acessórios e Taxa de Conversão
-          </p>
           <Link
             to="/resultado-financeiro"
             className="sellers-profit-link"

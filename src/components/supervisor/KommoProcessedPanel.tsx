@@ -70,14 +70,6 @@ export function KommoProcessedPanel({
           </li>
         )}
       </ul>
-      <p className="sv-footnote">
-        Mesma regra do painel do Kommo: para cada atendente, quantos atendimentos (talks) receberam mensagem dele no período. O Robô
-        soma cada autor automático à parte — Salesbot e envios com o nome do canal (mensagens enviadas pelo aparelho, que o Kommo
-        também põe no Robô). {int(data.uniqueTalks)} atendimentos diferentes tiveram mensagem enviada.
-        {data.withoutAuthor.messages > 0 &&
-          ` ${int(data.withoutAuthor.messages)} mensagem(ns) sem autor no Kommo, em ${int(data.withoutAuthor.talks)} atendimento(s), ficam fora (o Kommo também não as mostra).`}{' '}
-        Vale para a equipe toda, mesmo com filtro de atendente.
-      </p>
     </>
   );
 }

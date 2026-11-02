@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { Activity, AlertTriangle, CheckCircle2, Clock3, Inbox, Lock, RefreshCw, Send, ShieldCheck, Users, Webhook } from 'lucide-react';
+import { Activity, AlertTriangle, CheckCircle2, Clock3, Inbox, Lock, RefreshCw, Send, Users, Webhook } from 'lucide-react';
 import { KpiCard } from '../../components/finance/FinancePrimitives';
 import { KommoMappingCard } from '../../components/supervisor/KommoMappingCard';
 import { ErrorBlock, LoadingBlock, NotActiveTag, Panel } from '../../components/supervisor/SupervisorPrimitives';
@@ -77,15 +77,15 @@ export function SupervisorSettings() {
             </div>
             <div className="sv-kpis">
               <KpiCard label="Último evento recebido" value={health.lastEventAt ? formatInstantBR(health.lastEventAt) : '—'} icon={<Clock3 size={18} />} tone="neutral" />
-              <KpiCard label="Eventos nas últimas 24 h" value={int(health.events24h)} icon={<Webhook size={18} />} tone="goal" caption="Assinatura principal (kommo-webhook)" />
-              <KpiCard label="Respostas de vendedores (24 h)" value={int(health.outgoing24h)} icon={<Send size={18} />} tone="profit" caption="Eventos add_outgoing_message" />
+              <KpiCard label="Eventos nas últimas 24 h" value={int(health.events24h)} icon={<Webhook size={18} />} tone="goal" />
+              <KpiCard label="Respostas de vendedores (24 h)" value={int(health.outgoing24h)} icon={<Send size={18} />} tone="profit" />
               <KpiCard label="Erros (24 h)" value={int(health.errors24h)} icon={<AlertTriangle size={18} />} tone={health.errors24h ? 'deficit' : 'profit'} />
-              <KpiCard label="Pendentes (7 dias)" value={int(health.pending7d)} icon={<Inbox size={18} />} tone={health.pending7d ? 'warn' : 'profit'} caption="Recebidos e ainda não processados" />
-              <KpiCard label="Conversas gravadas" value={int(health.conversationsTotal)} icon={<Activity size={18} />} tone="neutral" caption={`${int(health.conversationsWithoutSeller)} sem vendedor vinculado`} />
+              <KpiCard label="Pendentes (7 dias)" value={int(health.pending7d)} icon={<Inbox size={18} />} tone={health.pending7d ? 'warn' : 'profit'} />
+              <KpiCard label="Conversas gravadas" value={int(health.conversationsTotal)} icon={<Activity size={18} />} tone="neutral" caption={`${int(health.conversationsWithoutSeller)} sem vendedor`} />
             </div>
             {health.failed > 0 && (
               <p className="sv-footnote">
-                {health.failed} conferência(s) não responderam a tempo e aparecem como “—”. Use Atualizar para tentar de novo.
+                {health.failed} conferência(s) sem resposta.
               </p>
             )}
           </div>
@@ -105,9 +105,6 @@ export function SupervisorSettings() {
             </li>
           ))}
         </ul>
-        <p className="sv-footnote sv-inline-icon">
-          <ShieldCheck size={13} aria-hidden="true" /> Tokens e segredos ficam só nas Edge Functions do Supabase e nunca chegam ao navegador.
-        </p>
       </Panel>
 
       <Panel title="Vendedores e usuários do Kommo" eyebrow={health ? `${int(health.kommoUsers)} usuários sincronizados` : 'Sincronização'}>
@@ -136,7 +133,7 @@ export function SupervisorSettings() {
       </Panel>
 
       <div className="sv-grid-2">
-        <Panel title="Supervisor IA" eyebrow="Configurações e preferências de análise" actions={<NotActiveTag>Desativado</NotActiveTag>}>
+        <Panel title="Supervisor IA" eyebrow="Análise" actions={<NotActiveTag>Desativado</NotActiveTag>}>
           <p className="sv-muted sv-inline-icon">
             <Lock size={14} aria-hidden="true" /> Modelo, critérios com peso e frequência de análise serão configurados aqui quando a
             ativação for autorizada. Nenhuma chamada de IA está ligada.

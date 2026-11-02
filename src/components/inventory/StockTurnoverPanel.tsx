@@ -130,13 +130,13 @@ export function StockTurnoverPanel({ items }: { items: StockItem[] }) {
 
   const trendText =
     cmp.trend === 'n/a'
-      ? 'Sem base de comparação no período anterior'
+      ? null
       : cmp.trend === 'stable'
-        ? `Estável vs período anterior (${days(previous.avgDays)})`
-        : `${cmp.trend === 'faster' ? '▼ Mais rápido' : '▲ Mais lento'}: ${days(Math.abs(cmp.delta!))} ${cmp.trend === 'faster' ? 'a menos' : 'a mais'} que o período anterior`;
+        ? 'Estável vs período anterior'
+        : `${cmp.trend === 'faster' ? '▼' : '▲'} ${days(Math.abs(cmp.delta!))} vs período anterior`;
   const turnoverPartial = [
-    current.unknown > 0 ? `${units(current.unknown)} sem data de entrada confiável` : null,
-    current.preorder > 0 ? `${units(current.preorder)} sob encomenda fora da média` : null,
+    current.unknown > 0 ? `${units(current.unknown)} sem data de entrada` : null,
+    current.preorder > 0 ? `${units(current.preorder)} sob encomenda` : null,
   ]
     .filter(Boolean)
     .join(' · ');
@@ -146,7 +146,6 @@ export function StockTurnoverPanel({ items }: { items: StockItem[] }) {
       <div className="turn-head">
         <div>
           <h2 className="turn-title">Giro do estoque</h2>
-          <p className="turn-sub">Velocidade de venda (vendas do período) e idade das mercadorias paradas. Brindes não contam como venda.</p>
         </div>
       </div>
       <div className="turn-filters">
@@ -170,13 +169,7 @@ export function StockTurnoverPanel({ items }: { items: StockItem[] }) {
           label="Giro médio de estoque"
           loading={loading}
           value={current.avgDays == null ? 'Sem dados' : days(current.avgDays)}
-          caption={
-            <>
-              Entrada → venda, média por unidade · {units(current.measured)} vendidas consideradas ({formatDateBR(range.from)} a {formatDateBR(range.to)})
-              <br />
-              <span className={`turn-trend is-${cmp.trend}`}>{trendText}</span>
-            </>
-          }
+          caption={trendText ? <span className={`turn-trend is-${cmp.trend}`}>{trendText}</span> : undefined}
           partial={turnoverPartial || null}
           onOpen={() => setOpen('turnover')}
         />
@@ -187,8 +180,8 @@ export function StockTurnoverPanel({ items }: { items: StockItem[] }) {
           label="Idade média do estoque atual"
           loading={loading}
           value={age.avgDays == null ? 'Sem dados' : days(age.avgDays)}
-          caption={`Há quanto tempo as unidades disponíveis para venda estão na loja · ${units(age.knownUnits)} com data de entrada${unavailableUnits > 0 ? ` · ${units(unavailableUnits)} em laboratório/reserva fora` : ''}`}
-          partial={age.unknownUnits > 0 ? `${units(age.unknownUnits)} sem data de entrada conhecida (lotes anteriores ao rastreamento${trackingSince ? ` de ${trackingSince}` : ''}, devoluções ou sem data no cadastro)` : null}
+          caption={unavailableUnits > 0 ? `${units(unavailableUnits)} em laboratório/reserva` : undefined}
+          partial={age.unknownUnits > 0 ? `${units(age.unknownUnits)} sem data de entrada` : null}
           onOpen={() => setOpen('age')}
         />
       </div>
@@ -306,7 +299,6 @@ function TurnoverModal({
         <div className="turn-modal-body">
           <section>
             <h4>A. Giro médio por categoria</h4>
-            <p className="turn-note">Permanência = data da venda − data de entrada. Média ponderada pelas unidades vendidas com data válida.</p>
             <div className="turn-table-wrap">
               <table className="turn-table">
                 <thead>
@@ -359,8 +351,7 @@ function TurnoverModal({
           <section ref={ageRef}>
             <h4>B. Produtos com maior tempo parado (estoque atual)</h4>
             <p className="turn-note">
-              Idade média do estoque atual: <strong>{days(ageByCat.avgDays)}</strong> ({units(ageByCat.knownUnits)} com data; {units(ageByCat.unknownUnits)} sem data). Unidades com IMEI/série
-              usam a data real; lotes usam as entradas detectadas (FIFO){trackingSince ? ` desde ${trackingSince}` : ''}.
+              Idade média do estoque atual: <strong>{days(ageByCat.avgDays)}</strong> ({units(ageByCat.knownUnits)} com data; {units(ageByCat.unknownUnits)} sem data).
             </p>
             <div className="turn-table-wrap">
               <table className="turn-table">
@@ -433,7 +424,6 @@ function TurnoverModal({
 
           <section>
             <h4>D. Evolução mensal do tempo médio de permanência</h4>
-            <p className="turn-note">Dias entre entrada e venda, por mês da venda (desde {formatDateBR(evolutionFrom)}). Mês sem unidades com data válida fica sem ponto.</p>
             {evolutionError ? (
               <p className="turn-alert" role="alert">{evolutionError}</p>
             ) : !evolutionLines ? (

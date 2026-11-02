@@ -56,7 +56,6 @@ export function SalesEvolutionChart({ points, granularity, mode, onModeChange, t
             <TrendingUp size={20} className="tone-profit" />
             Evolução de Vendas
           </h2>
-          <p className="fin-lead">Acompanhe a evolução de aparelhos e acessórios vendidos.</p>
           <span className="fin-muted fin-small">{subtitle}</span>
         </div>
         <div className="dv-segmented" role="group" aria-label="Modo de visualização">

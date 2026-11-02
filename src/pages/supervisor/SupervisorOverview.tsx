@@ -50,14 +50,14 @@ export function SupervisorOverview() {
       ) : null}
 
       <div className="sv-kpis">
-        <KpiCard label="Atendimentos" value={int(s.conversations)} icon={<MessagesSquare size={18} />} tone="goal" highlight caption={`${int(s.clientMessages)} mensagens de clientes · ${int(s.sellerMessages)} de atendentes`} />
-        <KpiCard label="Tempo médio de resposta" value={formatSeconds(s.avgResponseSeconds)} icon={<Clock3 size={18} />} tone="neutral" caption={s.responses ? `Mediana ${formatSeconds(s.medianResponseSeconds)} · ${int(s.responses)} respostas (inclui respostas até 24 h depois)` : 'Sem respostas de vendedor no período'} />
-        <KpiCard label="Clientes sem resposta" value={int(s.awaiting)} icon={<UserX size={18} />} tone={s.awaiting > 0 ? 'deficit' : 'profit'} caption="Terminaram o período com a última mensagem do cliente sem resposta de uma pessoa" />
-        <KpiCard label="Taxa de resposta" value={pct(responseRate)} icon={<Gauge size={18} />} tone="profit" caption={rounds ? `${int(s.answeredInPeriod)} de ${int(rounds)} rodadas do cliente respondidas no período` : 'Sem mensagens de clientes no período'} />
-        <KpiCard label="Conversas analisadas" value={int(s.analyzed)} icon={<CheckCircle2 size={18} />} tone="neutral" caption="Com avaliação salva do Supervisor IA" />
-        <KpiCard label="Pendentes de análise" value={int(s.pending)} icon={<Hourglass size={18} />} tone="warn" caption="Ainda sem avaliação" />
-        <KpiCard label="Qualidade média" value={s.avgScore != null ? `${s.avgScore.toFixed(1)} / 10` : '—'} icon={<Star size={18} />} tone="neutral" caption={s.avgScore != null ? 'Média das notas salvas' : 'Nenhuma conversa avaliada ainda'} />
-        <KpiCard label="Oportunidades identificadas" value="—" icon={<Lightbulb size={18} />} tone="neutral" caption="Serão apontadas pelo Supervisor IA, quando ativado" />
+        <KpiCard label="Atendimentos" value={int(s.conversations)} icon={<MessagesSquare size={18} />} tone="goal" highlight caption={`${int(s.clientMessages)} recebidas · ${int(s.sellerMessages)} enviadas`} />
+        <KpiCard label="Tempo médio de resposta" value={formatSeconds(s.avgResponseSeconds)} icon={<Clock3 size={18} />} tone="neutral" caption={s.responses ? `Mediana: ${formatSeconds(s.medianResponseSeconds)}` : undefined} />
+        <KpiCard label="Clientes sem resposta" value={int(s.awaiting)} icon={<UserX size={18} />} tone={s.awaiting > 0 ? 'deficit' : 'profit'} />
+        <KpiCard label="Taxa de resposta" value={pct(responseRate)} icon={<Gauge size={18} />} tone="profit" caption={rounds ? `${int(s.answeredInPeriod)} de ${int(rounds)}` : undefined} />
+        <KpiCard label="Conversas analisadas" value={int(s.analyzed)} icon={<CheckCircle2 size={18} />} tone="neutral" />
+        <KpiCard label="Pendentes de análise" value={int(s.pending)} icon={<Hourglass size={18} />} tone="warn" />
+        <KpiCard label="Qualidade média" value={s.avgScore != null ? `${s.avgScore.toFixed(1)} / 10` : '—'} icon={<Star size={18} />} tone="neutral" />
+        <KpiCard label="Oportunidades identificadas" value="—" icon={<Lightbulb size={18} />} tone="neutral" />
       </div>
 
       <Panel title="Quem realmente atendeu" eyebrow={`Status de ${int(data.totals.total)} conversas`}>
@@ -70,19 +70,13 @@ export function SupervisorOverview() {
             return `/supervisor/conversas?${p.toString()}`;
           }}
         />
-        <p className="sv-footnote">
-          Atendente = usuário do Kommo que enviou a resposta, não o responsável do lead. Cada conversa tem um só status; clique num
-          cartão para ver as conversas e o motivo da classificação.
-        </p>
       </Panel>
 
       {filters.seller === 'all' ? (
-        <Panel title="Conversas processadas — critério Kommo" eyebrow="Para comparar com o painel do Kommo">
+        <Panel title="Conversas processadas — critério Kommo" eyebrow="Kommo">
           <KommoProcessedPanel data={data.kommoProcessed} uniqueConversations={s.conversations} kommoUserName={kommoUserName} />
         </Panel>
-      ) : (
-        <p className="sv-footnote">"Conversas processadas — critério Kommo" é da equipe toda: escolha "Todos os atendentes" para ver.</p>
-      )}
+      ) : null}
 
       <div className="sv-grid-2">
         <Panel title="Atendimentos e tempo de resposta por dia" eyebrow="Evolução">
@@ -199,11 +193,6 @@ export function SupervisorOverview() {
         )}
       </Panel>
 
-      <p className="sv-footnote">
-        Indicadores calculados com as conversas e os horários reais das mensagens do Kommo no período. O tempo de resposta vai da
-        primeira mensagem do cliente até a resposta de uma pessoa (no Kommo ou pelo aparelho) e inclui horários fora do expediente; ele fica
-        com quem respondeu, não com o responsável do lead.
-      </p>
     </div>
   );
 }

@@ -131,7 +131,7 @@ export function SupervisorReports() {
           </Panel>
 
           <div className="sv-grid-2">
-            <Panel title="Problemas identificados" eyebrow="Regras fixas sobre os dados do dia">
+            <Panel title="Problemas identificados" eyebrow="Do dia">
               {alerts.length === 0 ? (
                 <p className="sv-muted">Nenhum alerta para este dia.</p>
               ) : (

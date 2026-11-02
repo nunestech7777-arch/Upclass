@@ -82,7 +82,6 @@ export function SupervisorLayout() {
           </span>
           <div>
             <h1 className="sv-title">Meu Supervisor</h1>
-            <p className="sv-subtitle">Conversas do Kommo, supervisão comercial e desempenho da equipe.</p>
           </div>
         </div>
         {showFilters && (

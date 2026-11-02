@@ -5,7 +5,6 @@ import { ShoppingBag, Smartphone, Headphones, AlertTriangle, Apple } from 'lucid
 import './Forecast.css';
 import '../components/finance/finance.css';
 import { buildContext } from '../lib/finance/calc';
-import { formatInstantBR, monthLabel } from '../lib/finance/dates';
 import {
   APPLE_SORT_KEYS,
   APPLE_TYPES,
@@ -22,12 +21,9 @@ import {
   buildCategoryForecast,
   buildSellerRow,
   countByCategory,
-  formatMoney,
-  formatPA,
   formatPerDay,
   goalFor,
   measureBySeller,
-  metricCopy,
   roundUnits,
   sortUnitRows,
   summarizeTeam,
@@ -49,7 +45,6 @@ import {
   RatioSummaryCards,
   RatioTable,
   TeamFilters, TeamProjectionTable, TeamSummaryCards, type RatioTeamRow, type TeamRow } from '../components/forecast/ForecastTeamSection';
-import { Link } from 'react-router-dom';
 import { tooltipStyle, useChartTheme } from '../lib/chartTheme';
 import { AnimatedText } from '../components/ui/AnimatedNumber';
 
@@ -221,9 +216,6 @@ export function Forecast() {
       <div className="forecast-header-row">
         <div>
           <h1 className="h1">Forecast de Produtos</h1>
-          <p className="text-muted" style={{ fontSize: '13px', marginTop: '4px' }}>
-            Projeção linear com base no ritmo dos dias completos do mês ({monthLabel(month)})
-          </p>
         </div>
       </div>
 
@@ -264,15 +256,6 @@ export function Forecast() {
                 <div>
                   <SectionEyebrow icon={unit === 'devices' ? <Smartphone size={14} /> : unit === 'apple' ? <Apple size={14} /> : <Headphones size={14} />}>{UNIT_COPY[unit].eyebrow}</SectionEyebrow>
                   <h2 className="fin-panel-title is-large">Projeção de vendas por vendedor</h2>
-                  <p className="fin-lead">
-                    {unit === 'apple'
-                      ? UNIT_COPY.apple.subtitle
-                      : ratio === 'ticket'
-                      ? 'Acompanhe quanto cada vendedor fatura, em média, por atendimento com venda de acessórios.'
-                      : ratio === 'pa'
-                        ? 'Acompanhe quantos acessórios cada vendedor vende, em média, por atendimento.'
-                        : metricCopy(unit, metric).subtitle}
-                  </p>
                 </div>
                 <TeamFilters
                   kind={unit}
@@ -308,21 +291,6 @@ export function Forecast() {
                     <AppleTable metric={metric} rows={view.appleRows} team={view.appleTeam} ctx={ctx} month={month} sortKey={sortKey} onSort={setSortKey} />
                   )}
                   <AppleReviewPanel items={view.appleReview} sellerName={(id) => view.sellerNames.get(id) ?? '—'} />
-                  <p className="fin-muted fin-small fin-table-note">
-                    Tipo identificado automaticamente pelo nome do produto no Mercado Phone (iPhone, MacBook, iPad, Apple Watch, AirPods, iMac, Mac mini, outros Apple); a
-                    palavra “Apple” sozinha não classifica, e capas, películas, pulseiras e cabos são acessórios compatíveis. Itens com indício de réplica, valor abaixo do
-                    original ou nome não reconhecido ficam “para revisão”. Cada item conta uma vez, no seu tipo e para o vendedor do item; brindes e canceladas não entram.
-                    Neste Forecast, produtos Apple reconhecidos (exceto iPhone) não contam em Acessórios. iPhone segue a regra da aba Aparelhos.{' '}
-                    {metric === 'revenue' ? 'Faturamento = valorTotal conciliado (o mesmo do Dashboard), não é lucro. ' : 'Quantidade = soma das unidades de cada item. '}
-                    Projeção = realizado até ontem ÷ dias completos × dias do mês (soma por tipo). Sem meta (nenhuma é criada automaticamente).{' '}
-                    {sellerFilter === 'all' && view.appleOperation !== view.appleTeam.sold && (
-                      <>
-                        Operação inteira: {metric === 'revenue' ? formatMoney(view.appleOperation) : `${view.appleOperation.toLocaleString('pt-BR')} produtos Apple`} (inclui vendedores
-                        ocultos do ranking).{' '}
-                      </>
-                    )}
-                    {data ? `Dados de ${formatInstantBR(data.loadedAt)}` : ''}
-                  </p>
                 </>
               ) : ratio ? (
                 <>
@@ -332,23 +300,6 @@ export function Forecast() {
                   ) : (
                     <RatioTable metric={ratio} rows={view.ratioRows} team={view.ratioTeam} month={month} sortKey={ratioSort} onSort={setRatioSort} />
                   )}
-                  <p className="fin-muted fin-small fin-table-note">
-                    Atendimento = venda (pedido) distinta do Mercado Phone por vendedor, com ao menos um acessório pago — o Mercado Phone não tem identificador de atendimento,
-                    então a métrica é baseada em vendas. Um pedido com acessórios de dois vendedores conta um atendimento para cada um; pedidos só com brindes não contam; canceladas
-                    não contam. Cada item vai para o vendedor do item.{' '}
-                    {ratio === 'ticket'
-                      ? 'Ticket médio = faturamento de acessórios (valorTotal) ÷ atendimentos; atendimentos com acessório ainda não conciliado ficam fora do numerador e do denominador até a sincronização financeira. '
-                      : 'PA = acessórios pagos (soma das quantidades) ÷ atendimentos, com duas casas decimais. '}
-                    Equipe = total ÷ total, nunca média dos vendedores. Sem meta, projeção nem ritmo: são médias.{' '}
-                    {sellerFilter === 'all' && view.ratioOperation.attendances !== view.ratioTeam.attendances && (
-                      <>
-                        Operação inteira: {view.ratioOperation.attendances.toLocaleString('pt-BR')} atendimentos,{' '}
-                        {ratio === 'ticket' ? `ticket ${view.ratioOperation.ticket != null ? formatMoney(view.ratioOperation.ticket) : '—'}` : `PA ${view.ratioOperation.pa != null ? formatPA(view.ratioOperation.pa) : '—'}`} (inclui
-                        vendedores ocultos do ranking).{' '}
-                      </>
-                    )}
-                    {data ? `Dados de ${formatInstantBR(data.loadedAt)}` : ''}
-                  </p>
                 </>
               ) : (
                 <>
@@ -360,40 +311,6 @@ export function Forecast() {
                     <TeamProjectionTable kind={unit} metric={metric} rows={view.rows} team={view.summary} ctx={ctx} month={month} sortKey={sortKey} onSort={setSortKey} />
                   )}
 
-                  <p className="fin-muted fin-small fin-table-note">
-                    {unit === 'devices'
-                      ? 'Aparelhos = produtos iPhone, atribuídos ao vendedor de cada item (brindes, acessórios e canceladas não entram). '
-                      : 'Acessórios = produtos que não são iPhone, vendidos por valor maior que zero e atribuídos ao vendedor de cada item (brindes e canceladas não entram). '}
-                    {metric === 'revenue' ? (
-                      <>
-                        Faturamento = valor de venda de cada item (valorTotal do Mercado Phone, o mesmo do Dashboard), atribuído ao vendedor do item; não é lucro nem custo. Itens ainda não
-                        conciliados ficam fora até a sincronização financeira{view.summary.pendingItems > 0 ? ` (${view.summary.pendingItems} no filtro)` : ''}.
-                        Projeção = faturamento até ontem ÷ dias completos × dias do mês, nunca abaixo do já faturado. Ritmo necessário = falta faturar ÷ dias restantes (hoje incluso),
-                        arredondado para cima no centavo.{' '}
-                      </>
-                    ) : (
-                      <>
-                        Projeção = vendidos até ontem ÷ dias completos × dias do mês, nunca abaixo do já vendido; o total da equipe é a soma exata arredondada uma só vez.
-                        Ritmo necessário = faltam ÷ dias restantes (hoje incluso).{' '}
-                      </>
-                    )}
-                    {view.operationTotal !== view.summary.sold && sellerFilter === 'all' && (
-                      <>
-                        Operação inteira: {metric === 'revenue' ? formatMoney(view.operationTotal) : `${view.operationTotal.toLocaleString('pt-BR')} ${UNIT_COPY[unit].many}`} (inclui vendedores ocultos do
-                        ranking).{' '}
-                      </>
-                    )}
-                    {metric === 'units' && sellerFilter === 'all' && view.summary.target != null && view.globalTarget !== view.summary.target && (
-                      <>
-                        A meta global de {UNIT_COPY[unit].many} em <Link className="fin-link" to="/metas">Metas</Link> ({view.globalTarget.toLocaleString('pt-BR')}) difere da soma das
-                        metas individuais ({view.summary.target.toLocaleString('pt-BR')}); o gráfico e as categorias abaixo usam a meta global.{' '}
-                      </>
-                    )}
-                    <Link className="fin-link" to={`/metas`}>
-                      Editar metas de {metric === 'revenue' ? 'faturamento de ' : ''}{UNIT_COPY[unit].many}
-                    </Link>
-                    {data ? ` · dados de ${formatInstantBR(data.loadedAt)}` : ''}
-                  </p>
                 </>
               )}
             </section>

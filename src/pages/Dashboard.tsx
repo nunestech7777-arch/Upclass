@@ -14,18 +14,16 @@ import { SalesEvolutionChart } from '../components/dashboard/SalesEvolutionChart
 import { ConversionNotice, SellerRankings } from '../components/dashboard/SellerRankings';
 import { AnimatedNumber } from '../components/ui/AnimatedNumber';
 import { countDelay, useScrollReveal } from '../lib/motion';
-import { MigrationPendingError, type ConversionStatus, type DashboardData, type DeviceGoal } from '../lib/finance/financeApi';
-import { formatInstantBR, monthOf, monthTitle, storeHourNow } from '../lib/finance/dates';
+import { MigrationPendingError, type DashboardData, type DeviceGoal } from '../lib/finance/financeApi';
+import { monthOf, monthTitle, storeHourNow } from '../lib/finance/dates';
 import { brl, int, pct } from '../lib/finance/format';
 import {
-  PRESET_LABELS,
   buildDeviceRows,
   buildSellerRows,
   buildSeries,
   deviceItemsOf,
   dataRange,
   defaultMode,
-  formatRange,
   goalWindow,
   rangeCoverage,
   salesIn,
@@ -40,7 +38,7 @@ const REVEAL_TARGETS = ':scope > .dv-kpis > *, :scope > .dv-goals > *, :scope > 
 
 export function Dashboard() {
   const source = useFinanceSource();
-  const { preset, range, today } = usePeriod();
+  const { range, today } = usePeriod();
   const need = useMemo(() => dataRange(range, today), [range, today]);
 
   const [data, setData] = useState<DashboardData | null>(null);
@@ -48,7 +46,6 @@ export function Dashboard() {
   const [error, setError] = useState<Error | null>(null);
   const [loading, setLoading] = useState(true);
   const [nonce, setNonce] = useState(0);
-  const [conversion, setConversion] = useState<ConversionStatus | null | undefined>(undefined);
   const [mode, setMode] = useState<{ key: string; value: SeriesMode } | null>(null);
   const [salesOpen, setSalesOpen] = useState(false);
   const [detail, setDetail] = useState<'devices' | 'accessories' | null>(null);
@@ -91,14 +88,6 @@ export function Dashboard() {
       alive = false;
     };
   }, [source, need.from, need.to, nonce]);
-
-  // Conversão: só contagens, isolada do resto (falha do CRM não afeta o Dashboard).
-  useEffect(() => {
-    source
-      .loadConversionStatus()
-      .then(setConversion)
-      .catch(() => setConversion(null));
-  }, [source]);
 
   const view = useMemo(() => {
     if (!data || data.range.from > need.from || data.range.to < need.to) return null;
@@ -152,9 +141,6 @@ export function Dashboard() {
         <div>
           <SectionEyebrow icon={<TrendingUp size={14} />}>Painel comercial</SectionEyebrow>
           <h1 className="fin-title">Dashboard</h1>
-          <p className="fin-lead">
-            {PRESET_LABELS[preset]} · {formatRange(range)} · horário da loja (América/São Paulo)
-          </p>
         </div>
         <div className="dv-head-actions">
           <button type="button" className="fin-btn" onClick={() => setNonce((n) => n + 1)} disabled={loading}>
@@ -172,11 +158,11 @@ export function Dashboard() {
         <div ref={contentRef} className={`dv-content dv-enter ${reloading ? 'dv-reloading' : ''}`} aria-busy={reloading}>
           <span className="dv-reload-bar" aria-hidden="true" />
           <div className="dv-kpis">
-            <KpiCard label="Aparelhos vendidos" value={<AnimatedNumber value={shown.units.devices} format={int} delay={countDelay(1)} />} icon={<Smartphone size={18} />} tone="goal" caption="iPhones no período" />
-            <KpiCard label="Acessórios vendidos" value={<AnimatedNumber value={shown.units.accessories} format={int} delay={countDelay(2)} />} icon={<Headphones size={18} />} tone="profit" caption={shown.units.gifts ? `${int(shown.units.gifts)} brinde(s) fora da contagem` : 'Acessórios pagos'} />
-            <KpiCard label="Faturamento" value={<AnimatedNumber value={shown.money.revenue} format={brl} delay={countDelay(3)} />} icon={<CircleDollarSign size={18} />} tone="neutral" badge={shown.coverage.complete ? undefined : 'Parcial'} caption="Receita líquida conciliada" />
-            <KpiCard label="Lucro bruto" value={<AnimatedNumber value={shown.money.profit} format={brl} delay={countDelay(4)} />} icon={<Wallet size={18} />} tone={shown.money.profit < 0 ? 'deficit' : 'profit'} highlight badge={shown.coverage.complete ? undefined : 'Parcial'} caption="Faturamento − custo dos produtos" />
-            <KpiCard label="Margem" value={<AnimatedNumber value={shown.money.margin} format={pct} delay={countDelay(5)} />} icon={<Percent size={18} />} tone="neutral" caption={shown.money.margin == null ? 'Indisponível sem faturamento' : 'Lucro bruto ÷ faturamento'} />
+            <KpiCard label="Aparelhos vendidos" value={<AnimatedNumber value={shown.units.devices} format={int} delay={countDelay(1)} />} icon={<Smartphone size={18} />} tone="goal" />
+            <KpiCard label="Acessórios vendidos" value={<AnimatedNumber value={shown.units.accessories} format={int} delay={countDelay(2)} />} icon={<Headphones size={18} />} tone="profit" caption={shown.units.gifts ? `Brindes: ${int(shown.units.gifts)}` : undefined} />
+            <KpiCard label="Faturamento" value={<AnimatedNumber value={shown.money.revenue} format={brl} delay={countDelay(3)} />} icon={<CircleDollarSign size={18} />} tone="neutral" badge={shown.coverage.complete ? undefined : 'Parcial'} />
+            <KpiCard label="Lucro bruto" value={<AnimatedNumber value={shown.money.profit} format={brl} delay={countDelay(4)} />} icon={<Wallet size={18} />} tone={shown.money.profit < 0 ? 'deficit' : 'profit'} highlight badge={shown.coverage.complete ? undefined : 'Parcial'} />
+            <KpiCard label="Margem" value={<AnimatedNumber value={shown.money.margin} format={pct} delay={countDelay(5)} />} icon={<Percent size={18} />} tone="neutral" />
           </div>
 
           <GoalCards week={shown.week} month={shown.month} units={shown.units} onOpenSales={() => setSalesOpen(true)} />
@@ -192,12 +178,11 @@ export function Dashboard() {
             mode={activeMode}
             onModeChange={(m) => setMode({ key: modeKey, value: m })}
             totals={{ devices: shown.units.devices, accessories: shown.units.accessories }}
-            subtitle={`${shown.series.granularity === 'hour' ? 'Por hora' : shown.series.granularity === 'day' ? 'Por dia' : 'Por mês'} · ${formatRange(range)}${activeMode === 'cumulative' ? ' · acumulado até o último dado real' : ''}`}
+            subtitle={shown.series.granularity === 'hour' ? 'Por hora' : shown.series.granularity === 'day' ? 'Por dia' : 'Por mês'}
           />
 
           <SellerRankings
             rows={shown.sellerRows}
-            operation={{ profit: shown.money.profit, revenue: shown.money.revenue, orders: shown.units.orders }}
             devices={{
               rows: shown.deviceRows,
               monthLabel: monthTitle(refMonth),
@@ -207,8 +192,7 @@ export function Dashboard() {
             }}
           />
 
-          <ConversionNotice status={conversion} />
-          <p className="fin-muted fin-small fin-table-note">Dados carregados em {formatInstantBR(data.loadedAt)} · os mesmos filtros e classificações valem para cards, gráfico e rankings.</p>
+          <ConversionNotice />
         </div>
       )}
 
@@ -225,7 +209,7 @@ export function Dashboard() {
       {view && data && deviceSeller && (
         <SalesItemsDialog
           title={`Aparelhos vendidos por ${view.sellerNames.get(deviceSeller) ?? 'vendedor'}`}
-          summary={`${formatRange(range)} · ${int(deviceRow?.sold ?? 0)} aparelho(s) · faturamento ${brl(deviceRow?.revenue ?? 0)} · lucro bruto ${brl(deviceRow?.profit ?? 0)}`}
+          summary={`${int(deviceRow?.sold ?? 0)} aparelho(s) · faturamento ${brl(deviceRow?.revenue ?? 0)} · lucro bruto ${brl(deviceRow?.profit ?? 0)}`}
           rows={deviceItemsOf(data.sales, view.names, deviceSeller, range)}
           productNames={view.names}
           sellerNames={view.sellerNames}

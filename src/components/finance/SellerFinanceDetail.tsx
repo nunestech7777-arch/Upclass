@@ -64,8 +64,8 @@ export function SellerFinanceDetail({ row, ctx, sales, productNames, sellerNames
         <Metric label="Pedidos com participação" value={int(row.orders)} />
         <Metric label="Ticket médio por pedido" value={brl(row.ticket)} />
         <Metric label="Lucro médio por iPhone" value={brl(row.avgIphoneProfit)} />
-        <Metric label="Média por produto" value={brl(row.avgPerUnit)} hint="Receita ÷ unidades" />
-        <Metric label="Aparelhos · Acessórios" value={`${int(row.devices)} · ${int(row.accessories)}`} hint={row.gifts ? `${int(row.gifts)} brinde(s) fora da contagem` : undefined} />
+        <Metric label="Média por produto" value={brl(row.avgPerUnit)} />
+        <Metric label="Aparelhos · Acessórios" value={`${int(row.devices)} · ${int(row.accessories)}`} hint={row.gifts ? `Brindes: ${int(row.gifts)}` : undefined} />
       </div>
 
       <div className="fin-detail-goal">

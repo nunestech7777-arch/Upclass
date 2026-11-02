@@ -169,10 +169,6 @@ export function DeviceGoalsManager() {
           </h2>
           <MonthPicker month={month} onChange={setMonth} allowFuture={3} />
         </div>
-        <p className="fin-muted fin-small">
-          Metas mensais de iPhones e de acessórios (pagos; brindes não contam) de cada vendedor, em unidades e em faturamento (R$), usadas na projeção do Forecast. As
-          quatro metas são independentes entre si e da meta de lucro — nenhuma é convertida em outra. Vazio = “Sem meta” (zero também não gera percentual).
-        </p>
         {error ? (
           <EmptyState title={error instanceof MigrationPendingError ? 'Metas individuais ainda não ativas no banco' : 'Erro ao carregar metas'}>
             {error instanceof MigrationPendingError ? 'Aplique a migração 0014_seller_device_goals.sql.' : error.message}

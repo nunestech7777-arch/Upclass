@@ -44,7 +44,6 @@ export function DailyResults() {
         </Link>
         <SectionEyebrow icon={<CalendarDays size={14} />}>Acompanhamento diário</SectionEyebrow>
         <h1 className="fin-title">Resultados diários</h1>
-        <p className="fin-lead">Meta do dia, ritmo acumulado e plano de ação calculado com os dados do Mercado Phone.</p>
       </header>
 
       <div className="fin-filters">
@@ -52,7 +51,7 @@ export function DailyResults() {
         <button type="button" className="fin-btn" onClick={reload} disabled={loading}>
           <RefreshCw size={15} className={loading ? 'fin-spin' : ''} /> Atualizar
         </button>
-        <span className="fin-updated">{data ? `Dados carregados em ${formatInstantBR(data.loadedAt)}` : ''}</span>
+        <span className="fin-updated">{data ? `Atualizado ${formatInstantBR(data.loadedAt)}` : ''}</span>
       </div>
 
       {error ? (

@@ -1,6 +1,6 @@
 import React from 'react';
 import { Link } from 'react-router-dom';
-import { AlertTriangle, Bot, CheckCircle2, CircleHelp, Inbox, UserX, UserRoundSearch } from 'lucide-react';
+import { Bot, CheckCircle2, CircleHelp, Inbox, UserX, UserRoundSearch } from 'lucide-react';
 import { int, pct } from '../../lib/finance/format';
 import {
   filterLabel,
@@ -80,18 +80,6 @@ export function AttendanceStatusPanel({
           );
         })}
       </div>
-      {responsibles === 'historical' && (
-        <p className="sv-footnote">
-          <Inbox size={13} aria-hidden="true" /> "Aguardando distribuição" não aparece em períodos passados: o Kommo só informa o
-          responsável de agora, e isso não comprova com quem o lead estava naquele dia.
-        </p>
-      )}
-      {responsibles === 'failed' && (
-        <p className="sv-footnote sv-warn">
-          <AlertTriangle size={13} aria-hidden="true" /> Não foi possível consultar o responsável dos leads no Kommo agora; "Aguardando
-          distribuição" fica sem número até a próxima atualização.
-        </p>
-      )}
     </>
   );
 }

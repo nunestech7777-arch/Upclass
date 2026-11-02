@@ -201,7 +201,7 @@ export function SellerPortal() {
 
         <GoalProgress loading={loading} sold={summary.sold} goal={summary.goal} pct={summary.progressPct} weekly={summary.weekly} />
 
-        <MySales sales={sales} loading={loading} rangeLabel={formatRange(range)} />
+        <MySales sales={sales} loading={loading} />
 
         <AvailableStock />
       </main>
@@ -240,7 +240,7 @@ function GoalProgress({ loading, sold, goal, pct, weekly }: { loading: boolean; 
   );
 }
 
-function MySales({ sales, loading, rangeLabel }: { sales: PortalSale[]; loading: boolean; rangeLabel: string }) {
+function MySales({ sales, loading }: { sales: PortalSale[]; loading: boolean }) {
   const [query, setQuery] = useState('');
   const [onlyDevices, setOnlyDevices] = useState(false);
   const [limit, setLimit] = useState(PAGE);
@@ -264,7 +264,7 @@ function MySales({ sales, loading, rangeLabel }: { sales: PortalSale[]; loading:
     <section className="sp-card" aria-label="Minhas vendas">
       <div className="sp-section-head">
         <h2>Minhas Vendas</h2>
-        <span className="sp-muted">{loading ? 'carregando…' : `${rows.length} item(ns) · ${rangeLabel}`}</span>
+        <span className="sp-muted">{loading ? 'carregando…' : `${rows.length} item(ns)`}</span>
       </div>
       <div className="sp-toolbar">
         <label className="sp-search">

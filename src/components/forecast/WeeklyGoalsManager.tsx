@@ -157,10 +157,6 @@ export function WeeklyGoalsManager() {
             </button>
           </div>
         </div>
-        <p className="fin-muted fin-small">
-          Meta individual de iPhones por semana (segunda a domingo, horário da loja). Cada vendedor vê somente a própria meta, sem poder alterá-la.
-          Cada semana é independente: salvar aqui não muda semanas anteriores nem as metas mensais do Forecast. Vazio = “Sem meta definida”.
-        </p>
         {error ? (
           <EmptyState title={pending ? 'Metas semanais ainda não ativas no banco' : 'Erro ao carregar metas semanais'}>
             {pending ? 'Aplique a migração 0017_seller_portal_access.sql.' : error}

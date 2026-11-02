@@ -51,7 +51,7 @@ export function DailyIndicators({ finance }: { finance: MonthFinance }) {
   const deviationLabel = paceDeviation == null ? 'Desvio do ritmo' : paceDeviation >= 0 ? 'Acima do ritmo' : 'Abaixo do ritmo';
   return (
     <div className="fin-indicators">
-      <Indicator icon={<Target size={14} />} label="Meta diária" value={dailyGoal != null ? brl(dailyGoal) : 'Sem meta'} tone="tone-goal" hint="Meta do mês ÷ dias do mês" />
+      <Indicator icon={<Target size={14} />} label="Meta diária" value={dailyGoal != null ? brl(dailyGoal) : 'Sem meta'} tone="tone-goal" />
       <Indicator
         icon={<TrendingUp size={14} />}
         label="Acumulado"
@@ -64,19 +64,16 @@ export function DailyIndicators({ finance }: { finance: MonthFinance }) {
         label={deviationLabel}
         value={paceDeviation == null ? '—' : brl(paceDeviation)}
         tone={paceDeviation == null ? '' : paceDeviation >= 0 ? 'tone-profit' : 'tone-deficit'}
-        hint="Acumulado até ontem − esperado"
       />
       <Indicator
         icon={<CalendarCheck size={14} />}
         label="Dias na meta"
         value={dailyGoal != null ? `${int(daysHit)} de ${int(completeDays)}` : '—'}
-        hint="Dias completos que atingiram a meta do dia"
       />
       <Indicator
         icon={<Gauge size={14} />}
         label="Necessário por dia"
         value={plan.neededPerDay != null ? brl(plan.neededPerDay) : '—'}
-        hint={ctx.phase === 'current' ? `Restante ÷ ${ctx.remainingDays} dia(s), incluindo hoje` : undefined}
       />
       <Indicator icon={<Percent size={14} />} label="% da meta" value={pct(totals.pctTarget)} tone="tone-goal" />
     </div>
@@ -223,11 +220,6 @@ export function ActionPlanPanel({
             <li key={m}>{m}</li>
           ))}
         </ul>
-        <p className="fin-muted fin-small">
-          iPhones equivalentes = teto(falta de hoje ÷ lucro médio por iPhone dos últimos 90 dias). É uma equivalência de lucro: acessórios,
-          brindes e a composição das vendas mudam o resultado, e vender essa quantidade não garante a meta. Desvio = lucro até ontem − meta ×
-          dias completos ÷ dias do mês.
-        </p>
       </div>
     </section>
   );
@@ -348,9 +340,6 @@ export function DailyResultsTable({ days, selected, onSelect }: { days: DayFinan
           </tbody>
         </table>
       </div>
-      <p className="fin-muted fin-small fin-table-note">
-        “% meta do dia” compara o lucro do dia com a meta diária. “Situação” compara o acumulado com o esperado para o mês até aquele dia.
-      </p>
     </section>
   );
 }

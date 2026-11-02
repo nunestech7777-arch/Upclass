@@ -4,7 +4,6 @@ import { ArrowDown, MessageSquareOff, Trophy } from 'lucide-react';
 import { SellerAvatar } from '../SellerAvatar';
 import { EmptyState, PctWithBar } from '../finance/FinancePrimitives';
 import { RANK_SORT_LABELS, sortSellerRows, type DeviceRankRow, type RankSortKey, type SellerDashRow } from '../../lib/finance/dashboard';
-import type { ConversionStatus } from '../../lib/finance/financeApi';
 import { brl, int, pct } from '../../lib/finance/format';
 
 type Tab = 'profit' | 'margin' | 'devices';
@@ -49,12 +48,11 @@ export interface DeviceRankingProps {
 
 interface Props {
   rows: SellerDashRow[];
-  operation: { profit: number; revenue: number; orders: number };
   devices: DeviceRankingProps;
 }
 
 /** Rankings por vendedor do ITEM: lucro bruto e margem, com ordenação. */
-export function SellerRankings({ rows, operation, devices }: Props) {
+export function SellerRankings({ rows, devices }: Props) {
   const [tab, setTab] = useState<Tab>('profit');
   const [sortKey, setSortKey] = useState<RankSortKey>('profit');
   const effective: RankSortKey = tab === 'margin' ? 'margin' : sortKey;
@@ -172,60 +170,39 @@ export function SellerRankings({ rows, operation, devices }: Props) {
           </table>
         </div>
       )}
-      {tab !== 'devices' && (
-      <p className="fin-muted fin-small fin-table-note">
-        Lucro bruto = faturamento − custo dos produtos (receita líquida e custo histórico do Mercado Phone, sem despesas nem comissões). Margem = lucro ÷ faturamento
-        (indisponível com faturamento zero). Cada item vai para o vendedor do item. Operação inteira no período (inclui vendedores ocultos e brindes): lucro {brl(operation.profit)},
-        faturamento {brl(operation.revenue)}, {int(operation.orders)} vendas.
-      </p>
-      )}
     </section>
   );
 }
 
 /** Conversão depende de oportunidades com resultado (CRM): sem dados reais, não inventamos percentuais. */
-export function ConversionNotice({ status }: { status: ConversionStatus | null | undefined }) {
+export function ConversionNotice() {
   return (
     <section className="fin-panel dv-conversion" aria-label="Ranking de conversão">
       <h2 className="fin-panel-title">
         <MessageSquareOff size={18} className="tone-warn" />
         Ranking de Conversão
       </h2>
-      <p>
-        <strong>Indisponível por falta de dados.</strong> A conversão (vendas convertidas ÷ oportunidades) exige oportunidades do CRM com resultado de ganho ou perda.
-        {status ? (
-          <>
-            {' '}
-            Hoje há {int(status.conversations)} conversas importadas do Kommo, e {int(status.classified)} com resultado classificado.
-          </>
-        ) : (
-          ' Não foi possível consultar o estado das conversas agora.'
-        )}{' '}
-        Para ativar este ranking, a integração precisa importar as oportunidades (leads) e seus status — fora do escopo desta etapa. Nenhum percentual é exibido para não induzir a 0% falsos.
-      </p>
     </section>
   );
 }
 
-function DeviceRankingTable({ rows, monthLabel, goalsAvailable, operationDevices, onOpenSeller }: DeviceRankingProps) {
+function DeviceRankingTable({ rows, monthLabel, goalsAvailable, onOpenSeller }: DeviceRankingProps) {
   if (rows.length === 0) return <EmptyState title="Nenhum vendedor no ranking">Mostre vendedores em Vendedores para vê-los aqui.</EmptyState>;
   const monthBasis = rows[0].basisIsMonth;
   const anyGoal = rows.some((r) => r.target != null);
   const total = rows.reduce((a, r) => ({ sold: a.sold + r.sold, revenue: a.revenue + r.revenue, profit: a.profit + r.profit }), { sold: 0, revenue: 0, profit: 0 });
-  const hidden = operationDevices - total.sold;
 
   return (
     <>
       {!goalsAvailable && (
         <p className="fin-notice is-partial dv-device-notice">
-          <span>Não foi possível carregar as metas individuais de aparelhos (confira se a migração 0014 foi aplicada): os vendedores aparecem sem meta.</span>
+          <span>Metas individuais de aparelhos indisponíveis no momento.</span>
         </p>
       )}
       {goalsAvailable && monthBasis && anyGoal && (
         <p className="fin-notice dv-device-notice">
           <span>
-            As metas são <strong>mensais</strong>. Como o período filtrado não é o mês inteiro, meta, % e faltantes comparam as metas de {monthLabel} com o{' '}
-            <strong>acumulado do mês</strong> (mostrado em “no mês”); a coluna “Aparelhos vendidos” mostra só o período filtrado.
+            Metas de {monthLabel}: % e faltantes usam o acumulado do mês.
           </span>
         </p>
       )}
@@ -290,11 +267,6 @@ function DeviceRankingTable({ rows, monthLabel, goalsAvailable, operationDevices
           </tfoot>
         </table>
       </div>
-      <p className="fin-muted fin-small fin-table-note">
-        Aparelho = produto iPhone, atribuído ao vendedor de cada item (acessórios, Apple Watch e vendas canceladas não entram). Faturamento e lucro bruto são só dos
-        aparelhos, itens conciliados. Aparelhos do período em toda a operação: {int(operationDevices)}
-        {hidden > 0 ? ` (${int(hidden)} de vendedores ocultos do ranking)` : ''}.
-      </p>
     </>
   );
 }

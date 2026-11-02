@@ -117,8 +117,8 @@ export function Inventory() {
     .join(' · ');
 
   const pricePartial =
-    m.missingPrice.items > 0 ? `Parcial: ${m.missingPrice.items} produto(s) vendável(is) sem preço (${units(m.missingPrice.units)}) fora do valor` : null;
-  const costPartial = m.missingCost.items > 0 ? `Parcial: ${m.missingCost.items} produto(s) sem custo (${units(m.missingCost.units)}) fora do custo` : null;
+    m.missingPrice.items > 0 ? `Parcial: ${m.missingPrice.items} produto(s) sem preço` : null;
+  const costPartial = m.missingCost.items > 0 ? `Parcial: ${m.missingCost.items} produto(s) sem custo` : null;
 
   const handleRegister = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -276,9 +276,6 @@ export function Inventory() {
       <div className="inventory-title-row">
         <div>
           <h1 className="h1">Estoque</h1>
-          <p className="text-muted inventory-subtitle">
-            Estoque atual do Mercado Phone, ao vivo: unidades disponíveis, valor potencial de venda, custo e lucro bruto potencial.
-          </p>
         </div>
       </div>
 
@@ -300,8 +297,8 @@ export function Inventory() {
       <StickyFilterBar
         summary={
           <>
-            <strong>{int(filtered.length)}</strong> produto(s) · {scope}
-            {fetchedAt && <> · Mercado Phone ao vivo, atualizado às {new Date(fetchedAt).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })}</>}
+            <strong>{int(filtered.length)}</strong> produto(s)
+            {fetchedAt && <> · atualizado às {new Date(fetchedAt).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })}</>}
           </>
         }
       >
@@ -367,7 +364,7 @@ export function Inventory() {
           badge="Quantidade"
           label="Produtos em estoque"
           value={units(m.units)}
-          caption={m.units > 0 ? breakdownText : 'Nenhuma unidade nos filtros'}
+          caption={m.units > 0 ? breakdownText : undefined}
           loading={loading && items.length === 0}
           onOpen={() => setDetail('quantity')}
         />
@@ -377,7 +374,7 @@ export function Inventory() {
           badge="Ranking"
           label="Produto com maior estoque"
           value={top ? top.group : '—'}
-          caption={top ? `${units(top.units)} ${top.units === 1 ? 'disponível' : 'disponíveis'}` : 'Sem produtos nos filtros'}
+          caption={top ? `${units(top.units)} ${top.units === 1 ? 'disponível' : 'disponíveis'}` : undefined}
           loading={loading && items.length === 0}
           onOpen={() => setDetail('ranking')}
         />
@@ -387,7 +384,6 @@ export function Inventory() {
           badge="Projeção"
           label="Valor potencial de venda"
           value={money(m.potential)}
-          caption="Se tudo for vendido pelos preços cadastrados"
           partial={pricePartial}
           loading={loading && items.length === 0}
           onOpen={() => setDetail('potential')}
@@ -398,7 +394,6 @@ export function Inventory() {
           badge="Investido"
           label="Custo total do estoque"
           value={money(m.cost)}
-          caption="Custos registrados das unidades em estoque"
           partial={costPartial}
           loading={loading && items.length === 0}
           onOpen={() => setDetail('cost')}
@@ -409,8 +404,8 @@ export function Inventory() {
           badge="Estimativa"
           label="Lucro bruto potencial"
           value={money(m.profit)}
-          caption={m.potential > 0 ? `Margem potencial ${((m.profit / m.potential) * 100).toLocaleString('pt-BR', { maximumFractionDigits: 1 })}% · não é lucro realizado` : 'Não é lucro realizado'}
-          partial={m.complete ? null : 'Estimativa parcial: há produtos sem preço ou custo'}
+          caption={m.potential > 0 ? `Margem: ${((m.profit / m.potential) * 100).toLocaleString('pt-BR', { maximumFractionDigits: 1 })}%` : undefined}
+          partial={m.complete ? null : 'Parcial: produtos sem preço ou custo'}
           loading={loading && items.length === 0}
           onOpen={() => setDetail('profit')}
         />

@@ -80,8 +80,7 @@ export function Settings() {
         <div className="flex-col gap-6">
           <div className="flex-between" style={{paddingBottom: '16px', borderBottom: '1px solid var(--border-color)', gap: '12px'}}>
             <div>
-              <h3 style={{fontWeight: 600, marginBottom: '4px'}}>Exibir Ranking</h3>
-              <p className="text-muted text-sm">Mostra o ranking de vendedores no dashboard principal.</p>
+              <h3 style={{fontWeight: 600}}>Exibir Ranking</h3>
             </div>
             <button
               className="ios-hit"
@@ -103,8 +102,7 @@ export function Settings() {
 
           <div className="flex-between" style={{paddingBottom: '16px', borderBottom: '1px solid var(--border-color)', gap: '12px'}}>
             <div>
-              <h3 style={{fontWeight: 600, marginBottom: '4px'}}>Exibir Metas</h3>
-              <p className="text-muted text-sm">Mostra os cards de meta da semana e do mês.</p>
+              <h3 style={{fontWeight: 600}}>Exibir Metas</h3>
             </div>
             <button
               className="ios-hit"
@@ -126,8 +124,7 @@ export function Settings() {
 
           <div className="flex-between" style={{paddingBottom: '16px', borderBottom: '1px solid var(--border-color)', gap: '12px'}}>
             <div>
-              <h3 style={{fontWeight: 600, marginBottom: '4px'}}>Exibir Produtos</h3>
-              <p className="text-muted text-sm">Mostra os produtos mais vendidos e estoque crítico.</p>
+              <h3 style={{fontWeight: 600}}>Exibir Produtos</h3>
             </div>
             <button
               className="ios-hit"
@@ -149,8 +146,7 @@ export function Settings() {
 
           <div className="flex-between" style={{gap: '12px'}}>
             <div>
-              <h3 style={{fontWeight: 600, marginBottom: '4px'}}>Exibir Painel TV</h3>
-              <p className="text-muted text-sm">Habilita a visualização do botão para o modo apresentação.</p>
+              <h3 style={{fontWeight: 600}}>Exibir Painel TV</h3>
             </div>
             <button
               className="ios-hit"
@@ -175,10 +171,6 @@ export function Settings() {
       <div className="card" style={{maxWidth: '600px', width: '100%'}}>
         <div style={{marginBottom: '16px'}}>
           <h3 style={{fontWeight: 600, marginBottom: '4px'}}>Vendedores e Fotos de Perfil</h3>
-          <p className="text-muted text-sm">
-            Gerencie as fotos, defina quais vendedores aparecem nos rankings (Dashboard, Vendedores, Painel TV e Previsão)
-            e o login individual de cada vendedor no Painel do Vendedor. “Oculto” vale só para os rankings — não bloqueia o login.
-          </p>
           {loginsError && <p className="text-sm" role="alert" style={{ color: 'var(--danger)', marginTop: '8px' }}>{loginsError}</p>}
         </div>
 
@@ -266,8 +258,7 @@ export function Settings() {
         <div style={{flex: 1, minWidth: 0}}>
           <h3 style={{fontWeight: 600, marginBottom: '4px'}}>Integração Kommo</h3>
           <span className="text-muted text-sm">
-            O vínculo dos vendedores com os usuários do Kommo, o status dos webhooks e o histórico de erros
-            agora ficam em Meu Supervisor → Configurações.
+            Em Meu Supervisor → Configurações.
           </span>
         </div>
         <ArrowRight size={18} aria-hidden="true" />

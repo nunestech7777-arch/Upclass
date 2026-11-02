@@ -98,10 +98,6 @@ function TeamGrid() {
           })}
         </div>
       )}
-      <p className="sv-footnote">
-        Cada atendente conta as conversas em que ele mesmo respondeu (autor da mensagem no Kommo), não as conversas cujo lead está no nome
-        dele. Conversa com dois atendentes conta para os dois. Clique num vendedor para ver o desempenho individual.
-      </p>
     </div>
   );
 }
@@ -178,12 +174,12 @@ function SellerDetail({ sellerId }: { sellerId: string }) {
       ) : (
         <>
           <div className={`sv-kpis uc-reload-scope ${loading ? 'is-reloading' : ''}`}>
-            <KpiCard label="Atendimentos" value={int(s.conversations)} icon={<MessagesSquare size={18} />} tone="goal" highlight caption="Conversas em que ele respondeu" />
-            <KpiCard label="Tempo médio de resposta" value={formatSeconds(s.avgResponseSeconds)} icon={<Clock3 size={18} />} tone="neutral" caption={s.responses ? `Mediana ${formatSeconds(s.medianResponseSeconds)} · ${int(s.responses)} respostas` : 'Sem respostas no período'} />
+            <KpiCard label="Atendimentos" value={int(s.conversations)} icon={<MessagesSquare size={18} />} tone="goal" highlight />
+            <KpiCard label="Tempo médio de resposta" value={formatSeconds(s.avgResponseSeconds)} icon={<Clock3 size={18} />} tone="neutral" caption={s.responses ? `Mediana: ${formatSeconds(s.medianResponseSeconds)}` : undefined} />
             <KpiCard label="Clientes sem resposta" value={int(s.awaiting)} icon={<UserX size={18} />} tone={s.awaiting ? 'deficit' : 'profit'} />
             <KpiCard label="Conversas analisadas" value={int(s.analyzed)} icon={<CheckCircle2 size={18} />} tone="neutral" caption={`${int(s.pending)} pendentes`} />
-            <KpiCard label="Avaliação de qualidade" value={s.avgScore != null ? `${s.avgScore.toFixed(1)} / 10` : '—'} icon={<Star size={18} />} tone="neutral" caption={s.avgScore != null ? 'Média das notas salvas' : 'Sem avaliações salvas'} />
-            <KpiCard label="Mensagens enviadas" value={int(s.sellerMessages)} icon={<TrendingUp size={18} />} tone="neutral" caption={`${int(s.clientMessages)} recebidas de clientes`} />
+            <KpiCard label="Avaliação de qualidade" value={s.avgScore != null ? `${s.avgScore.toFixed(1)} / 10` : '—'} icon={<Star size={18} />} tone="neutral" />
+            <KpiCard label="Mensagens enviadas" value={int(s.sellerMessages)} icon={<TrendingUp size={18} />} tone="neutral" caption={`${int(s.clientMessages)} recebidas`} />
           </div>
 
           <Panel title="Evolução no período" eyebrow="Atendimentos e tempo de resposta">

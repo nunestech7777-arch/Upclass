@@ -117,9 +117,7 @@ export function ProfitGoalsManager() {
           </h2>
           <MonthPicker month={month} onChange={setMonth} allowFuture={3} />
         </div>
-        <p className="fin-muted fin-small">
-          A meta da operação é a soma das metas individuais do mês. Meta vazia = “Sem meta” (diferente de zero). O pior cenário deve ser menor ou
-          igual à meta. As metas de unidades acima continuam valendo para os rankings de quantidade.{' '}
+        <p className="fin-small">
           <Link className="fin-link" to={`/resultado-financeiro`}>
             Ver resultado do mês
           </Link>

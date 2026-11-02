@@ -1,5 +1,5 @@
 import React, { useMemo, useState } from 'react';
-import { cutoffCaption, SORT_LABELS, sortSellers, type RankingSortKey } from '../lib/finance/ui';
+import { SORT_LABELS, sortSellers, type RankingSortKey } from '../lib/finance/ui';
 import { Link } from 'react-router-dom';
 import {
   ArrowRight,
@@ -19,7 +19,7 @@ import {
 import { combineSellers } from '../lib/finance/calc';
 import { buildSummaryText } from '../lib/finance/summary';
 import { brl, int, pct } from '../lib/finance/format';
-import { formatInstantBR, monthLabel } from '../lib/finance/dates';
+import { formatInstantBR } from '../lib/finance/dates';
 import { MigrationPendingError } from '../lib/finance/financeApi';
 import { useFinanceParams, useMonthFinance } from '../components/finance/useFinance';
 import { MonthPicker } from '../components/finance/MonthPicker';
@@ -109,7 +109,6 @@ export function FinancialResults() {
       <header className="fin-page-head">
         <SectionEyebrow icon={<TrendingUp size={14} />}>Painel de resultados</SectionEyebrow>
         <h1 className="fin-title">Ranking de lucro por vendedor</h1>
-        <p className="fin-lead">Resultados da equipe Upclass, metas e evolução do mês.</p>
       </header>
 
       <div className="fin-filters">
@@ -123,7 +122,6 @@ export function FinancialResults() {
         <span className="fin-eyebrow">Meta do mês</span>
         {finance?.totals.target != null ? (
           <p>
-            Usando a soma das metas dos vendedores (<strong className="tone-goal">{brl(finance.totals.target)}</strong>) ·{' '}
             {int(data?.goals.filter((g) => g.profit_target != null).length ?? 0)} vendedor(es) com meta ·{' '}
             <Link to={`/metas`} className="fin-link">
               editar metas
@@ -131,7 +129,7 @@ export function FinancialResults() {
           </p>
         ) : (
           <p>
-            Nenhuma meta de lucro cadastrada para {monthLabel(month)}.{' '}
+            Sem meta de lucro ·{' '}
             <Link to={`/metas`} className="fin-link">
               Cadastrar metas de lucro
             </Link>
@@ -157,8 +155,7 @@ export function FinancialResults() {
           </select>
         </label>
         <span className="fin-updated">
-          {data ? `Dados carregados em ${formatInstantBR(data.loadedAt)}` : ''}
-          {data?.lastSync?.finished_at ? ` · custos conciliados em ${formatInstantBR(data.lastSync.finished_at)}` : ''}
+          {data ? `Atualizado ${formatInstantBR(data.loadedAt)}` : ''}
         </span>
         <span className="fin-spacer" />
         <button type="button" className="fin-btn" onClick={exportCsv} disabled={!finance || rows.length === 0}>
@@ -187,18 +184,14 @@ export function FinancialResults() {
               tone="profit"
               highlight
               badge={finance.coverage.complete ? undefined : 'Parcial'}
-              caption={
-                <>
-                  Lucro comercial (receita − custo) · {int(finance.coverage.reconciled)} de {int(finance.coverage.items)} itens conciliados
-                </>
-              }
+              caption={`Conciliados: ${int(finance.coverage.reconciled)} de ${int(finance.coverage.items)}`}
             />
             <KpiCard
               label="Meta total"
               value={brl(finance.totals.target, 'Sem meta')}
               icon={<Target size={18} />}
               tone="goal"
-              caption={finance.totals.pctTarget != null ? `${pct(finance.totals.pctTarget)} da meta atingida` : 'Cadastre metas de lucro'}
+              caption={finance.totals.pctTarget != null ? `${pct(finance.totals.pctTarget)} da meta` : undefined}
               progress={finance.totals.pctTarget}
             />
             <KpiCard
@@ -206,7 +199,7 @@ export function FinancialResults() {
               value={brl(finance.totals.worst, 'Sem meta')}
               icon={<ShieldCheck size={18} />}
               tone="worst"
-              caption={finance.totals.pctWorst != null ? `${pct(finance.totals.pctWorst)} atingido` : '—'}
+              caption={finance.totals.pctWorst != null ? `${pct(finance.totals.pctWorst)} atingido` : undefined}
               progress={finance.totals.pctWorst}
             />
             <KpiCard
@@ -214,7 +207,6 @@ export function FinancialResults() {
               value={finance.totals.gap == null ? '—' : finance.totals.gap === 0 ? 'Meta batida' : brl(finance.totals.gap)}
               icon={<Flag size={18} />}
               tone={finance.totals.gap ? 'deficit' : 'profit'}
-              caption={finance.totals.gap == null ? 'Sem meta cadastrada' : 'Para alcançar o objetivo da operação'}
             />
             <KpiCard
               label={finance.context.phase === 'past' ? 'Fechamento do mês' : 'Projeção do mês'}
@@ -229,15 +221,11 @@ export function FinancialResults() {
               }
               badge={finance.totals.projection != null && !finance.coverage.completeUntilCutoff ? 'Parcial' : undefined}
               caption={
-                <>
-                  {finance.totals.projection != null && finance.totals.target != null
-                    ? finance.totals.projection >= finance.totals.target
-                      ? 'Bate a meta · '
-                      : 'Não bate a meta · '
-                    : ''}
-                  {finance.context.phase === 'current' ? 'Estimativa linear · ' : ''}
-                  {cutoffCaption(finance.context)}
-                </>
+                finance.totals.projection != null && finance.totals.target != null
+                  ? finance.totals.projection >= finance.totals.target
+                    ? 'Bate a meta'
+                    : 'Não bate a meta'
+                  : undefined
               }
             />
           </div>
@@ -261,7 +249,6 @@ export function FinancialResults() {
                   <input type="checkbox" checked={showHidden} onChange={(e) => setShowHidden(e.target.checked)} />
                   Mostrar ocultos do ranking ({int(hiddenCount)})
                 </label>
-                <span className="fin-muted fin-small">Ordenado por {SORT_LABELS[sortKey].toLowerCase()}</span>
               </div>
             </div>
             {data && (
@@ -279,11 +266,6 @@ export function FinancialResults() {
                 footer={footer}
               />
             )}
-            <p className="fin-muted fin-small fin-table-note">
-              Operação inteira (todos os vendedores, inclusive ocultos e brindes): lucro {brl(finance.totals.profit)}, faturamento{' '}
-              {brl(finance.totals.revenue)}, {int(finance.totals.orders)} pedidos distintos. Pedidos por vendedor contam participação — um pedido
-              com itens de dois vendedores aparece para os dois.
-            </p>
           </section>
 
           <div className="fin-charts-row">

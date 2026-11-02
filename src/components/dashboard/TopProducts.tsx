@@ -48,7 +48,7 @@ export function TopProductCard({ kind, product, onOpen }: CardProps) {
               </b>
             </div>
           </div>
-          {product.unreconciled > 0 && <span className="fin-badge-partial">Faturamento parcial · {int(product.unreconciled)} item(ns) sem custo conciliado</span>}
+          {product.unreconciled > 0 && <span className="fin-badge-partial">Parcial · {int(product.unreconciled)} a conciliar</span>}
           {product.ranking.length > 1 && (
             <ul className="dv-top-rank">
               {product.ranking.slice(1, 5).map((r, i) => (

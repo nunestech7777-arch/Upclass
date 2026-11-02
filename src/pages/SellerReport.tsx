@@ -156,9 +156,6 @@ export function SellerReport() {
           </span>
           <span className="seller-supervisor-text">
             <strong>Atendimentos e conversas no Meu Supervisor</strong>
-            <span className="text-muted text-sm">
-              Conversas do WhatsApp e Instagram, tempo de resposta, clientes sem resposta e avaliações deste vendedor.
-            </span>
           </span>
           <ArrowRight size={18} aria-hidden="true" />
         </Link>
