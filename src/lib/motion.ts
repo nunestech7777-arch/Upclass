@@ -69,7 +69,7 @@ export function useFirstVisible(ref: RefObject<Element | null>, delay?: number) 
         }
         first = false;
       },
-      { threshold: 0.12 }
+      { rootMargin: revealRootMargin() }
     );
     io.observe(el);
     return () => io.disconnect();
@@ -86,17 +86,26 @@ export function useFirstVisible(ref: RefObject<Element | null>, delay?: number) 
 export const easeOutExpo = (t: number): number => (t >= 1 ? 1 : 1 - Math.pow(2, -10 * t));
 
 /**
+ * Borda de baixo da área considerada visível, em relação a `innerHeight`. No computador, um bloco entra
+ * quando já mostra 24 px. Em telas de toque o navegador desenha a página também por baixo das barras
+ * flutuantes (Safari no iPhone: ~80 px abaixo do `innerHeight`), então essa faixa conta como visível —
+ * senão um card que aparece sob a barra de vidro ficaria oculto, deixando um vão na tela.
+ */
+const viewportBottomExtra = (): number =>
+  typeof window !== 'undefined' && window.matchMedia?.('(pointer: coarse)').matches ? 96 : -24;
+const revealRootMargin = (): string => `0px 0px ${viewportBottomExtra()}px 0px`;
+
+/**
  * Observa quando um bloco chega à tela para ser revelado. Dois critérios, para servir a qualquer
- * tamanho: o topo passou de 90% da altura da tela (blocos altos, como tabelas longas, que nunca
- * ficam com boa parte visível) ou o bloco está inteiro visível (o último item da página, que não
- * consegue subir além da borda de baixo). `onReveal` recebe só os que acabaram de chegar.
+ * tamanho: o bloco chegou à borda visível (viewportBottomExtra; blocos altos, como tabelas longas, que nunca ficam
+ * com boa parte visível) ou o bloco está inteiro visível (um item pequeno no fim da página). `onReveal` recebe só os que acabaram de chegar.
  */
 export function createRevealObserver(onReveal: (els: HTMLElement[]) => void) {
   const handle = (entries: IntersectionObserverEntry[]) => {
     const els = entries.filter((e) => e.isIntersecting).map((e) => e.target as HTMLElement);
     if (els.length) onReveal(els);
   };
-  const byTop = new IntersectionObserver(handle, { rootMargin: '0px 0px -10% 0px' });
+  const byTop = new IntersectionObserver(handle, { rootMargin: revealRootMargin() });
   const whole = new IntersectionObserver(handle, { threshold: 1 });
   return {
     observe(el: Element) {
@@ -125,7 +134,7 @@ export function useScrollReveal(ref: RefObject<HTMLElement | null>, selector: st
   useLayoutEffect(() => {
     const root = ref.current;
     if (!active || !root || reduced || typeof IntersectionObserver === 'undefined') return;
-    const fold = window.innerHeight * 0.92;
+    const fold = window.innerHeight + viewportBottomExtra();
     const targets = [...root.querySelectorAll<HTMLElement>(selector)].filter((el) => el.getBoundingClientRect().top > fold);
     if (!targets.length) return;
     for (const el of targets) el.classList.add('rv-pending');
@@ -296,7 +305,7 @@ export function usePageMotion(ref: RefObject<HTMLElement | null>): void {
       for (const el of fresh) seen.add(el);
       if (isReduced()) return;
       const lite = isLite();
-      const fold = window.innerHeight * 0.92;
+      const fold = window.innerHeight + viewportBottomExtra();
       const base = firstBatch ? HEAD_DELAY_MS : 0;
       firstBatch = false;
       const inView = fresh
