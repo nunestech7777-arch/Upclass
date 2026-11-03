@@ -3,14 +3,10 @@ import { Link } from 'react-router-dom';
 import { MessagesSquare } from 'lucide-react';
 import { SellerAvatar } from '../SellerAvatar';
 import { EmptyState, PctWithBar } from '../finance/FinancePrimitives';
-import { MIN_ATTENDANCES, type ConversionRow, type ConversionStatus } from '../../lib/finance/conversionRanking';
+import { MIN_ATTENDANCES, type ConversionRow } from '../../lib/finance/conversionRanking';
 import { int, pct } from '../../lib/finance/format';
 
-const PENDING_LABEL: Record<Exclude<ConversionStatus, 'ranked'>, string> = {
-  insufficient: `Menos de ${MIN_ATTENDANCES} atendimentos`,
-  no_attendance: 'Sem atendimentos no Kommo',
-  no_kommo_link: 'Sem vínculo com o Kommo',
-};
+
 
 interface Props {
   rows: ConversionRow[] | null;
@@ -23,7 +19,9 @@ interface Props {
 }
 
 /** Vendas por atendimento: pedidos no MercadoPhone ÷ conversas atendidas no Kommo. */
-export function ConversionRanking({ rows, periodLabel, failed, salesArriving }: Props) {
+export function ConversionRanking({ rows: allRows, periodLabel, failed, salesArriving }: Props) {
+  // Só quem tem atendimentos no Kommo no período (sem vínculo ou sem atendimento fica de fora).
+  const rows = allRows?.filter((r) => r.status === 'ranked' || r.status === 'insufficient') ?? null;
   const ranked = rows?.filter((r) => r.status === 'ranked') ?? [];
   const maxIndex = Math.max(...ranked.map((r) => r.index ?? 0), 1);
 
@@ -49,7 +47,7 @@ export function ConversionRanking({ rows, periodLabel, failed, salesArriving }: 
           <span className="dv-skel is-row" />
         </div>
       ) : rows.length === 0 ? (
-        <EmptyState title="Nenhum vendedor no ranking">Mostre vendedores em Vendedores para vê-los aqui.</EmptyState>
+        <EmptyState title="Nenhum atendimento no Kommo no período">Sem vendedores para comparar.</EmptyState>
       ) : (
         <div className="fin-table-wrap">
           <table className="fin-table dv-rank-table">
@@ -80,7 +78,7 @@ export function ConversionRanking({ rows, periodLabel, failed, salesArriving }: 
                       <PctWithBar value={((r.index ?? 0) / maxIndex) * 100} tone="goal" label={pct(r.index)} />
                     ) : (
                       <span className="fin-muted">
-                        {PENDING_LABEL[r.status]}
+                        Menos de {MIN_ATTENDANCES} atendimentos
                         {r.status === 'insufficient' && r.index != null ? ` · ${pct(r.index)}` : ''}
                       </span>
                     )}
