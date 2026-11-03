@@ -7,6 +7,8 @@ import { formatDateBR } from '../../lib/finance/dates';
 import { int } from '../../lib/finance/format';
 import { countDelay } from '../../lib/motion';
 import { AnimatedNumber } from '../ui/AnimatedNumber';
+import { useCardLink } from '../ui/useCardLink';
+import { cardLinks } from '../../lib/cardLinks';
 
 const pct1 = (v: number | null | undefined) => (v == null ? '—' : `${v.toLocaleString('pt-BR', { maximumFractionDigits: 1 })}%`);
 
@@ -42,9 +44,10 @@ function windowText(p: UnitGoalProgress): string | null {
   return p.fits ? null : `${formatDateBR(p.window.from)} a ${formatDateBR(p.window.to)}`;
 }
 
-function GoalCard({ title, icon, progress, highlight, delay }: { title: string; icon: React.ReactNode; progress: UnitGoalProgress; highlight?: boolean; delay: number }) {
+function GoalCard({ title, icon, progress, highlight, delay, to }: { title: string; icon: React.ReactNode; progress: UnitGoalProgress; highlight?: boolean; delay: number; to: string }) {
+  const link = useCardLink(to);
   return (
-    <div className={`fin-kpi dv-goal ${highlight ? 'is-highlight' : ''}`}>
+    <div className={`fin-kpi dv-goal ${highlight ? 'is-highlight' : ''}`} {...link}>
       <div className="fin-kpi-head">
         <span className="fin-kpi-label">{title}</span>
         <span className="fin-kpi-icon tone-goal">{icon}</span>
@@ -78,11 +81,12 @@ export function GoalCards({
   units: UnitsSummary;
   onOpenSales: () => void;
 }) {
+  const salesLink = useCardLink(cardLinks.sales());
   return (
     <div className="dv-goals">
-      <GoalCard title="Meta da Semana" icon={<TrendingUp size={18} />} progress={week} delay={countDelay(4)} />
-      <GoalCard title="Meta do Mês" icon={<Target size={18} />} progress={month} highlight delay={countDelay(5)} />
-      <button type="button" className="fin-kpi dv-sales-card" onClick={onOpenSales} title="Ver todos os produtos vendidos no período">
+      <GoalCard title="Meta da Semana" icon={<TrendingUp size={18} />} progress={week} delay={countDelay(4)} to={cardLinks.goals('meta-semanal')} />
+      <GoalCard title="Meta do Mês" icon={<Target size={18} />} progress={month} highlight delay={countDelay(5)} to={cardLinks.goals('meta-mensal')} />
+      <div className="fin-kpi dv-sales-card" {...salesLink}>
         <div className="fin-kpi-head">
           <span className="fin-kpi-label">Total de Vendas</span>
           <span className="fin-kpi-icon tone-profit">
@@ -95,8 +99,10 @@ export function GoalCards({
         <span className="fin-kpi-caption">
           {int(units.devices + units.accessories)} unidades
         </span>
-        <span className="fin-link fin-small">Ver produtos vendidos →</span>
-      </button>
+        <button type="button" className="fin-link fin-small dv-card-action" onClick={onOpenSales}>
+          Ver produtos vendidos →
+        </button>
+      </div>
     </div>
   );
 }

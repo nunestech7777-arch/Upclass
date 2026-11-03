@@ -16,6 +16,8 @@ import type { Seller } from '../lib/database.types';
 import './SellerReport.css';
 import { AnimatedText } from '../components/ui/AnimatedNumber';
 import { useConversionRanking } from '../components/dashboard/useConversionRanking';
+import { useCardLink } from '../components/ui/useCardLink';
+import { cardLinks } from '../lib/cardLinks';
 import { conversionText } from '../lib/finance/conversionRanking';
 import { firstDay, lastDay } from '../lib/finance/dates';
 import { int, pct } from '../lib/finance/format';
@@ -40,6 +42,8 @@ export function SellerReport() {
   // Taxa de conversão do mês: a mesma conta e o mesmo número do Ranking de Conversão.
   const conversion = useConversionRanking({ from: firstDay(month), to: lastDay(month) });
   const conv = conversion.rows?.find((r) => r.seller.id === id);
+  // Indicador de conversão → Ranking de Conversão do Dashboard (mesmo cálculo).
+  const conversionLink = useCardLink(cardLinks.conversionRanking());
 
   useEffect(() => {
     if (!id) return;
@@ -139,7 +143,7 @@ export function SellerReport() {
           <span className="seller-kpi-label">TOTAL PRODUTOS</span>
           <span className="seller-kpi-hint">Ver detalhes →</span>
         </div>
-        <div className="seller-kpi-card">
+        <div className="seller-kpi-card" {...conversionLink}>
           <TrendingUp size={22} className="seller-kpi-icon" />
           <span className="seller-kpi-value">
             <AnimatedText text={conversion.rows ? conversionText(conv, pct) : conversion.failed === 'pending' ? 'Ativação pendente' : conversion.failed ? 'Indisponível' : '…'} />

@@ -6,6 +6,8 @@ import { isReconciled, type FinanceSale } from '../../lib/finance/calc';
 import type { TopProduct } from '../../lib/finance/dashboard';
 import { countDelay } from '../../lib/motion';
 import { AnimatedNumber } from '../ui/AnimatedNumber';
+import { useCardLink } from '../ui/useCardLink';
+import type { To } from 'react-router-dom';
 
 const units = (v: number | null | undefined) => `${int(v)} un.`;
 
@@ -13,14 +15,17 @@ interface CardProps {
   kind: 'devices' | 'accessories';
   product: TopProduct | null;
   onOpen: () => void;
+  /** Destino do card (Vendas filtradas pelo produto); "Ver detalhes" continua abrindo o detalhamento. */
+  to?: To | null;
 }
 
-export function TopProductCard({ kind, product, onOpen }: CardProps) {
+export function TopProductCard({ kind, product, onOpen, to }: CardProps) {
   const isDevice = kind === 'devices';
   const title = isDevice ? 'Aparelho mais vendido' : 'Acessório mais vendido';
   const delay = countDelay(isDevice ? 7 : 8);
+  const link = useCardLink(product ? to : null, product ? `${title}: ${product.name}` : undefined);
   return (
-    <button type="button" className="fin-panel dv-top" onClick={onOpen} disabled={!product} aria-label={`${title}: ver detalhes`}>
+    <section className="fin-panel dv-top" aria-label={title} {...link}>
       <span className="fin-eyebrow">
         {isDevice ? <Smartphone size={14} /> : <Headphones size={14} />}
         {title}
@@ -61,12 +66,14 @@ export function TopProductCard({ kind, product, onOpen }: CardProps) {
               ))}
             </ul>
           )}
-          <span className="fin-link fin-small">Ver detalhes →</span>
+          <button type="button" className="fin-link fin-small dv-card-action" onClick={onOpen}>
+            Ver detalhes →
+          </button>
         </>
       ) : (
         <span className="fin-muted">Nenhuma venda de {isDevice ? 'aparelhos' : 'acessórios'} no período.</span>
       )}
-    </button>
+    </section>
   );
 }
 

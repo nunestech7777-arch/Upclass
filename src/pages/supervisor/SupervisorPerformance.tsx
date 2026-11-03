@@ -1,3 +1,4 @@
+import { cardLinks } from '../../lib/cardLinks';
 import React, { useEffect, useMemo, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { ArrowLeft, CheckCircle2, Clock3, Link2, MessagesSquare, Star, TrendingUp, UserX } from 'lucide-react';
@@ -174,11 +175,11 @@ function SellerDetail({ sellerId }: { sellerId: string }) {
       ) : (
         <>
           <div className={`sv-kpis uc-reload-scope ${loading ? 'is-reloading' : ''}`}>
-            <KpiCard label="Atendimentos" value={int(s.conversations)} icon={<MessagesSquare size={18} />} tone="goal" highlight />
+            <KpiCard to={cardLinks.supervisor('conversas', search)} label="Atendimentos" value={int(s.conversations)} icon={<MessagesSquare size={18} />} tone="goal" highlight />
             <KpiCard label="Tempo médio de resposta" value={formatSeconds(s.avgResponseSeconds)} icon={<Clock3 size={18} />} tone="neutral" caption={s.responses ? `Mediana: ${formatSeconds(s.medianResponseSeconds)}` : undefined} />
             <KpiCard label="Clientes sem resposta" value={int(s.awaiting)} icon={<UserX size={18} />} tone={s.awaiting ? 'deficit' : 'profit'} />
-            <KpiCard label="Conversas analisadas" value={int(s.analyzed)} icon={<CheckCircle2 size={18} />} tone="neutral" caption={`${int(s.pending)} pendentes`} />
-            <KpiCard label="Avaliação de qualidade" value={s.avgScore != null ? `${s.avgScore.toFixed(1)} / 10` : '—'} icon={<Star size={18} />} tone="neutral" />
+            <KpiCard to={cardLinks.supervisor('analise-ia', search)} label="Conversas analisadas" value={int(s.analyzed)} icon={<CheckCircle2 size={18} />} tone="neutral" caption={`${int(s.pending)} pendentes`} />
+            <KpiCard to={cardLinks.supervisor('analise-ia', search)} label="Avaliação de qualidade" value={s.avgScore != null ? `${s.avgScore.toFixed(1)} / 10` : '—'} icon={<Star size={18} />} tone="neutral" />
             <KpiCard label="Mensagens enviadas" value={int(s.sellerMessages)} icon={<TrendingUp size={18} />} tone="neutral" caption={`${int(s.clientMessages)} recebidas`} />
           </div>
 

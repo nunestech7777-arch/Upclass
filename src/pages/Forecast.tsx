@@ -44,7 +44,10 @@ import {
   type AppleTeamRow,
   RatioSummaryCards,
   RatioTable,
-  TeamFilters, TeamProjectionTable, TeamSummaryCards, type RatioTeamRow, type TeamRow } from '../components/forecast/ForecastTeamSection';
+  TeamFilters, TeamProjectionTable, TeamSummaryCards, type ForecastCardLinks, type RatioTeamRow, type TeamRow } from '../components/forecast/ForecastTeamSection';
+import { usePeriod } from '../context/PeriodContext';
+import { firstDay, lastDay } from '../lib/finance/dates';
+import { cardLinks } from '../lib/cardLinks';
 import { tooltipStyle, useChartTheme } from '../lib/chartTheme';
 import { AnimatedText } from '../components/ui/AnimatedNumber';
 import { AnimatedBar } from '../components/ui/AnimatedBar';
@@ -97,6 +100,25 @@ export function Forecast() {
   }, [source, month]);
 
   const ctx = useMemo(() => buildContext(month), [month]);
+
+  // Destinos dos cards: o mês do Forecast e o vendedor filtrado vão junto (o mês só vira período geral
+  // quando o período atual não é exatamente esse mês).
+  const { range: globalRange } = usePeriod();
+  const cardTargets = useMemo<ForecastCardLinks>(() => {
+    const monthRange = { from: firstDay(month), to: lastDay(month) };
+    const period = globalRange.from === monthRange.from && globalRange.to === monthRange.to ? undefined : monthRange;
+    const vendedor = sellerFilter !== 'all' ? sellerFilter : undefined;
+    return {
+      sold: cardLinks.sales({ categoria: unit === 'accessories' ? 'Acessórios' : 'Aparelhos', vendedor, period }),
+      accessories: cardLinks.sales({ categoria: 'Acessórios', vendedor, period }),
+      iphone: cardLinks.sales({ categoria: 'Aparelhos', vendedor, period }),
+      orders: cardLinks.sales({ vendedor, period }),
+      goals: cardLinks.goals('metas-vendedor'),
+      financial: cardLinks.financial(),
+      review: '#fc-review',
+      seller: cardLinks.seller,
+    };
+  }, [month, globalRange.from, globalRange.to, sellerFilter, unit]);
 
   const freshView = useMemo(() => {
     if (!data || data.month !== month) return null;
@@ -278,6 +300,7 @@ export function Forecast() {
               {unit === 'apple' ? (
                 <>
                   <AppleSummaryCards
+                    links={cardTargets}
                     metric={metric}
                     team={view.appleTeam}
                     teamTypes={view.appleTeamTypes}
@@ -295,7 +318,7 @@ export function Forecast() {
                 </>
               ) : ratio ? (
                 <>
-                  <RatioSummaryCards metric={ratio} team={view.ratioTeam} rows={view.ratioRows} />
+                  <RatioSummaryCards metric={ratio} team={view.ratioTeam} rows={view.ratioRows} links={cardTargets} />
                   {view.ratioRows.length === 0 ? (
                     <EmptyState title="Nenhum vendedor no filtro">Ative vendedores no ranking.</EmptyState>
                   ) : (
@@ -304,7 +327,7 @@ export function Forecast() {
                 </>
               ) : (
                 <>
-                  <TeamSummaryCards kind={unit} metric={metric} team={view.summary} ctx={ctx} sellersCount={view.rows.length} />
+                  <TeamSummaryCards kind={unit} metric={metric} team={view.summary} ctx={ctx} sellersCount={view.rows.length} links={cardTargets} />
 
                   {view.rows.length === 0 ? (
                     <EmptyState title="Nenhum vendedor no filtro">Ative vendedores no ranking ou cadastre metas de {metric === 'revenue' ? 'faturamento de ' : ''}{UNIT_COPY[unit].many}.</EmptyState>

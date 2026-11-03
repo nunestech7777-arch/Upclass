@@ -26,7 +26,7 @@ export function ConversionRanking({ rows: allRows, periodLabel, failed, salesArr
   const maxIndex = Math.max(...ranked.map((r) => r.index ?? 0), 1);
 
   return (
-    <section className="fin-panel dv-conversion" aria-label="Ranking de conversão">
+    <section id="ranking-conversao" className="fin-panel dv-conversion" aria-label="Ranking de conversão">
       <div className="fin-ranking-head">
         <h2 className="fin-panel-title is-large">
           <MessagesSquare size={20} className="tone-goal" />

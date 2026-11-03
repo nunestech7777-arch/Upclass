@@ -16,13 +16,12 @@
 .dv-goal-line strong small { font-size: 14px; color: var(--fin-muted); font-weight: 600; }
 .dv-goal-line em { grid-column: 1 / -1; font-size: 12px; font-style: normal; color: var(--fin-muted); }
 .dv-goal-line .fin-progress { grid-column: 1 / -1; }
-.dv-sales-card { text-align: left; cursor: pointer; font: inherit; color: inherit; }
-.dv-sales-card:hover { border-color: var(--fin-highlight-border); }
+.dv-sales-card { text-align: left; font: inherit; color: inherit; }
 
 .dv-tops { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 14px; margin-bottom: 14px; }
-.dv-top { text-align: left; cursor: pointer; font: inherit; color: inherit; margin-bottom: 0; }
-.dv-top:disabled { cursor: default; }
-.dv-top:not(:disabled):hover { border-color: var(--fin-highlight-border); }
+.dv-top { text-align: left; font: inherit; color: inherit; margin-bottom: 0; }
+/* Ação interna dos cards navegáveis (abre o detalhamento sem sair da tela). */
+.dv-card-action { align-self: flex-start; background: none; border: 0; padding: 4px 0; font-family: inherit; cursor: pointer; }
 .dv-top-name { font-size: 24px; font-weight: 800; letter-spacing: -0.02em; line-height: 1.2; }
 .dv-top-stats { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 10px; }
 .dv-top-stats span { display: block; font-size: 11px; color: var(--fin-muted); margin-bottom: 2px; }

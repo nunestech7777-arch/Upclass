@@ -1,3 +1,4 @@
+import { cardLinks } from '../../lib/cardLinks';
 import React, { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { CheckCircle2, CircleDashed, FileSearch, Lock, Quote, Sparkles, UserCheck } from 'lucide-react';
@@ -69,7 +70,7 @@ export function SupervisorAiAnalysis() {
         <LoadingBlock />
       ) : (
         <div className={`sv-kpis sv-kpis-3 uc-reload-scope ${loading ? 'is-reloading' : ''}`}>
-          <KpiCard label="Conversas no período" value={int(s.conversations)} icon={<Sparkles size={18} />} tone="goal" />
+          <KpiCard to={cardLinks.supervisor('conversas', search)} label="Conversas no período" value={int(s.conversations)} icon={<Sparkles size={18} />} tone="goal" />
           <KpiCard label="Analisadas" value={int(s.analyzed)} icon={<CheckCircle2 size={18} />} tone="profit" caption={`${pct(s.conversations ? (s.analyzed / s.conversations) * 100 : null)}`} />
           <KpiCard label="Pendentes de análise" value={int(s.pending)} icon={<CircleDashed size={18} />} tone="warn" />
         </div>

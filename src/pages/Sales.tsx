@@ -2,6 +2,8 @@ import { addDays, formatDateBR, wallClock } from '../lib/finance/dates';
 import { PRESET_LABELS, formatRange } from '../lib/finance/dashboard';
 import { usePeriod } from '../context/PeriodContext';
 import React, { useEffect, useMemo, useState } from 'react';
+import { useLocation } from 'react-router-dom';
+import { readSalesLinkFilters } from '../lib/cardLinks';
 import { EmptyState } from '../components/brand/BrandLogo';
 import {
   Search,
@@ -364,6 +366,18 @@ export function Sales() {
   const [metricDetail, setMetricDetail] = useState<'units' | 'ranking' | 'revenue' | 'profit' | 'avg' | null>(null);
   // Filtro de categoria no modal de Ranking de Produtos Vendidos
   const [rankingCategoryFilter, setRankingCategoryFilter] = useState<'all' | 'Aparelhos' | 'Acessórios'>('all');
+
+  // Filtros vindos de um card de outra tela (?categoria=, ?produto=, ?busca=, ?vendedor=, ver cardLinks.ts).
+  const { search: locationSearch } = useLocation();
+  useEffect(() => {
+    const f = readSalesLinkFilters(locationSearch);
+    if (!f.categoria && !f.produto && !f.busca && !f.vendedor) return;
+    setCategoryFilter(f.categoria ?? 'all');
+    setProductFilter(f.produto ?? 'all');
+    setSellerFilter(f.vendedor ?? 'all');
+    setSearch(f.busca ?? '');
+    setCurrentPage(1);
+  }, [locationSearch]);
 
   // Paginação da Tabela
   const [currentPage, setCurrentPage] = useState(1);

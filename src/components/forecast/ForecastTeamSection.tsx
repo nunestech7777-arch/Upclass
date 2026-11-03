@@ -105,7 +105,19 @@ function soldExtras(metric: ForecastMetric, row: SellerUnitRow) {
 
 // ---------------------------------------------------------------------------
 
-export function TeamSummaryCards({ kind, metric, team, ctx }: { kind: UnitKind; metric: ForecastMetric; team: TeamUnitSummary; ctx: MonthContext; sellersCount: number }) {
+/** Destinos dos cards do Forecast (montados em Forecast.tsx com o mês e o vendedor filtrados). */
+export interface ForecastCardLinks {
+  sold?: string | null;
+  goals?: string | null;
+  financial?: string | null;
+  accessories?: string | null;
+  orders?: string | null;
+  iphone?: string | null;
+  review?: string | null;
+  seller?: (sellerId: string) => string;
+}
+
+export function TeamSummaryCards({ kind, metric, team, ctx, links = {} }: { kind: UnitKind; metric: ForecastMetric; team: TeamUnitSummary; ctx: MonthContext; sellersCount: number; links?: ForecastCardLinks }) {
   const copy = UNIT_COPY[kind];
   const mc = metricCopy(kind, metric);
   const money = metric === 'revenue';
@@ -116,6 +128,7 @@ export function TeamSummaryCards({ kind, metric, team, ctx }: { kind: UnitKind; 
   return (
     <div className="fc-kpis">
       <KpiCard
+        to={money ? links.financial : links.sold}
         label={mc.soldLabel}
         value={show(team.sold)}
         icon={money ? <CircleDollarSign size={18} /> : kind === 'devices' ? <Smartphone size={18} /> : <Headphones size={18} />}
@@ -124,6 +137,7 @@ export function TeamSummaryCards({ kind, metric, team, ctx }: { kind: UnitKind; 
         caption={money && team.pendingItems > 0 ? `Parcial: ${int(team.pendingItems)} a conciliar` : undefined}
       />
       <KpiCard
+        to={links.goals}
         label="Meta total da equipe"
         value={team.target != null ? show(team.target) : 'Sem meta'}
         icon={<Target size={18} />}
@@ -138,6 +152,7 @@ export function TeamSummaryCards({ kind, metric, team, ctx }: { kind: UnitKind; 
         tone={projectionTone}
       />
       <KpiCard
+        to={links.goals}
         label="Faltam para a meta"
         value={team.remaining == null ? '—' : team.remaining === 0 ? 'Meta batida' : money ? formatMoney(team.remaining) : `${int(team.remaining)} ${copy.many}`}
         icon={<Flag size={18} />}
@@ -361,11 +376,12 @@ export type RatioTeamRow = RatioRow & { name: string; seller: FinanceSeller };
 const ratioValue = (metric: RatioMetric, r: RatioRow) =>
   metric === 'ticket' ? (r.ticket != null ? formatMoney(r.ticket) : '—') : r.pa != null ? `${formatPA(r.pa)} PA` : '—';
 
-export function RatioSummaryCards({ metric, team, rows }: { metric: RatioMetric; team: RatioRow; rows: RatioTeamRow[] }) {
+export function RatioSummaryCards({ metric, team, rows, links = {} }: { metric: RatioMetric; team: RatioRow; rows: RatioTeamRow[]; links?: ForecastCardLinks }) {
   // Sempre o maior indicador, independentemente da ordenação escolhida na tabela.
   const best = sortRatioRows(rows, metric, 'value').find((r) => (metric === 'ticket' ? r.ticket : r.pa) != null);
   const bestCard = (
     <KpiCard
+      to={best && links.seller ? links.seller(best.seller.id) : null}
       label={metric === 'ticket' ? 'Maior ticket médio' : 'Maior PA'}
       value={best ? ratioValue(metric, best) : '—'}
       icon={<Award size={18} />}
@@ -375,6 +391,7 @@ export function RatioSummaryCards({ metric, team, rows }: { metric: RatioMetric;
   );
   const attendancesCard = (
     <KpiCard
+      to={links.orders}
       label="Atendimentos válidos"
       value={int(team.attendances)}
       icon={<Users size={18} />}
@@ -392,6 +409,7 @@ export function RatioSummaryCards({ metric, team, rows }: { metric: RatioMetric;
           highlight
         />
         <KpiCard
+          to={links.financial}
           label="Faturamento conciliado"
           value={formatMoney(team.revenue)}
           icon={<CircleDollarSign size={18} />}
@@ -419,7 +437,7 @@ export function RatioSummaryCards({ metric, team, rows }: { metric: RatioMetric;
         tone="profit"
         highlight
       />
-      <KpiCard label="Acessórios vendidos" value={int(team.units)} icon={<Headphones size={18} />} tone="neutral" />
+      <KpiCard to={links.accessories} label="Acessórios vendidos" value={int(team.units)} icon={<Headphones size={18} />} tone="neutral" />
       {attendancesCard}
       {bestCard}
       <KpiCard
@@ -539,6 +557,7 @@ export function AppleSummaryCards({
   teamTypes,
   ctx,
   reviewCount,
+  links = {},
 }: {
   metric: ForecastMetric;
   team: TeamUnitSummary;
@@ -546,6 +565,7 @@ export function AppleSummaryCards({
   ctx: MonthContext;
   sellersCount: number;
   reviewCount: number;
+  links?: ForecastCardLinks;
 }) {
   const money = metric === 'revenue';
   const show = (n: number) => (money ? formatMoney(n) : int(n));
@@ -569,7 +589,7 @@ export function AppleSummaryCards({
         icon={<TrendingUp size={18} />}
         tone="neutral"
       />
-      <KpiCard label="iPhone" value={show(iphone)} icon={<Smartphone size={18} />} tone="neutral" caption={share(iphone) || undefined} />
+      <KpiCard to={money ? null : links.iphone} label="iPhone" value={show(iphone)} icon={<Smartphone size={18} />} tone="neutral" caption={share(iphone) || undefined} />
       <KpiCard
         label="Outros produtos Apple"
         value={show(othersTotal)}
@@ -578,6 +598,7 @@ export function AppleSummaryCards({
         caption={others.length > 0 ? others.map((t) => `${t.type} ${show(t.team.sold)}`).join(' · ') : undefined}
       />
       <KpiCard
+        to={reviewCount > 0 ? links.review : null}
         label="Para revisão"
         value={reviewCount > 0 ? int(reviewCount) : 'Nenhum'}
         icon={<AlertTriangle size={18} />}
@@ -754,7 +775,7 @@ export function AppleTable({
 export function AppleReviewPanel({ items, sellerName }: { items: AppleReviewItem[]; sellerName: (id: string) => string }) {
   if (items.length === 0) return null;
   return (
-    <details className="fc-review">
+    <details id="fc-review" className="fc-review">
       <summary>
         <AlertTriangle size={15} /> {items.length} produto(s) para revisão — não foram classificados automaticamente e não entram em Produtos Apple
       </summary>

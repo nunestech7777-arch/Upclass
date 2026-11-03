@@ -23,6 +23,7 @@ import { formatInstantBR, dayLabel } from '../../lib/finance/dates';
 import { int, pct } from '../../lib/finance/format';
 import { CHANNEL_LABEL, type Channel } from '../../lib/supervisor/channels';
 import { formatSeconds } from '../../lib/supervisor/metrics';
+import { cardLinks } from '../../lib/cardLinks';
 import { AnimatedBar } from '../../components/ui/AnimatedBar';
 import { AnimatedText } from '../../components/ui/AnimatedNumber';
 
@@ -52,13 +53,13 @@ export function SupervisorOverview() {
       ) : null}
 
       <div className="sv-kpis">
-        <KpiCard label="Atendimentos" value={int(s.conversations)} icon={<MessagesSquare size={18} />} tone="goal" highlight caption={`${int(s.clientMessages)} recebidas · ${int(s.sellerMessages)} enviadas`} />
-        <KpiCard label="Tempo médio de resposta" value={formatSeconds(s.avgResponseSeconds)} icon={<Clock3 size={18} />} tone="neutral" caption={s.responses ? `Mediana: ${formatSeconds(s.medianResponseSeconds)}` : undefined} />
+        <KpiCard to={cardLinks.supervisor('conversas', search)} label="Atendimentos" value={int(s.conversations)} icon={<MessagesSquare size={18} />} tone="goal" highlight caption={`${int(s.clientMessages)} recebidas · ${int(s.sellerMessages)} enviadas`} />
+        <KpiCard to={cardLinks.supervisor('vendedores', search)} label="Tempo médio de resposta" value={formatSeconds(s.avgResponseSeconds)} icon={<Clock3 size={18} />} tone="neutral" caption={s.responses ? `Mediana: ${formatSeconds(s.medianResponseSeconds)}` : undefined} />
         <KpiCard label="Clientes sem resposta" value={int(s.awaiting)} icon={<UserX size={18} />} tone={s.awaiting > 0 ? 'deficit' : 'profit'} />
-        <KpiCard label="Taxa de resposta" value={pct(responseRate)} icon={<Gauge size={18} />} tone="profit" caption={rounds ? `${int(s.answeredInPeriod)} de ${int(rounds)}` : undefined} />
-        <KpiCard label="Conversas analisadas" value={int(s.analyzed)} icon={<CheckCircle2 size={18} />} tone="neutral" />
-        <KpiCard label="Pendentes de análise" value={int(s.pending)} icon={<Hourglass size={18} />} tone="warn" />
-        <KpiCard label="Qualidade média" value={s.avgScore != null ? `${s.avgScore.toFixed(1)} / 10` : '—'} icon={<Star size={18} />} tone="neutral" />
+        <KpiCard to={cardLinks.supervisor('vendedores', search)} label="Taxa de resposta" value={pct(responseRate)} icon={<Gauge size={18} />} tone="profit" caption={rounds ? `${int(s.answeredInPeriod)} de ${int(rounds)}` : undefined} />
+        <KpiCard to={cardLinks.supervisor('analise-ia', search)} label="Conversas analisadas" value={int(s.analyzed)} icon={<CheckCircle2 size={18} />} tone="neutral" />
+        <KpiCard to={cardLinks.supervisor('analise-ia', search)} label="Pendentes de análise" value={int(s.pending)} icon={<Hourglass size={18} />} tone="warn" />
+        <KpiCard to={cardLinks.supervisor('analise-ia', search)} label="Qualidade média" value={s.avgScore != null ? `${s.avgScore.toFixed(1)} / 10` : '—'} icon={<Star size={18} />} tone="neutral" />
         <KpiCard label="Oportunidades identificadas" value="—" icon={<Lightbulb size={18} />} tone="neutral" />
       </div>
 

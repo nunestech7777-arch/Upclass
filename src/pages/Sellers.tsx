@@ -29,6 +29,8 @@ import type { Seller } from '../lib/database.types';
 import './Sellers.css';
 import { AnimatedText } from '../components/ui/AnimatedNumber';
 import { useConversionRanking } from '../components/dashboard/useConversionRanking';
+import { useCardLink } from '../components/ui/useCardLink';
+import { cardLinks } from '../lib/cardLinks';
 import { conversionLeader, conversionText, sortByConversion } from '../lib/finance/conversionRanking';
 import { int, pct } from '../lib/finance/format';
 
@@ -39,6 +41,16 @@ const localDate = (iso: string) => {
   const [y, m, d] = iso.split('-').map(Number);
   return new Date(y, m - 1, d);
 };
+
+/** Card do vendedor: o card inteiro abre o relatório (foto e botão continuam com o clique próprio). */
+function SellerCardLink({ to, className, children }: { to: string; className: string; children: React.ReactNode }) {
+  const link = useCardLink(to);
+  return (
+    <div className={className} {...link}>
+      {children}
+    </div>
+  );
+}
 
 export function Sellers() {
   const { theme } = useTheme();
@@ -330,8 +342,9 @@ export function Sellers() {
           const conv = conversionById.get(seller.id);
 
           return (
-            <div 
-              key={seller.id} 
+            <SellerCardLink
+              key={seller.id}
+              to={cardLinks.seller(seller.id)}
               className={`seller-card ${rank === 1 ? 'rank-1' : ''}`}
             >
               <span 
@@ -419,7 +432,7 @@ export function Sellers() {
                 Ver Relatório Completo
                 <ArrowRight size={14} />
               </Link>
-            </div>
+            </SellerCardLink>
           );
         })}
       </div>

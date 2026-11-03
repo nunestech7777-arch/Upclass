@@ -24,6 +24,7 @@ import { MigrationPendingError } from '../lib/finance/financeApi';
 import { useFinanceParams, useMonthFinance } from '../components/finance/useFinance';
 import { MonthPicker } from '../components/finance/MonthPicker';
 import { EmptyState, KpiCard, SectionEyebrow } from '../components/finance/FinancePrimitives';
+import { cardLinks } from '../lib/cardLinks';
 import { useFinanceNotices } from '../components/finance/useFinanceNotices';
 import { ProfitRankingTable } from '../components/finance/ProfitRankingTable';
 import { MonthEvolutionChart, SellerComparisonChart } from '../components/finance/FinanceCharts';
@@ -182,6 +183,7 @@ export function FinancialResults() {
         <div className={`uc-reload-scope ${loading ? 'is-reloading' : ''}`}>
           <div className="fin-kpis">
             <KpiCard
+              to={cardLinks.daily()}
               label="Lucro realizado total"
               value={brl(finance.totals.profit)}
               icon={<CircleDollarSign size={18} />}
@@ -191,6 +193,7 @@ export function FinancialResults() {
               caption={`Conciliados: ${int(finance.coverage.reconciled)} de ${int(finance.coverage.items)}`}
             />
             <KpiCard
+              to={cardLinks.goals('metas-lucro')}
               label="Meta total"
               value={brl(finance.totals.target, 'Sem meta')}
               icon={<Target size={18} />}
@@ -199,6 +202,7 @@ export function FinancialResults() {
               progress={finance.totals.pctTarget}
             />
             <KpiCard
+              to={cardLinks.goals('metas-lucro')}
               label="Pior cenário total"
               value={brl(finance.totals.worst, 'Sem meta')}
               icon={<ShieldCheck size={18} />}
@@ -207,12 +211,14 @@ export function FinancialResults() {
               progress={finance.totals.pctWorst}
             />
             <KpiCard
+              to={cardLinks.daily()}
               label="Falta para a meta"
               value={finance.totals.gap == null ? '—' : finance.totals.gap === 0 ? 'Meta batida' : brl(finance.totals.gap)}
               icon={<Flag size={18} />}
               tone={finance.totals.gap ? 'deficit' : 'profit'}
             />
             <KpiCard
+              to={cardLinks.daily()}
               label={finance.context.phase === 'past' ? 'Fechamento do mês' : 'Projeção do mês'}
               value={finance.totals.projection != null ? brl(finance.totals.projection) : 'Indisponível'}
               icon={<TrendingUp size={18} />}

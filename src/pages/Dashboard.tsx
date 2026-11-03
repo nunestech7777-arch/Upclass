@@ -17,6 +17,7 @@ import { ConversionRanking } from '../components/dashboard/ConversionRanking';
 import { AttendanceCountPendingError, loadAttendedConversations, peekAttendedConversations } from '../lib/finance/conversionApi';
 import { buildConversionRanking, salesStillArriving } from '../lib/finance/conversionRanking';
 import { AnimatedNumber } from '../components/ui/AnimatedNumber';
+import { cardLinks, type SalesCategory } from '../lib/cardLinks';
 import { countDelay, useScrollReveal } from '../lib/motion';
 import { MigrationPendingError, type DashboardData, type DeviceGoal } from '../lib/finance/financeApi';
 import { monthOf, monthTitle, storeHourNow } from '../lib/finance/dates';
@@ -37,9 +38,17 @@ import {
   topProduct,
   unitGoalProgress,
   type SeriesMode,
+  type TopProduct,
 } from '../lib/finance/dashboard';
 
 const REVEAL_TARGETS = ':scope > .dv-kpis > *, :scope > .dv-goals > *, :scope > .dv-tops > *, :scope > :not(.dv-kpis, .dv-goals, .dv-tops, .dv-reload-bar)';
+
+/** Vendas do produto mais vendido: pelo id quando é um produto só; senão pela busca do nome. */
+function productSalesLink(product: TopProduct | null, categoria: SalesCategory): string | null {
+  if (!product) return null;
+  const ids = new Set(product.rows.map((r) => r.product_id));
+  return ids.size === 1 ? cardLinks.sales({ produto: [...ids][0] }) : cardLinks.sales({ categoria, busca: product.name });
+}
 
 export function Dashboard() {
   const source = useFinanceSource();
@@ -189,18 +198,18 @@ export function Dashboard() {
         <div ref={contentRef} className={`dv-content dv-enter ${reloading ? 'dv-reloading' : ''}`} aria-busy={reloading}>
           <span className="dv-reload-bar" aria-hidden="true" />
           <div className="dv-kpis">
-            <KpiCard label="Aparelhos vendidos" value={<AnimatedNumber value={shown.units.devices} format={int} delay={countDelay(1)} />} icon={<Smartphone size={18} />} tone="goal" />
-            <KpiCard label="Acessórios vendidos" value={<AnimatedNumber value={shown.units.accessories} format={int} delay={countDelay(2)} />} icon={<Headphones size={18} />} tone="profit" caption={shown.units.gifts ? `Brindes: ${int(shown.units.gifts)}` : undefined} />
-            <KpiCard label="Faturamento" value={<AnimatedNumber value={shown.money.revenue} format={brl} delay={countDelay(3)} />} icon={<CircleDollarSign size={18} />} tone="neutral" badge={shown.coverage.complete ? undefined : 'Parcial'} />
-            <KpiCard label="Lucro bruto" value={<AnimatedNumber value={shown.money.profit} format={brl} delay={countDelay(4)} />} icon={<Wallet size={18} />} tone={shown.money.profit < 0 ? 'deficit' : 'profit'} highlight badge={shown.coverage.complete ? undefined : 'Parcial'} />
-            <KpiCard label="Margem" value={<AnimatedNumber value={shown.money.margin} format={pct} delay={countDelay(5)} />} icon={<Percent size={18} />} tone="neutral" />
+            <KpiCard to={cardLinks.sales({ categoria: 'Aparelhos' })} label="Aparelhos vendidos" value={<AnimatedNumber value={shown.units.devices} format={int} delay={countDelay(1)} />} icon={<Smartphone size={18} />} tone="goal" />
+            <KpiCard to={cardLinks.sales({ categoria: 'Acessórios' })} label="Acessórios vendidos" value={<AnimatedNumber value={shown.units.accessories} format={int} delay={countDelay(2)} />} icon={<Headphones size={18} />} tone="profit" caption={shown.units.gifts ? `Brindes: ${int(shown.units.gifts)}` : undefined} />
+            <KpiCard to={cardLinks.financial()} label="Faturamento" value={<AnimatedNumber value={shown.money.revenue} format={brl} delay={countDelay(3)} />} icon={<CircleDollarSign size={18} />} tone="neutral" badge={shown.coverage.complete ? undefined : 'Parcial'} />
+            <KpiCard to={cardLinks.financial()} label="Lucro bruto" value={<AnimatedNumber value={shown.money.profit} format={brl} delay={countDelay(4)} />} icon={<Wallet size={18} />} tone={shown.money.profit < 0 ? 'deficit' : 'profit'} highlight badge={shown.coverage.complete ? undefined : 'Parcial'} />
+            <KpiCard to={cardLinks.financial()} label="Margem" value={<AnimatedNumber value={shown.money.margin} format={pct} delay={countDelay(5)} />} icon={<Percent size={18} />} tone="neutral" />
           </div>
 
           <GoalCards week={shown.week} month={shown.month} units={shown.units} onOpenSales={() => setSalesOpen(true)} />
 
           <div className="dv-tops">
-            <TopProductCard kind="devices" product={shown.topDevice} onOpen={() => setDetail('devices')} />
-            <TopProductCard kind="accessories" product={shown.topAccessory} onOpen={() => setDetail('accessories')} />
+            <TopProductCard kind="devices" product={shown.topDevice} onOpen={() => setDetail('devices')} to={productSalesLink(shown.topDevice, 'Aparelhos')} />
+            <TopProductCard kind="accessories" product={shown.topAccessory} onOpen={() => setDetail('accessories')} to={productSalesLink(shown.topAccessory, 'Acessórios')} />
           </div>
 
           <SalesEvolutionChart

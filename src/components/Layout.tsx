@@ -5,12 +5,15 @@ import { PeriodBar } from './PeriodBar';
 import { BottomNav } from './BottomNav';
 import { usePageMotion } from '../lib/motion';
 import { PageNoticesProvider } from '../lib/notices/PageNotices';
+import { useHashTarget } from './ui/useHashTarget';
 
 export function Layout() {
   const pageRef = useRef<HTMLDivElement>(null);
   // Cards, números e blocos de todas as páginas entram com a mesma cascata do Dashboard. A animação
   // observa só a área da página (o primeiro filho dela é a raiz da rota atual), fora a barra de período.
   usePageMotion(pageRef);
+  // Cards que levam a uma seção (/metas#meta-mensal): rola até ela ao chegar.
+  useHashTarget();
 
   return (
     <PageNoticesProvider>

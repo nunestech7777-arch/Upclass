@@ -53,7 +53,7 @@ export function Goals() {
       <h2 className="h2">Metas de unidades</h2>
 
       <div className={`grid-dashboard uc-reload-scope ${loading ? 'is-reloading' : ''}`}>
-        <div className="card flex-col gap-4">
+        <div id="meta-semanal" className="card flex-col gap-4">
           <h2 className="h2">Meta Semanal</h2>
           <div className="flex-col gap-2">
             <label className="text-muted" style={{fontWeight: 500}}>Quantidade de Aparelhos</label>
@@ -75,7 +75,7 @@ export function Goals() {
           </div>
         </div>
 
-        <div className="card flex-col gap-4">
+        <div id="meta-mensal" className="card flex-col gap-4">
           <h2 className="h2">Meta Mensal</h2>
           <div className="flex-col gap-2">
             <label className="text-muted" style={{fontWeight: 500}}>Quantidade de Aparelhos</label>
@@ -107,15 +107,16 @@ export function Goals() {
         </button>
       </div>
 
-      <div style={{ marginTop: '24px' }}>
+      {/* ids: destinos dos cards de outras telas (cardLinks.goals) */}
+      <div id="metas-semanais-vendedor" style={{ marginTop: '24px' }}>
         <WeeklyGoalsManager />
       </div>
 
-      <div style={{ marginTop: '24px' }}>
+      <div id="metas-vendedor" style={{ marginTop: '24px' }}>
         <DeviceGoalsManager />
       </div>
 
-      <div style={{ marginTop: '24px' }}>
+      <div id="metas-lucro" style={{ marginTop: '24px' }}>
         <ProfitGoalsManager />
       </div>
     </div>

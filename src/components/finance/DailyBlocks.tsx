@@ -27,14 +27,17 @@ import { brl, int, pct } from '../../lib/finance/format';
 import { dayLabel, formatDateBR } from '../../lib/finance/dates';
 import { PaceLabel } from './FinancePrimitives';
 import { AnimatedText } from '../ui/AnimatedNumber';
+import { useCardLink } from '../ui/useCardLink';
+import { cardLinks } from '../../lib/cardLinks';
 
 // ---------------------------------------------------------------------------
 // Indicadores do dia/mês (anexos 06–07, topo)
 // ---------------------------------------------------------------------------
 
-function Indicator({ icon, label, value, tone, hint }: { icon: React.ReactNode; label: string; value: string; tone?: string; hint?: string }) {
+function Indicator({ icon, label, value, tone, hint, to }: { icon: React.ReactNode; label: string; value: string; tone?: string; hint?: string; to?: string }) {
+  const link = useCardLink(to);
   return (
-    <div className="fin-indicator">
+    <div className="fin-indicator" {...link}>
       <span className="fin-indicator-label">
         {icon}
         {label}
@@ -53,8 +56,9 @@ export function DailyIndicators({ finance }: { finance: MonthFinance }) {
   const deviationLabel = paceDeviation == null ? 'Desvio do ritmo' : paceDeviation >= 0 ? 'Acima do ritmo' : 'Abaixo do ritmo';
   return (
     <div className="fin-indicators">
-      <Indicator icon={<Target size={14} />} label="Meta diária" value={dailyGoal != null ? brl(dailyGoal) : 'Sem meta'} tone="tone-goal" />
+      <Indicator to={cardLinks.goals('metas-lucro')} icon={<Target size={14} />} label="Meta diária" value={dailyGoal != null ? brl(dailyGoal) : 'Sem meta'} tone="tone-goal" />
       <Indicator
+        to={cardLinks.financial()}
         icon={<TrendingUp size={14} />}
         label="Acumulado"
         value={brl(totals.profit)}
@@ -68,16 +72,18 @@ export function DailyIndicators({ finance }: { finance: MonthFinance }) {
         tone={paceDeviation == null ? '' : paceDeviation >= 0 ? 'tone-profit' : 'tone-deficit'}
       />
       <Indicator
+        to="#fin-days-table"
         icon={<CalendarCheck size={14} />}
         label="Dias na meta"
         value={dailyGoal != null ? `${int(daysHit)} de ${int(completeDays)}` : '—'}
       />
       <Indicator
+        to="#fin-plan"
         icon={<Gauge size={14} />}
         label="Necessário por dia"
         value={plan.neededPerDay != null ? brl(plan.neededPerDay) : '—'}
       />
-      <Indicator icon={<Percent size={14} />} label="% da meta" value={pct(totals.pctTarget)} tone="tone-goal" />
+      <Indicator to={cardLinks.financial()} icon={<Percent size={14} />} label="% da meta" value={pct(totals.pctTarget)} tone="tone-goal" />
     </div>
   );
 }
@@ -101,7 +107,7 @@ export function ActionPlanPanel({
   const current = ctx.phase === 'current';
 
   return (
-    <section className="fin-panel fin-plan" aria-label="Plano de ação de hoje">
+    <section id="fin-plan" className="fin-panel fin-plan" aria-label="Plano de ação de hoje">
       <h3 className="fin-panel-title">
         <ClipboardList size={18} className="tone-profit" />
         {current ? 'Plano de ação de hoje' : 'Resumo do plano do mês'}
@@ -284,7 +290,7 @@ export function MonthTimeline({ days, selected, onSelect }: { days: DayFinance[]
 export function DailyResultsTable({ days, selected, onSelect }: { days: DayFinance[]; selected: string | null; onSelect: (d: string) => void }) {
   const rows = days.filter((d) => !d.isFuture).reverse();
   return (
-    <section className="fin-panel" aria-label="Resultado dia a dia">
+    <section id="fin-days-table" className="fin-panel" aria-label="Resultado dia a dia">
       <h3 className="fin-panel-title">Resultado dia a dia</h3>
       <div className="fin-table-wrap">
         <table className="fin-table fin-daily-table">
@@ -361,6 +367,16 @@ interface DayGroup {
   byCategory: Record<FinanceCategory, { units: number; profit: number; items: { sale: FinanceSale; name: string }[] }>;
 }
 
+/** Vendas de um vendedor no dia: o card leva às Vendas do dia filtradas pelo vendedor. */
+function DayGroupCard({ to, children }: { to: string; children: React.ReactNode }) {
+  const link = useCardLink(to);
+  return (
+    <article className="fin-day-group" {...link}>
+      {children}
+    </article>
+  );
+}
+
 export function DayDetail({
   date,
   sales,
@@ -414,7 +430,7 @@ export function DayDetail({
       ) : (
         <div className="fin-day-groups">
           {groups.map((g) => (
-            <article key={g.sellerId} className="fin-day-group">
+            <DayGroupCard key={g.sellerId} to={cardLinks.sales({ vendedor: g.sellerId, period: { from: date, to: date } })}>
               <header>
                 <button type="button" className="fin-link-btn" onClick={() => onOpenSeller(g.sellerId)}>
                   {g.name}
@@ -452,7 +468,7 @@ export function DayDetail({
                   </div>
                 )
               )}
-            </article>
+            </DayGroupCard>
           ))}
         </div>
       )}

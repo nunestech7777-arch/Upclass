@@ -4,6 +4,8 @@ import type { PaceStatus } from '../../lib/finance/calc';
 import { pct } from '../../lib/finance/format';
 import { AnimatedText, CountUpValue } from '../ui/AnimatedNumber';
 import { AnimatedBar } from '../ui/AnimatedBar';
+import { useCardLink } from '../ui/useCardLink';
+import type { To } from 'react-router-dom';
 
 /** Preenchimento limitado a 100% (animado, padrão do Dashboard); o texto ao lado mostra o valor real. */
 export function ProgressBar({ value, tone }: { value: number | null; tone: 'profit' | 'goal' | 'worst' | 'deficit' | 'warn' }) {
@@ -44,11 +46,15 @@ interface KpiCardProps {
   progress?: number | null;
   highlight?: boolean;
   badge?: string;
+  /** Destino do detalhamento (card navegável, ver cardLinks.ts); sem ele o card não é clicável. */
+  to?: To | null;
 }
 
-export function KpiCard({ label, value, icon, tone, caption, progress, highlight, badge }: KpiCardProps) {
+export function KpiCard({ label, value, icon, tone, caption, progress, highlight, badge, to }: KpiCardProps) {
+  // Sem aria-label: o leitor de tela lê o próprio conteúdo do card (rótulo e valor) como nome do link.
+  const link = useCardLink(to);
   return (
-    <div className={`fin-kpi ${highlight ? 'is-highlight' : ''} tone-${tone}`}>
+    <div className={`fin-kpi ${highlight ? 'is-highlight' : ''} tone-${tone}`} {...link}>
       <div className="fin-kpi-head">
         <span className="fin-kpi-label">{label}</span>
         <span className={`fin-kpi-icon tone-${tone}`}>{icon}</span>
