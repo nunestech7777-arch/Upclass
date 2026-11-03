@@ -40,10 +40,13 @@ export const cardLinks = {
   /** Card Ranking de Conversão do Dashboard. */
   conversionRanking: () => '/#ranking-conversao',
   sellersRanking: () => '/vendedores',
-  /** Meu Supervisor: `search` = filtros atuais (?vendedor, ?canal), mantidos na seção de destino. */
-  supervisor: (section: '' | 'conversas' | 'analise-ia' | 'vendedores' | 'relatorios', search = '', status?: string) => {
+  /** Meu Supervisor: `search` = filtros atuais (?vendedor, ?canal), mantidos na seção de destino; `extra` = ?status, ?pendente… */
+  supervisor: (section: '' | 'conversas' | 'analise-ia' | 'vendedores' | 'relatorios', search = '', extra: Record<string, string> = {}) => {
     const q = new URLSearchParams(search);
-    if (status) q.set('status', status);
+    // Filtros só da lista de Conversas não acompanham para outra seção (só vendedor e canal).
+    q.delete('status');
+    q.delete('pendente');
+    for (const [k, v] of Object.entries(extra)) q.set(k, v);
     const s = q.toString();
     return `/supervisor${section ? `/${section}` : ''}${s ? `?${s}` : ''}`;
   },

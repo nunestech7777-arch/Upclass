@@ -4,6 +4,7 @@ import assert from 'node:assert/strict';
 import { channelOf, originLabel, kommoLeadUrl } from './channels.ts';
 import {
   byTimeline,
+  classifyConversations,
   conversationStats,
   formatSeconds,
   median,
@@ -168,4 +169,45 @@ test('sortByTimeline: mesma ordem que sort(byTimeline), inclusive empates e rece
 test('storeDayOf: dia no fuso de Brasília', () => {
   assert.equal(storeDayOf('2026-10-28T02:59:59Z'), '2026-10-27');
   assert.equal(storeDayOf('2026-10-28T03:00:00Z'), '2026-10-28');
+});
+
+// ---------------------------------------------------------------------------
+// Regressão 02/11/2026: resposta posterior ao período (lead 27183537) e "Clientes sem resposta"
+// ---------------------------------------------------------------------------
+
+test('resposta de 02/11 a mensagem de 31/10 20:16: em 31/10 a conversa segue "não atendida" e "sem resposta"', () => {
+  const day = rangeToInstants({ from: '2026-10-31', to: '2026-10-31' });
+  const human = (sent_at: string): PeriodMessage => ({ ...msg('c', 'seller', sent_at), sender_id: 'caroline' });
+  const messages = [msg('c', 'client', '2026-10-31T23:16:00Z'), human('2026-11-02T12:54:00Z')];
+  const status = classifyConversations([conv('c', { kommo_lead_id: '27183537' })], messages, day.toIso, { linkedKommoUsers: new Set(['caroline']) });
+  assert.equal(status.get('c')?.status, 'nao_atendida');
+  assert.deepEqual(status.get('c')?.attendants, []);
+  const s = conversationStats(messages, day.toIso);
+  assert.equal(s.awaitingReply, true, 'a resposta futura não apaga o "sem resposta" de 31/10');
+  assert.equal(s.hadHumanReply, false);
+  assert.equal(s.sellerMessages, 0, 'contadores do período não incluem a resposta de 02/11');
+  // Ela só fecha a rodada para o tempo de resposta, marcada como fora do período.
+  assert.equal(s.rounds.length, 1);
+  assert.equal(s.rounds[0].inPeriod, false);
+});
+
+test('"Clientes sem resposta" inclui atendidas que terminaram o período com nova mensagem do cliente', () => {
+  const day = rangeToInstants({ from: '2026-10-31', to: '2026-10-31' });
+  const human = (id: string, sent_at: string): PeriodMessage => ({ ...msg(id, 'seller', sent_at), sender_id: 'u1' });
+  const messages = [
+    // a: não atendida (conta nos dois indicadores)
+    msg('a', 'client', '2026-10-31T13:00:00Z'),
+    // b: atendida e depois o cliente escreveu de novo sem resposta até o fim do dia
+    msg('b', 'client', '2026-10-31T13:00:00Z'),
+    human('b', '2026-10-31T13:05:00Z'),
+    msg('b', 'client', '2026-10-31T20:00:00Z'),
+    // c: atendida e encerrada respondida (não conta em nenhum)
+    msg('c', 'client', '2026-10-31T13:00:00Z'),
+    human('c', '2026-10-31T13:02:00Z'),
+  ];
+  const convs = ['a', 'b', 'c'].map((id) => conv(id));
+  const status = classifyConversations(convs, messages, day.toIso, { linkedKommoUsers: new Set(['u1']) });
+  assert.deepEqual(['a', 'b', 'c'].map((id) => status.get(id)?.status), ['nao_atendida', 'atendida', 'atendida']);
+  const summary = summarize(convs, messages, ['2026-10-31'], { periodEnd: day.toIso });
+  assert.equal(summary.awaiting, 2, 'não atendida (a) + atendida com mensagem pendente no fim (b)');
 });

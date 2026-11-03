@@ -1,7 +1,7 @@
 // Rodar com: npm test
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { buildTranscript } from './transcript.ts';
+import { buildTranscript, transcriptPeriodView } from './transcript.ts';
 
 const names = { clientName: 'Maria' };
 
@@ -101,4 +101,47 @@ test('marcador de mensagem sem texto (events API) é sinalizado, com autor e pos
     ['client', 'Maria', false, null],
     ['seller', 'Ana', true, null],
   ]);
+});
+
+test('período escolhido: marca mensagens anteriores e posteriores e conta só as de dentro como "no período"', () => {
+  // 31/10 na loja = [31/10 03:00Z, 01/11 03:00Z)
+  const t = buildTranscript(
+    [
+      row('1', '2026-10-30T15:00:00Z', 'client'),
+      row('2', '2026-10-31T23:16:00Z', 'client'),
+      row('3', '2026-10-31T23:20:00Z', 'bot', { sender_name: 'Salesbot' }),
+      row('4', '2026-11-02T12:54:00Z', 'seller', { sender_name: 'CAROLINE' }),
+      row('5', '2026-11-02T12:55:00Z', 'client'),
+    ],
+    names
+  );
+  const v = transcriptPeriodView(t, '2026-10-31T03:00:00.000Z', '2026-11-01T03:00:00.000Z');
+  assert.deepEqual(v.positions, ['before', 'in', 'in', 'after', 'after']);
+  assert.deepEqual(v.inPeriod, { client: 1, seller: 0, bot: 1 });
+  assert.deepEqual(v.all, { client: 3, seller: 1, bot: 1 });
+  assert.equal(v.firstAfter, 3, 'o aviso de resposta posterior fica antes da resposta de 02/11');
+  assert.equal(v.firstInAfterBefore, 1);
+  // Autor preservado na transcrição completa.
+  assert.equal(t[3].senderName, 'CAROLINE');
+});
+
+test('período escolhido: conversa toda dentro do período não ganha marcadores', () => {
+  const t = buildTranscript([row('1', '2026-10-31T13:00:00Z', 'client'), row('2', '2026-10-31T13:05:00Z', 'seller')], names);
+  const v = transcriptPeriodView(t, '2026-10-31T03:00:00.000Z', '2026-11-01T03:00:00.000Z');
+  assert.equal(v.firstAfter, -1);
+  assert.equal(v.firstInAfterBefore, -1);
+  assert.deepEqual(v.inPeriod, v.all);
+});
+
+test('período escolhido: limites exatos — início entra, fim (meia-noite seguinte) já é posterior', () => {
+  const t = buildTranscript([row('1', '2026-10-31T03:00:00Z', 'client'), row('2', '2026-11-01T02:59:59Z', 'seller'), row('3', '2026-11-01T03:00:00Z', 'seller')], names);
+  const v = transcriptPeriodView(t, '2026-10-31T03:00:00.000Z', '2026-11-01T03:00:00.000Z');
+  assert.deepEqual(v.positions, ['in', 'in', 'after']);
+  assert.deepEqual(v.inPeriod, { client: 1, seller: 1, bot: 0 });
+});
+
+test('horário e dia exibidos no fuso da loja (mensagem de 31/10 23:16 não vira 01/11)', () => {
+  const t = buildTranscript([row('1', '2026-11-01T02:16:00Z', 'client')], names, 'America/Sao_Paulo');
+  assert.equal(t[0].time, '23:16');
+  assert.match(t[0].dayLabel ?? '', /31/);
 });

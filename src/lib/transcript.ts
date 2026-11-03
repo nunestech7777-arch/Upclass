@@ -15,6 +15,8 @@ export interface TranscriptMessage {
   time: string;
   /** Data completa, preenchida só quando o dia muda em relação à mensagem anterior. */
   dayLabel: string | null;
+  /** Instante original (UTC), para comparar com o período escolhido. */
+  sentAt: string;
 }
 
 type TimelineRow = Pick<ConversationMessage, 'id' | 'sender' | 'message' | 'sent_at'> &
@@ -71,6 +73,55 @@ export function buildTranscript(
       unavailable: messageType === 'unavailable',
       time: timeFmt.format(date),
       dayLabel,
+      sentAt: m.sent_at,
     };
   });
+}
+
+export type PeriodPosition = 'before' | 'in' | 'after';
+
+export interface TranscriptCounts {
+  client: number;
+  seller: number;
+  bot: number;
+}
+
+export interface TranscriptPeriodView {
+  /** Posição de cada mensagem (mesma ordem da transcrição) em relação a [início, fim) do período. */
+  positions: PeriodPosition[];
+  /** Contagens só das mensagens dentro do período (as que definem o status) e de todo o histórico exibido. */
+  inPeriod: TranscriptCounts;
+  all: TranscriptCounts;
+  /** Índice da primeira mensagem depois do fim do período (−1 = nenhuma). */
+  firstAfter: number;
+  /** Índice da primeira mensagem do período quando há histórico anterior a ele (−1 = não há). */
+  firstInAfterBefore: number;
+}
+
+/**
+ * Situa cada mensagem da transcrição no período escolhido no Meu Supervisor. Só exibição: o status
+ * do atendimento continua calculado apenas com as mensagens do período (classifyConversations);
+ * resposta posterior aparece no histórico, marcada, e não muda o status daquele período.
+ */
+export function transcriptPeriodView(transcript: Pick<TranscriptMessage, 'sender' | 'sentAt'>[], fromIso: string, toIso: string): TranscriptPeriodView {
+  const from = Date.parse(fromIso);
+  const to = Date.parse(toIso);
+  const inPeriod: TranscriptCounts = { client: 0, seller: 0, bot: 0 };
+  const all: TranscriptCounts = { client: 0, seller: 0, bot: 0 };
+  let firstAfter = -1;
+  let firstIn = -1;
+  let hasBefore = false;
+  const positions = transcript.map((m, i): PeriodPosition => {
+    const t = Date.parse(m.sentAt);
+    const pos: PeriodPosition = t < from ? 'before' : t >= to ? 'after' : 'in';
+    if (m.sender === 'client' || m.sender === 'seller' || m.sender === 'bot') {
+      all[m.sender] += 1;
+      if (pos === 'in') inPeriod[m.sender] += 1;
+    }
+    if (pos === 'after' && firstAfter < 0) firstAfter = i;
+    if (pos === 'in' && firstIn < 0) firstIn = i;
+    if (pos === 'before') hasBefore = true;
+    return pos;
+  });
+  return { positions, inPeriod, all, firstAfter, firstInAfterBefore: hasBefore ? firstIn : -1 };
 }

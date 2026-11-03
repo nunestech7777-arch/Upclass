@@ -1,6 +1,6 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import { Link, useParams, useSearchParams } from 'react-router-dom';
-import { ChevronLeft, ChevronRight, MessagesSquare, Search } from 'lucide-react';
+import { ChevronLeft, ChevronRight, MessagesSquare, Search, X } from 'lucide-react';
 import { AttendanceDetails } from '../../components/supervisor/AttendanceStatus';
 import { ConversationThread } from '../../components/supervisor/ConversationThread';
 import { ChannelBadge, EmptyState, ErrorBlock, LoadingBlock } from '../../components/supervisor/SupervisorPrimitives';
@@ -10,6 +10,7 @@ import { int } from '../../lib/finance/format';
 import { filterLabel, isAttendanceFilter, matchesAttendanceFilter, type AttendanceFilter } from '../../lib/supervisor/attendance';
 import { filtersKey, sanitizeSearch } from '../../lib/supervisor/filters';
 import { fetchLeadResponsibles } from '../../lib/supervisor/supervisorApi';
+import { AWAITING_CATEGORY_LABEL, awaitingBreakdown, isAwaitingCategory, type AwaitingCategory } from '../../lib/supervisor/awaiting';
 
 const PAGE_SIZE = 30;
 const STATUS_FILTERS: (AttendanceFilter | 'all')[] = [
@@ -31,11 +32,18 @@ export function SupervisorConversations() {
   const [params, setParams] = useSearchParams();
   const rawStatus = params.get('status');
   const status: AttendanceFilter | 'all' = isAttendanceFilter(rawStatus) ? rawStatus : 'all';
+  // Categoria de "Clientes sem resposta" (card da Visão geral): mesma lista e mesma conciliação do card.
+  const rawPending = params.get('pendente');
+  const pending: AwaitingCategory | null = isAwaitingCategory(rawPending) ? rawPending : null;
   const { data, error, loading, reload } = usePeriodSummary(filters);
+  const pendingIds = useMemo(
+    () => (pending && data ? awaitingBreakdown(data.summary.awaitingList, data.attendance, data.summary.awaiting).ids[pending] : null),
+    [pending, data]
+  );
   const [term, setTerm] = useState('');
   const [debounced, setDebounced] = useState('');
   // A página volta a 0 no mesmo render em que filtro, status ou busca mudam.
-  const queryKey = `${filtersKey(filters)}|${status}|${debounced}`;
+  const queryKey = `${filtersKey(filters)}|${status}|${pending ?? ''}|${debounced}`;
   const [pageState, setPageState] = useState({ key: queryKey, page: 0 });
   const rawPage = pageState.key === queryKey ? pageState.page : 0;
   const setPage = (next: (p: number) => number) => setPageState({ key: queryKey, page: next(page) });
@@ -54,11 +62,12 @@ export function SupervisorConversations() {
       .filter((c) => {
         const a = data.attendance.get(c.id);
         if (status !== 'all' && (!a || !matchesAttendanceFilter(a, status))) return false;
+        if (pendingIds && !pendingIds.has(c.id)) return false;
         if (!t) return true;
         return /^\d+$/.test(t) ? c.kommo_lead_id === t : normalize(c.client_name).includes(needle);
       })
       .sort((a, b) => Date.parse(lastAt(b)) - Date.parse(lastAt(a)) || a.id.localeCompare(b.id));
-  }, [data, status, debounced]);
+  }, [data, status, debounced, pendingIds]);
 
   const pages = Math.max(1, Math.ceil(rows.length / PAGE_SIZE));
   // Ao recarregar a lista pode encolher: nunca fica numa página que não existe mais.
@@ -78,6 +87,15 @@ export function SupervisorConversations() {
     };
   }, [visibleLeads]);
 
+  const clearPending = () =>
+    setParams(
+      (prev) => {
+        const p = new URLSearchParams(prev);
+        p.delete('pendente');
+        return p;
+      },
+      { replace: true }
+    );
   const setStatus = (next: AttendanceFilter | 'all') =>
     setParams(
       (prev) => {
@@ -115,6 +133,16 @@ export function SupervisorConversations() {
             </button>
           ))}
         </div>
+        {pending && (
+          <div className="sv-pending-filter">
+            <span>
+              Sem resposta no fim do período · <b>{AWAITING_CATEGORY_LABEL[pending]}</b>
+            </span>
+            <button type="button" onClick={clearPending} aria-label="Remover o filtro de clientes sem resposta">
+              <X size={14} aria-hidden="true" />
+            </button>
+          </div>
+        )}
         <div className="sv-search">
           <Search size={15} aria-hidden="true" />
           <input
@@ -126,7 +154,7 @@ export function SupervisorConversations() {
           />
         </div>
         <div className="sv-conv-count">
-          {!data ? 'Carregando…' : `${int(rows.length)} conversa${rows.length === 1 ? '' : 's'}${status === 'all' ? ' no período' : ` · ${filterLabel(status)}`}`}
+          {!data ? 'Carregando…' : `${int(rows.length)} conversa${rows.length === 1 ? '' : 's'}${status === 'all' && !pending ? ' no período' : status === 'all' ? '' : ` · ${filterLabel(status)}`}`}
         </div>
 
         {error ? (
@@ -144,7 +172,7 @@ export function SupervisorConversations() {
             Não foi possível consultar o Kommo agora, então este filtro não pode ser calculado. Tente recarregar em instantes.
           </EmptyState>
         ) : rows.length === 0 ? (
-          <EmptyState title="Nenhuma conversa encontrada.">Mude o período, o atendente, o canal, o status ou a busca.</EmptyState>
+          <EmptyState title="Nenhuma conversa encontrada.">Mude o período, o atendente, o canal, o status{pending ? ', o filtro de clientes sem resposta' : ''} ou a busca.</EmptyState>
         ) : (
           <ul className={`sv-conv-items uc-reload-scope ${loading ? 'is-reloading' : ''}`}>
             {visible.map((c) => {
@@ -192,6 +220,7 @@ export function SupervisorConversations() {
             attendance={selected}
             responsibleId={selectedConv ? responsibleOf(selectedConv.kommo_lead_id) : undefined}
             kommoUserName={kommoUserName}
+            period={filters.range}
           />
         ) : (
           <div className="sv-placeholder">

@@ -2,9 +2,10 @@ import React, { useEffect, useMemo, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { ArrowLeft, Bot, ExternalLink, Sparkles } from 'lucide-react';
 import { fetchConversationMessages, type TimelineMessage } from '../../lib/api';
-import { buildTranscript } from '../../lib/transcript';
+import { buildTranscript, transcriptPeriodView, type TranscriptCounts } from '../../lib/transcript';
+import { rangeToInstants, type StoreRange } from '../../lib/supervisor/filters';
 import { kommoLeadUrl } from '../../lib/supervisor/channels';
-import { formatInstantBR } from '../../lib/finance/dates';
+import { formatDateBR, formatInstantBR, STORE_TIME_ZONE } from '../../lib/finance/dates';
 import { int } from '../../lib/finance/format';
 import { fetchConversationDetail, type ConversationDetail } from '../../lib/supervisor/supervisorApi';
 import type { ConversationAttendance } from '../../lib/supervisor/attendance';
@@ -18,10 +19,20 @@ interface Props {
   attendance?: ConversationAttendance;
   responsibleId?: string | null;
   kommoUserName: (id: string | null | undefined) => string;
+  /** Período escolhido: marca as mensagens fora dele (o status só usa as de dentro). */
+  period?: StoreRange;
+}
+
+function CountsLine({ label, c }: { label: string; c: TranscriptCounts }) {
+  return (
+    <span className="sv-thread-count">
+      <b>{label}</b> {int(c.client)} do cliente · {int(c.seller)} de atendentes · {int(c.bot)} do bot
+    </span>
+  );
 }
 
 /** Histórico de uma conversa: mensagens do cliente, do vendedor e do bot na ordem real do Kommo. */
-export function ConversationThread({ conversationId, backTo, attendance, responsibleId, kommoUserName }: Props) {
+export function ConversationThread({ conversationId, backTo, attendance, responsibleId, kommoUserName, period }: Props) {
   const [state, setState] = useState<{ detail: ConversationDetail | null; messages: TimelineMessage[]; error: string | null; loading: boolean }>({
     detail: null,
     messages: [],
@@ -42,9 +53,16 @@ export function ConversationThread({ conversationId, backTo, attendance, respons
   }, [conversationId, nonce]);
 
   const transcript = useMemo(
-    () => (state.detail ? buildTranscript(state.messages, { clientName: state.detail.client_name }) : []),
+    () => (state.detail ? buildTranscript(state.messages, { clientName: state.detail.client_name }, STORE_TIME_ZONE) : []),
     [state.detail, state.messages]
   );
+  // Só com a conversa no período (há status): situa cada mensagem em relação a ele.
+  const periodView = useMemo(() => {
+    if (!period || !attendance) return null;
+    const { fromIso, toIso } = rangeToInstants(period);
+    return transcriptPeriodView(transcript, fromIso, toIso);
+  }, [transcript, period, attendance]);
+  const periodText = period ? (period.from === period.to ? formatDateBR(period.from) : `${formatDateBR(period.from)} a ${formatDateBR(period.to)}`) : '';
   const counts = useMemo(() => {
     const c = { client: 0, seller: 0, bot: 0, unavailable: 0 };
     for (const m of transcript) {
@@ -94,10 +112,23 @@ export function ConversationThread({ conversationId, backTo, attendance, respons
       </div>
 
       <div className="sv-thread-stats">
-        <span>{int(counts.client)} do cliente</span>
-        <span>{int(counts.seller)} de atendentes</span>
-        <span>{int(counts.bot)} do bot</span>
-        {counts.unavailable > 0 && <span className="sv-muted">{int(counts.unavailable)} sem texto (Kommo não enviou o conteúdo)</span>}
+        {periodView ? (
+          <>
+            <CountsLine label="No período:" c={periodView.inPeriod} />
+            {(periodView.firstAfter >= 0 || periodView.firstInAfterBefore >= 0) && <CountsLine label="Histórico exibido:" c={periodView.all} />}
+          </>
+        ) : (
+          <>
+            <span>{int(counts.client)} do cliente</span>
+            <span>{int(counts.seller)} de atendentes</span>
+            <span>{int(counts.bot)} do bot</span>
+          </>
+        )}
+        {counts.unavailable > 0 && (
+          <span className="sv-muted">
+            {int(counts.unavailable)} sem texto{periodView ? ' no histórico' : ''} (Kommo não enviou o conteúdo)
+          </span>
+        )}
       </div>
 
       {hasAnalysis && (
@@ -124,13 +155,24 @@ export function ConversationThread({ conversationId, backTo, attendance, respons
 
       <div className="sv-messages" aria-label="Mensagens da conversa">
         {transcript.length === 0 && <EmptyState title="Nenhuma mensagem registrada para esta conversa." />}
-        {transcript.map((m) => (
+        {transcript.map((m, i) => (
           <React.Fragment key={m.id}>
+            {periodView && i === periodView.firstInAfterBefore && (
+              <div className="sv-period-mark" role="note">
+                Início do período selecionado ({periodText})
+              </div>
+            )}
+            {periodView && i === periodView.firstAfter && (
+              <div className="sv-period-mark is-after" role="note">
+                {m.sender === 'seller' ? 'Resposta posterior' : 'Mensagens posteriores'} ao período selecionado — não {m.sender === 'seller' ? 'altera' : 'alteram'} o status de {periodText}.
+              </div>
+            )}
             {m.dayLabel && <div className="sv-day">{m.dayLabel}</div>}
-            <div className={`sv-msg sv-msg-${m.sender}`}>
+            <div className={`sv-msg sv-msg-${m.sender} ${periodView && periodView.positions[i] !== 'in' ? 'is-outside-period' : ''}`}>
               <div className="sv-msg-author">
                 {m.sender === 'bot' && <Bot size={12} aria-hidden="true" />}
                 <span>{m.senderName}</span>
+                {periodView && periodView.positions[i] !== 'in' && <span className="uc-sr-only">(fora do período selecionado)</span>}
                 <time>{m.time}</time>
               </div>
               <div className={`sv-bubble ${m.unavailable ? 'is-unavailable' : ''}`}>

@@ -34,8 +34,10 @@ test('Metas: cada card leva à seção correspondente', () => {
 
 test('Meu Supervisor: mantém os filtros atuais (vendedor, canal) e acrescenta o status', () => {
   assert.equal(cardLinks.supervisor('conversas', 'vendedor=abc&canal=whatsapp'), '/supervisor/conversas?vendedor=abc&canal=whatsapp');
-  assert.equal(cardLinks.supervisor('conversas', '', 'nao_atendida'), '/supervisor/conversas?status=nao_atendida');
+  assert.equal(cardLinks.supervisor('conversas', '', { status: 'nao_atendida' }), '/supervisor/conversas?status=nao_atendida');
+  assert.equal(cardLinks.supervisor('conversas', 'canal=whatsapp', { pendente: 'nunca_atendida' }), '/supervisor/conversas?canal=whatsapp&pendente=nunca_atendida');
   assert.equal(cardLinks.supervisor('analise-ia'), '/supervisor/analise-ia');
+  assert.equal(cardLinks.supervisor('conversas', 'canal=whatsapp&pendente=automatica&status=atendida'), '/supervisor/conversas?canal=whatsapp', 'filtros da lista não vazam');
 });
 
 test('Outros destinos: relatório do vendedor, ranking de conversão e resultado diário', () => {
