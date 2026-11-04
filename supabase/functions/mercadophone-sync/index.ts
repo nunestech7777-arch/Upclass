@@ -1,7 +1,8 @@
 import { createClient } from 'jsr:@supabase/supabase-js@2';
 import { fetchAllVendedores, fetchEstoqueSnapshot, fetchHistoricoVendas } from '../_shared/mercadophone.ts';
 import { mapItemSellers, planSellerUpdates, type SaleSellerRow } from '../_shared/itemSellers.ts';
-import { pickReconcileDays, runFinancialSync, todayInStore } from '../_shared/financialSync.ts';
+import { pickReconcileDays, recordSkippedRun, runFinancialSync, todayInStore } from '../_shared/financialSync.ts';
+import { lockHolder, withFinancialLock } from '../_shared/financialLock.ts';
 import { planStockMovements, type IntervalSales, type LedgerSnapshotItem, type LevelRow } from '../_shared/stockLedger.ts';
 
 const RECONCILE_DAYS = 3;
@@ -250,20 +251,37 @@ Deno.serve(async (req) => {
     // as datas com itens ainda pendentes desde 01/09/2026 — até 12 dias (≈ 12 consultas, ~3 s cada) por
     // execução, com vagas reservadas para pendências; se o MercadoPhone cair, a execução para e a próxima retoma.
     // Cada dia é independente: falha num dia fica registrada e os outros seguem.
+    // Trava compartilhada (migração 0022): um clique em "Atualizar dados" ou uma conciliação manual
+    // em andamento faz a rotina esperar até 30 s; se continuar ocupada (ou a trava falhar), a
+    // execução pulada fica registrada em financial_sync_runs e a próxima rotina retoma.
     let financial: unknown = null;
     try {
-      const days = await pickReconcileDays(supabase, { recentDays: RECONCILE_DAYS, maxDays: 12 });
-      const result = await runFinancialSync(supabase, fetchHistoricoVendas, {
-        start: [...days].sort()[0],
-        end: [...days].sort().at(-1)!,
-        days,
-        mode: 'apply',
-        trigger: 'cron',
-        timeBudgetMs: 60_000,
-      });
-      financial = { ...result.counts, days_processed: result.days_processed, days_failed: result.days_failed };
+      const locked = await withFinancialLock(
+        supabase,
+        lockHolder('cron'),
+        async () => {
+          const days = await pickReconcileDays(supabase, { recentDays: RECONCILE_DAYS, maxDays: 12 });
+          return runFinancialSync(supabase, fetchHistoricoVendas, {
+            start: [...days].sort()[0],
+            end: [...days].sort().at(-1)!,
+            days,
+            mode: 'apply',
+            trigger: 'cron',
+            timeBudgetMs: 60_000,
+          });
+        },
+        { waitMs: 30_000 }
+      );
+      if (locked.acquired) {
+        const result = locked.value;
+        financial = { ...result.counts, days_processed: result.days_processed, days_failed: result.days_failed };
+      } else {
+        financial = { skipped: 'busy' };
+        await recordSkippedRun(supabase, 'Conciliação pulada: outra conciliação em andamento (trava ocupada por mais de 30 s)');
+      }
     } catch (err) {
       console.error('failed to reconcile financial data', err);
+      if (/trava da conciliação/.test(String(err))) await recordSkippedRun(supabase, String(err).slice(0, 500));
     }
 
     return new Response(

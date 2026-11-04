@@ -3,7 +3,7 @@ import { Link } from 'react-router-dom';
 import { ArrowDown, Trophy } from 'lucide-react';
 import { SellerAvatar } from '../SellerAvatar';
 import { EmptyState, PctWithBar } from '../finance/FinancePrimitives';
-import { RANK_SORT_LABELS, sortSellerRows, type DeviceRankRow, type RankSortKey, type SellerDashRow } from '../../lib/finance/dashboard';
+import { RANK_SORT_LABELS, confirmedMoney, sortSellerRows, type DeviceRankRow, type RankSortKey, type SellerDashRow } from '../../lib/finance/dashboard';
 import { brl, int, pct } from '../../lib/finance/format';
 
 type Tab = 'profit' | 'margin' | 'devices';
@@ -57,7 +57,9 @@ export function SellerRankings({ rows, devices }: Props) {
   const [sortKey, setSortKey] = useState<RankSortKey>('profit');
   const effective: RankSortKey = tab === 'margin' ? 'margin' : sortKey;
   const sorted = sortSellerRows(rows, effective);
-  const total = rows.reduce((a, r) => ({ revenue: a.revenue + r.revenue, cost: a.cost + r.cost, profit: a.profit + r.profit, devices: a.devices + r.devices, accessories: a.accessories + r.accessories, units: a.units + r.units }), { revenue: 0, cost: 0, profit: 0, devices: 0, accessories: 0, units: 0 });
+  const total = rows.reduce((a, r) => ({ revenue: a.revenue + r.revenue, cost: a.cost + r.cost, profit: a.profit + r.profit, devices: a.devices + r.devices, accessories: a.accessories + r.accessories, units: a.units + r.units, items: a.items + r.items, reconciledItems: a.reconciledItems + r.reconciledItems }), { revenue: 0, cost: 0, profit: 0, devices: 0, accessories: 0, units: 0, items: 0, reconciledItems: 0 });
+  /** "—" quando nenhum item do grupo está conciliado (ver `confirmedMoney`). */
+  const known = (v: number, g: { items: number; reconciledItems: number }) => confirmedMoney(v, g.items, g.reconciledItems);
   const totalMargin = total.revenue > 0 ? (total.profit / total.revenue) * 100 : null;
   const maxMargin = Math.max(...rows.map((r) => r.margin ?? 0), 1);
 
@@ -124,7 +126,6 @@ export function SellerRankings({ rows, devices }: Props) {
                   <td className="col-rank fin-rank">{String(i + 1).padStart(2, '0')}</td>
                   <td className="align-left">
                     <SellerCell row={r} />
-                    {r.reconciledItems < r.items && <span className="fin-tag tone-warn">parcial</span>}
                   </td>
                   {tab === 'profit' && (
                     <>
@@ -133,9 +134,9 @@ export function SellerRankings({ rows, devices }: Props) {
                     </>
                   )}
                   {tab === 'margin' && <td className="align-right num">{int(r.units)}</td>}
-                  <td className="align-right num">{brl(r.revenue)}</td>
-                  <td className="align-right num">{brl(r.cost)}</td>
-                  <td className={`align-right num strong ${r.profit < 0 ? 'tone-deficit' : 'tone-profit'}`}>{brl(r.profit)}</td>
+                  <td className="align-right num">{brl(known(r.revenue, r))}</td>
+                  <td className="align-right num">{brl(known(r.cost, r))}</td>
+                  <td className={`align-right num strong ${r.profit < 0 ? 'tone-deficit' : 'tone-profit'}`}>{brl(known(r.profit, r))}</td>
                   <td className={tab === 'margin' ? 'align-left' : 'align-right num'}>
                     {tab === 'margin' ? (
                       r.margin == null ? (
@@ -161,9 +162,9 @@ export function SellerRankings({ rows, devices }: Props) {
                   </>
                 )}
                 {tab === 'margin' && <td className="align-right num">{int(total.units)}</td>}
-                <td className="align-right num">{brl(total.revenue)}</td>
-                <td className="align-right num">{brl(total.cost)}</td>
-                <td className={`align-right num ${total.profit < 0 ? 'tone-deficit' : 'tone-profit'}`}>{brl(total.profit)}</td>
+                <td className="align-right num">{brl(known(total.revenue, total))}</td>
+                <td className="align-right num">{brl(known(total.cost, total))}</td>
+                <td className={`align-right num ${total.profit < 0 ? 'tone-deficit' : 'tone-profit'}`}>{brl(known(total.profit, total))}</td>
                 <td className={tab === 'margin' ? 'align-left' : 'align-right num'}>{pct(totalMargin)}</td>
               </tr>
             </tfoot>
@@ -178,7 +179,8 @@ function DeviceRankingTable({ rows, monthLabel, goalsAvailable, onOpenSeller }: 
   if (rows.length === 0) return <EmptyState title="Nenhum vendedor no ranking">Mostre vendedores em Vendedores para vê-los aqui.</EmptyState>;
   const monthBasis = rows[0].basisIsMonth;
   const anyGoal = rows.some((r) => r.target != null);
-  const total = rows.reduce((a, r) => ({ sold: a.sold + r.sold, revenue: a.revenue + r.revenue, profit: a.profit + r.profit }), { sold: 0, revenue: 0, profit: 0 });
+  const total = rows.reduce((a, r) => ({ sold: a.sold + r.sold, revenue: a.revenue + r.revenue, profit: a.profit + r.profit, items: a.items + r.items, reconciledItems: a.reconciledItems + r.reconciledItems }), { sold: 0, revenue: 0, profit: 0, items: 0, reconciledItems: 0 });
+  const known = (v: number, g: { items: number; reconciledItems: number }) => confirmedMoney(v, g.items, g.reconciledItems);
 
   return (
     <>
@@ -217,7 +219,6 @@ function DeviceRankingTable({ rows, monthLabel, goalsAvailable, onOpenSeller }: 
                     <SellerAvatar name={r.seller.name} photoUrl={r.seller.photo_url} size="sm" />
                     <span className="fin-seller-name">{r.seller.name}</span>
                   </button>
-                  {r.reconciledItems < r.items && <span className="fin-tag tone-warn">parcial</span>}
                 </td>
                 <td className="align-right num">
                   <span className="strong tone-profit">{int(r.sold)}</span>
@@ -236,8 +237,8 @@ function DeviceRankingTable({ rows, monthLabel, goalsAvailable, onOpenSeller }: 
                 <td className="align-right num">
                   {r.target == null ? <span className="fin-muted">—</span> : r.remaining === 0 ? <span className="fc-reached">META ATINGIDA</span> : <span className="strong tone-deficit">{int(r.remaining)}</span>}
                 </td>
-                <td className="align-right num">{brl(r.revenue)}</td>
-                <td className={`align-right num strong ${r.profit < 0 ? 'tone-deficit' : 'tone-profit'}`}>{brl(r.profit)}</td>
+                <td className="align-right num">{brl(known(r.revenue, r))}</td>
+                <td className={`align-right num strong ${r.profit < 0 ? 'tone-deficit' : 'tone-profit'}`}>{brl(known(r.profit, r))}</td>
               </tr>
             ))}
           </tbody>
@@ -249,8 +250,8 @@ function DeviceRankingTable({ rows, monthLabel, goalsAvailable, onOpenSeller }: 
               <td />
               <td />
               <td />
-              <td className="align-right num">{brl(total.revenue)}</td>
-              <td className={`align-right num ${total.profit < 0 ? 'tone-deficit' : 'tone-profit'}`}>{brl(total.profit)}</td>
+              <td className="align-right num">{brl(known(total.revenue, total))}</td>
+              <td className={`align-right num ${total.profit < 0 ? 'tone-deficit' : 'tone-profit'}`}>{brl(known(total.profit, total))}</td>
             </tr>
           </tfoot>
         </table>

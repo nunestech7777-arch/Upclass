@@ -7,6 +7,7 @@ import {
   buildSellerRows,
   buildDeviceRows,
   buildSeries,
+  confirmedMoney,
   deviceItemsOf,
   coverageSummary,
   dataRange,
@@ -17,6 +18,7 @@ import {
   pickGranularity,
   presetRange,
   rangeCoverage,
+  refreshPendingCount,
   salesIn,
   sortSellerRows,
   summarizeMoney,
@@ -531,5 +533,47 @@ describe('vendas com vários iPhones (venda real 8613940 e variações)', () => 
   it('o faturamento não duplica: soma das linhas, uma vez cada', () => {
     const m = summarizeMoney(it8613940().map((s) => ({ ...s, revenue: s.amount, cost: 0, profit: s.amount })));
     assert.equal(m.revenue, 16350);
+  });
+});
+
+describe('botão "Atualizar dados" (amarelo com pendência)', () => {
+  const ok = (d: string) => sale({ seller_id: 'a', product_id: 'i15', sold_date: d });
+  const open = (d: string, o: Partial<FinanceSale> = {}) =>
+    sale({ seller_id: 'a', product_id: 'i15', sold_date: d, financial_status: 'pending', revenue: null, cost: null, profit: null, ...o });
+  it('normal quando tudo está conciliado', () => {
+    assert.equal(refreshPendingCount([ok('2026-11-03'), ok('2026-11-04')]), 0);
+  });
+  it('regressão 8913080: 8 itens recém-chegados sem custo → amarelo (8)', () => {
+    const sales = [...Array.from({ length: 66 }, () => ok('2026-11-02')), ...Array.from({ length: 8 }, () => open('2026-11-04', { created_at: '2026-11-04T14:36:13Z' }))];
+    assert.equal(refreshPendingCount(sales), 8);
+  });
+  it('iPhone com custo 0 na origem acende; cancelado não conta', () => {
+    const zero = sale({ seller_id: 'a', product_id: 'i15', sold_date: '2026-10-11', cost: 0, profit: 4000, amount: 4000, product_type: 'PRODUTO APPLE' });
+    const cancelled = open('2026-10-12', { item_status: 'cancelled' });
+    assert.equal(refreshPendingCount([zero, cancelled, ok('2026-10-13')]), 1);
+  });
+  it('vendas antes de 01/09/2026 (fora da conciliação automática) não deixam o botão amarelo', () => {
+    assert.equal(refreshPendingCount([open('2026-08-20'), ok('2026-08-21')]), 0);
+    // Mesmo com motivo que não é "fora da conciliação" (ex.: não encontrado, custo 0 de iPhone).
+    const oldZero = sale({ seller_id: 'a', product_id: 'i15', sold_date: '2026-08-20', cost: 0, profit: 4000, amount: 4000, product_type: 'PRODUTO APPLE' });
+    assert.equal(refreshPendingCount([open('2026-08-20', { financial_status: 'not_found' }), oldZero]), 0);
+  });
+});
+
+describe('valores financeiros sem item conciliado aparecem como "—"', () => {
+  it('grupo com itens e nenhum conciliado → null (não é R$ 0,00 confirmado)', () => {
+    assert.equal(confirmedMoney(0, 8, 0), null);
+  });
+  it('grupo com algum conciliado mantém a soma dos conciliados; grupo vazio mantém zero', () => {
+    assert.equal(confirmedMoney(800, 8, 1), 800);
+    assert.equal(confirmedMoney(0, 0, 0), 0);
+  });
+  it('regressão 8913080: com os 8 itens pendentes, faturamento e lucro do pedido ficam "—"; o valor pago continua', () => {
+    const rows = Array.from({ length: 8 }, () => sale({ seller_id: 'a', product_id: 'i15', sold_date: '2026-11-04', amount: 3460, financial_status: 'pending', revenue: null, cost: null, profit: null }));
+    const m = summarizeMoney(rows);
+    assert.equal(confirmedMoney(m.revenue, m.items, m.reconciledItems), null);
+    assert.equal(confirmedMoney(m.profit, m.items, m.reconciledItems), null);
+    assert.equal(m.margin, null);
+    assert.equal(summarizeUnits(rows, names).devices, 8, 'quantidades não dependem da conciliação');
   });
 });

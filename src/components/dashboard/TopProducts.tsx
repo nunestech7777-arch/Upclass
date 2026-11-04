@@ -3,7 +3,7 @@ import { Headphones, Smartphone, X } from 'lucide-react';
 import { brl, int, pct } from '../../lib/finance/format';
 import { formatDateBR, wallClock } from '../../lib/finance/dates';
 import { isReconciled, type FinanceSale } from '../../lib/finance/calc';
-import type { TopProduct } from '../../lib/finance/dashboard';
+import { confirmedMoney, type TopProduct } from '../../lib/finance/dashboard';
 import { countDelay } from '../../lib/motion';
 import { AnimatedNumber } from '../ui/AnimatedNumber';
 import { useCardLink } from '../ui/useCardLink';
@@ -49,11 +49,10 @@ export function TopProductCard({ kind, product, onOpen, to }: CardProps) {
             <div>
               <span>Faturamento gerado</span>
               <b>
-                <AnimatedNumber value={product.revenue} format={brl} delay={delay} />
+                <AnimatedNumber value={confirmedMoney(product.revenue, product.rows.length, product.rows.length - product.unreconciled)} format={brl} delay={delay} />
               </b>
             </div>
           </div>
-          {product.unreconciled > 0 && <span className="fin-badge-partial">Parcial · {int(product.unreconciled)} a conciliar</span>}
           {product.ranking.length > 1 && (
             <ul className="dv-top-rank">
               {product.ranking.slice(1, 5).map((r, i) => (
@@ -90,7 +89,6 @@ interface ItemsDialogProps {
   productNames: Map<string, string>;
   sellerNames: Map<string, string>;
   columns?: SalesItemsColumns;
-  unreconciled?: number;
   /** Controles extras acima da tabela (ex.: escolher o produto). */
   toolbar?: React.ReactNode;
   onClose: () => void;
@@ -100,7 +98,7 @@ interface ItemsDialogProps {
  * Itens vendidos (produto, quantidade, data, cliente, valor e, opcionalmente, vendedor do item,
  * lucro bruto e número da venda). Usado pelo produto mais vendido e pelo ranking por aparelhos.
  */
-export function SalesItemsDialog({ title, summary, rows, productNames, sellerNames, columns = { seller: true }, unreconciled = 0, toolbar, onClose }: ItemsDialogProps) {
+export function SalesItemsDialog({ title, summary, rows, productNames, sellerNames, columns = { seller: true }, toolbar, onClose }: ItemsDialogProps) {
   const ref = useRef<HTMLDivElement>(null);
   useEffect(() => {
     const previous = document.activeElement as HTMLElement | null;
@@ -152,7 +150,7 @@ export function SalesItemsDialog({ title, summary, rows, productNames, sellerNam
                     {columns.order && <td className="align-left nowrap">{r.mp_order_id ?? <span className="fin-muted">—</span>}</td>}
                     <td className="align-left">{r.customer_name ?? <span className="fin-muted">Não informado</span>}</td>
                     {columns.seller && <td className="align-left">{sellerNames.get(r.seller_id) ?? 'Vendedor não cadastrado'}</td>}
-                    <td className="align-right num">{isReconciled(r) ? brl(r.revenue) : <span className="fin-muted">{brl(r.amount)}*</span>}</td>
+                    <td className="align-right num">{isReconciled(r) ? brl(r.revenue) : <span className="fin-muted">{brl(r.amount)}</span>}</td>
                     {columns.profit && (
                       <td className={`align-right num ${isReconciled(r) ? ((r.profit ?? 0) < 0 ? 'tone-deficit' : 'tone-profit') : ''}`}>
                         {isReconciled(r) ? brl(r.profit) : <span className="fin-muted">—</span>}
@@ -164,7 +162,6 @@ export function SalesItemsDialog({ title, summary, rows, productNames, sellerNam
             </tbody>
           </table>
         </div>
-        {unreconciled > 0 && <p className="fin-muted fin-small">* valor pago pelo cliente; custo, receita líquida e lucro ainda não conciliados.</p>}
       </div>
     </div>
   );
@@ -185,16 +182,14 @@ export function TopProductDialog({ title, product, productNames, sellerNames, on
   const rows = group ? group.rows : product.all.flatMap((g) => g.rows).sort((a, b) => b.sold_at.localeCompare(a.sold_at));
   const qty = group ? group.qty : product.all.reduce((a, g) => a + g.qty, 0);
   const revenue = rows.reduce((a, r) => a + (isReconciled(r) ? Number(r.revenue) : 0), 0);
-  const unreconciled = rows.filter((r) => !isReconciled(r)).length;
   return (
     <SalesItemsDialog
       title={`${title}: ${group ? group.name : 'todos os produtos'}`}
-      summary={`${int(qty)} unidade(s) · ${int(rows.length)} item(ns) · faturamento ${brl(revenue)}`}
+      summary={`${int(qty)} unidade(s) · ${int(rows.length)} item(ns) · faturamento ${brl(confirmedMoney(revenue, rows.length, rows.filter(isReconciled).length))}`}
       rows={rows}
       productNames={productNames}
       sellerNames={sellerNames}
       columns={{ seller: true }}
-      unreconciled={unreconciled}
       toolbar={
         <label className="fin-sort dv-product-select">
           Produto

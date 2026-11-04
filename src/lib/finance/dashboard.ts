@@ -14,6 +14,7 @@ import { isDeviceProduct } from '../productClassifier.ts';
 import {
   PENDING_REASONS,
   PENDING_REASON_LABEL,
+  RECONCILE_SINCE,
   emptyPendingCounts,
   financeCategory,
   isActive,
@@ -150,6 +151,15 @@ export function summarizeUnits(sales: FinanceSale[], names: Names): UnitsSummary
   return out;
 }
 
+/**
+ * Valor financeiro (faturamento conciliado, custo, lucro) de um grupo de itens: `null` ("—" na tela)
+ * quando o grupo tem itens mas nenhum conciliado — a soma seria zero só por falta de custo, não um
+ * valor confirmado. Com algum item conciliado, a soma dos conciliados é mantida (mesmo cálculo de antes).
+ */
+export function confirmedMoney(value: number, items: number, reconciledItems: number): number | null {
+  return items > 0 && reconciledItems === 0 ? null : value;
+}
+
 export interface MoneySummary {
   revenue: number;
   cost: number;
@@ -218,7 +228,17 @@ export function rangeCoverage(sales: FinanceSale[], now = Date.now()): Coverage 
   };
 }
 
-/** Resumo da conciliação para o botão e o modal (mesmos dados do `rangeCoverage`; nenhuma regra nova). */
+/**
+ * Itens que deixam o botão "Atualizar dados" amarelo: ativos e ainda não conciliados no período,
+ * desde o início da conciliação (01/09/2026). Vendas anteriores nunca são conciliadas automaticamente
+ * (nem pelo botão) e não acendem o botão — ficariam amarelas para sempre.
+ */
+export function refreshPendingCount(sales: FinanceSale[]): number {
+  return sales.filter((s) => isActive(s) && !isReconciled(s) && s.sold_date >= RECONCILE_SINCE).length;
+}
+
+/** Resumo da conciliação (mesmos dados do `rangeCoverage`; nenhuma regra nova). */
+
 export interface CoverageSummary {
   total: number;
   reconciled: number;

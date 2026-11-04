@@ -13,6 +13,15 @@ export function invalidateFinanceCache(): void {
   entries.clear();
 }
 
+/** Chave da leitura do Dashboard (para saber se a tela abriu com a cópia em cache). */
+export const dashboardCacheKey = (from: string, to: string) => `dashboard:${from}:${to}`;
+
+/** A leitura está guardada (e ainda vale)? A tela mostra a cópia e relê em segundo plano. */
+export function isFinanceCached(key: string, now: number = Date.now()): boolean {
+  const hit = entries.get(key);
+  return !!hit && now - hit.at < READ_CACHE_MS;
+}
+
 function cached<T>(key: string, load: () => Promise<T>, now: () => number): Promise<T> {
   const hit = entries.get(key);
   if (hit && now() - hit.at < READ_CACHE_MS) return hit.value as Promise<T>;
@@ -37,7 +46,7 @@ export function withReadCache(source: FinanceSource, now: () => number = Date.no
     ...source,
     loadMonth: (month) => cached(`month:${month}`, () => source.loadMonth(month), now),
     loadForecast: (month) => cached(`forecast:${month}`, () => source.loadForecast(month), now),
-    loadDashboard: (from, to) => cached(`dashboard:${from}:${to}`, () => source.loadDashboard(from, to), now),
+    loadDashboard: (from, to) => cached(dashboardCacheKey(from, to), () => source.loadDashboard(from, to), now),
     loadDeviceGoals: (month) => cached(`deviceGoals:${month}`, () => source.loadDeviceGoals(month), now),
     saveGoals: write(source.saveGoals.bind(source)),
     deleteGoal: write(source.deleteGoal.bind(source)),
@@ -46,7 +55,7 @@ export function withReadCache(source: FinanceSource, now: () => number = Date.no
     deleteDeviceGoal: write(source.deleteDeviceGoal.bind(source)),
     runSync: async (start, end, mode) => {
       const res = await source.runSync(start, end, mode);
-      if (mode === 'apply') invalidateFinanceCache();
+      if (mode !== 'preview') invalidateFinanceCache();
       return res;
     },
   };

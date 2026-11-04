@@ -5,9 +5,11 @@
  * abertas e dias recentes — custo 0 (status ok) de venda antiga só é relido pela conciliação manual.
  *
  * Duas origens:
- * - globais (noticesApi.ts): consultadas no banco, valem em qualquer página — `missing_cost`;
+ * - globais (noticesApi.ts): consultadas no banco, valem em qualquer página — nenhuma hoje;
  * - da página (PageNotices.tsx): a página aberta publica avisos do período que já carregou, sem
- *   consulta nova — `partial_result` e `empty_days` (Resultado financeiro e Resultados diários).
+ *   consulta nova — `empty_days` (Resultado financeiro e Resultados diários).
+ * Desde 04/11/2026 pendências de conciliação (`missing_cost`, `partial_result`) não vão para o sino:
+ * o único sinal delas é o botão "Atualizar dados" do Dashboard. Os montadores ficam para reuso.
  * Novos tipos (falha de sincronização, divergências, integrações) entram como novo `kind`.
  */
 import {

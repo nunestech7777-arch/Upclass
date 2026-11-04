@@ -19,6 +19,7 @@ import {
   type ReconcileIssue,
   type SaleFinanceRow,
 } from './financialReconcile.ts';
+import { lockHolder, withFinancialLock } from './financialLock.ts';
 
 export type FetchHistory = (dataInicial: string, dataFinal: string) => Promise<HistoricoFinanceItem[]>;
 
@@ -46,6 +47,9 @@ export interface FinancialSyncOptions {
   timeBudgetMs?: number;
   now?: Date;
   graceDays?: number;
+  /** false (botão "Atualizar dados"): não soma conferências no contador da rotina — cliques seguidos
+   * não antecipam o alerta de pendência longa (48 conferências ≈ 1 dia de rotina). */
+  countChecks?: boolean;
 }
 
 export interface DayFailure {
@@ -332,8 +336,9 @@ export async function runFinancialSync(
         throw err;
       }
       // Conferência sem mudança também conta: atualiza só as linhas que estavam pendentes, em lote.
-      await markChecked(supabase, tracked.checks.map((c) => ({ id: c.id, attempts: c.patch.financial_check_attempts as number })), checkedAt);
-      const windowAlerts = [...plan.alerts, ...pendingAlerts(tracked.stale)];
+      const countChecks = options.countChecks ?? true;
+      if (countChecks) await markChecked(supabase, tracked.checks.map((c) => ({ id: c.id, attempts: c.patch.financial_check_attempts as number })), checkedAt);
+      const windowAlerts = [...plan.alerts, ...(countChecks ? pendingAlerts(tracked.stale) : [])];
       await saveAlerts(supabase, windowAlerts);
       await saveAttempts(supabase, source, tracked.attempts);
       alerts.push(...windowAlerts);
@@ -476,4 +481,131 @@ export async function pickReconcileDays(
   const head = ordered.slice(0, limit - reserved);
   const tail = pendingDays.slice(0, limit - head.length);
   return [...head, ...tail];
+}
+
+/** Dias conferidos por clique em "Atualizar dados" (≈ 1 consulta ao histórico, ~3 s cada). */
+export const PENDING_REFRESH_MAX_DAYS = 6;
+/** Intervalo mínimo entre duas conciliações pelo botão (qualquer administrador). */
+export const PENDING_REFRESH_COOLDOWN_MS = 20_000;
+/** Execução sem `finished_at` mais nova que isto ainda está rodando (rotina ou botão). */
+export const RUN_BUSY_MS = 90_000;
+
+export type RefreshGate = 'ok' | 'busy' | 'recent';
+
+/**
+ * Controle de frequência do botão, a partir das últimas execuções em `financial_sync_runs`: outra
+ * execução em andamento (rotina de 30 min ou outro clique) → `busy`; clique há menos de
+ * `PENDING_REFRESH_COOLDOWN_MS` → `recent`. Puro (testável).
+ */
+export function refreshGate(runs: { started_at: string; finished_at: string | null; trigger: string }[], now: number): RefreshGate {
+  for (const r of runs) {
+    const age = now - Date.parse(r.started_at);
+    if (!r.finished_at && age < RUN_BUSY_MS) return 'busy';
+  }
+  return runs.some((r) => r.trigger.startsWith('button:') && now - Date.parse(r.started_at) < PENDING_REFRESH_COOLDOWN_MS) ? 'recent' : 'ok';
+}
+
+/** Produto Apple vendido com custo 0 já "ok": custo não cadastrado na origem (mesma regra do painel, `hasZeroSourceCost`). */
+const isZeroSourceCost = (r: { cost?: number | string | null; amount?: number | string | null; product_type?: string | null }) =>
+  r.cost != null && Number(r.cost) === 0 && Number(r.amount) > 0 && /PRODUTO APPLE/i.test(r.product_type ?? '');
+
+/**
+ * Dias que o botão "Atualizar dados" concilia: só datas com itens ativos ainda abertos (pendente, não
+ * encontrado, ambíguo, divergente) ou com iPhone de custo 0 (custo ainda não cadastrado no MercadoPhone),
+ * dentro do período visível e de [`since`, hoje]. Mais recentes primeiro (a venda que acabou de chegar),
+ * até `maxDays` — nunca o histórico inteiro.
+ */
+export async function pickPendingDays(
+  // deno-lint-ignore no-explicit-any
+  supabase: any,
+  { from, to, now = new Date(), since = SWEEP_SINCE, maxDays = PENDING_REFRESH_MAX_DAYS }: { from: string; to: string; now?: Date; since?: string; maxDays?: number }
+): Promise<string[]> {
+  if (!ISO_DATE.test(from) || !ISO_DATE.test(to)) throw new Error('período inválido (AAAA-MM-DD)');
+  const today = todayInStore(now);
+  const start = from > since ? from : since;
+  const end = to < today ? to : today;
+  if (start > end) return [];
+
+  const [open, zero] = await Promise.all([
+    supabase
+      .from('sales')
+      .select('sold_date')
+      .eq('item_status', 'active')
+      .in('financial_status', OPEN_FINANCIAL_STATUSES)
+      .gte('sold_date', start)
+      .lte('sold_date', end)
+      .order('sold_date', { ascending: false })
+      .limit(1000),
+    supabase
+      .from('sales')
+      .select('sold_date, cost, amount, product_type')
+      .eq('item_status', 'active')
+      .eq('financial_status', 'ok')
+      .eq('cost', 0)
+      .gte('sold_date', start)
+      .lte('sold_date', end)
+      .order('sold_date', { ascending: false })
+      .limit(1000),
+  ]);
+  if (open.error) throw new Error(`listar itens pendentes: ${open.error.message}`);
+  if (zero.error) throw new Error(`listar itens sem custo: ${zero.error.message}`);
+  const days = new Set<string>();
+  for (const r of open.data ?? []) if (r.sold_date) days.add(r.sold_date);
+  for (const r of zero.data ?? []) if (r.sold_date && isZeroSourceCost(r)) days.add(r.sold_date);
+  return [...days].filter((d) => ISO_DATE.test(d)).sort().reverse().slice(0, maxDays);
+}
+
+export interface PendingRefreshResult extends Partial<FinancialSyncResult> {
+  ok: true;
+  skipped?: RefreshGate | 'nothing_pending';
+}
+
+/**
+ * Botão "Atualizar dados": controle de frequência → dias pendentes do período → conciliação com a
+ * trava compartilhada (sem esperar: ocupada = `busy`). Sem pendência não consulta o MercadoPhone nem
+ * pega a trava. Erro (inclusive trava indisponível) sobe para a function responder 500.
+ */
+export async function reconcilePendingRange(
+  // deno-lint-ignore no-explicit-any
+  supabase: any,
+  fetchHistory: FetchHistory,
+  { from, to, trigger, now = new Date(), holder = lockHolder(trigger) }: { from: string; to: string; trigger: string; now?: Date; holder?: string }
+): Promise<PendingRefreshResult> {
+  const { data: runs, error } = await supabase
+    .from('financial_sync_runs')
+    .select('started_at, finished_at, trigger')
+    .order('started_at', { ascending: false })
+    .limit(10);
+  if (error) throw new Error(`ler execuções: ${error.message}`);
+  const gate = refreshGate(runs ?? [], now.getTime());
+  if (gate !== 'ok') return { ok: true, skipped: gate, days_processed: [], days_failed: [] };
+
+  const days = await pickPendingDays(supabase, { from, to, now });
+  if (days.length === 0) return { ok: true, skipped: 'nothing_pending', days_processed: [], days_failed: [] };
+  const sorted = [...days].sort();
+  const locked = await withFinancialLock(supabase, holder, () =>
+    runFinancialSync(supabase, fetchHistory, {
+      start: sorted[0],
+      end: sorted.at(-1)!,
+      days,
+      mode: 'apply',
+      trigger,
+      timeBudgetMs: 40_000,
+      countChecks: false,
+      now,
+    })
+  );
+  if (!locked.acquired) return { ok: true, skipped: 'busy', days_processed: [], days_failed: [] };
+  return { ok: true, ...locked.value };
+}
+
+/** Execução da rotina que não conciliou por causa da trava: fica visível em financial_sync_runs. */
+// deno-lint-ignore no-explicit-any
+export async function recordSkippedRun(supabase: any, reason: string, now = new Date()): Promise<void> {
+  const today = todayInStore(now);
+  const at = now.toISOString();
+  const { error } = await supabase
+    .from('financial_sync_runs')
+    .insert({ period_start: today, period_end: today, mode: 'apply', trigger: 'cron', status: 'error', started_at: at, finished_at: at, error: reason });
+  if (error) console.error('registrar execução pulada', error.message);
 }

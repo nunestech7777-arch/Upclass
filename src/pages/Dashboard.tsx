@@ -1,14 +1,15 @@
-import React, { useEffect, useMemo, useRef, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { CircleDollarSign, Headphones, Percent, RefreshCw, Smartphone, TrendingUp, Wallet } from 'lucide-react';
 import './Dashboard.css';
 import '../components/finance/finance.css';
 import '../components/dashboard/dashboard.css';
 import { SoldProductsModal } from '../components/SoldProductsModal';
 import { EmptyState, KpiCard, SectionEyebrow } from '../components/finance/FinancePrimitives';
-import { CoverageStatus } from '../components/dashboard/CoverageStatus';
 import { useFinanceSource } from '../components/finance/useFinance';
 import { usePeriod } from '../context/PeriodContext';
-import { invalidateFinanceCache } from '../lib/finance/readCache';
+import { dashboardCacheKey, invalidateFinanceCache, isFinanceCached } from '../lib/finance/readCache';
+import { useSyncSignature } from '../lib/finance/useSyncSignature';
+import { notifyFinancialUpdated } from '../lib/notices/noticesApi';
 import { GoalCards } from '../components/dashboard/GoalCards';
 import { SalesItemsDialog, TopProductCard, TopProductDialog } from '../components/dashboard/TopProducts';
 import { SalesEvolutionChart } from '../components/dashboard/SalesEvolutionChart';
@@ -26,12 +27,13 @@ import {
   buildDeviceRows,
   buildSellerRows,
   buildSeries,
+  confirmedMoney,
   deviceItemsOf,
   dataRange,
   defaultMode,
   formatRange,
   goalWindow,
-  rangeCoverage,
+  refreshPendingCount,
   salesIn,
   summarizeMoney,
   summarizeUnits,
@@ -59,6 +61,7 @@ export function Dashboard() {
   const dataRef = useRef<DashboardData | null>(null);
   const [error, setError] = useState<Error | null>(null);
   const [loading, setLoading] = useState(true);
+  /** Só o clique em "Atualizar dados" muda: a contagem do Kommo ignora o cache uma vez. */
   const [nonce, setNonce] = useState(0);
   const [mode, setMode] = useState<{ key: string; value: SeriesMode } | null>(null);
   const [salesOpen, setSalesOpen] = useState(false);
@@ -77,7 +80,7 @@ export function Dashboard() {
     return () => {
       alive = false;
     };
-  }, [source, refMonth, nonce]);
+  }, [source, refMonth]);
 
   // Atendimentos do Kommo do período (Ranking de Conversão): consulta própria, em cache; falha não derruba o painel.
   const rangeKey = `${range.from}|${range.to}`;
@@ -100,7 +103,7 @@ export function Dashboard() {
   // Uma consulta cobre período + janelas de meta; trocar o filtro dentro do intervalo já carregado não consulta de novo.
   useEffect(() => {
     const cur = dataRef.current;
-    if (nonce === 0 && cur && cur.range.from <= need.from && cur.range.to >= need.to) {
+    if (cur && cur.range.from <= need.from && cur.range.to >= need.to) {
       setLoading(false);
       return;
     }
@@ -119,7 +122,67 @@ export function Dashboard() {
     return () => {
       alive = false;
     };
-  }, [source, need.from, need.to, nonce]);
+  }, [source, need.from, need.to]);
+
+  // Recarga sem esconder a tela (botão e segundo plano): painel e metas chegam juntos, no período e
+  // filtros atuais — nenhum card fica com dado de outra leitura. Uma recarga por vez.
+  const live = useRef({ need, refMonth });
+  live.current = { need, refMonth };
+  const mounted = useRef(true);
+  useEffect(() => {
+    mounted.current = true;
+    return () => {
+      mounted.current = false;
+    };
+  }, []);
+  const reloading = useRef<Promise<void> | null>(null);
+  const reloadAgain = useRef(false);
+  const reload = useCallback((): Promise<void> => {
+    if (reloading.current) {
+      reloadAgain.current = true;
+      return reloading.current;
+    }
+    const run = async () => {
+      do {
+        reloadAgain.current = false;
+        const { need: want, refMonth: month } = live.current;
+        invalidateFinanceCache();
+        const [d, goals] = await Promise.all([
+          source.loadDashboard(want.from, want.to),
+          source.loadDeviceGoals(month).then(
+            (g) => ({ goals: g, available: true }),
+            () => ({ goals: [] as DeviceGoal[], available: false })
+          ),
+        ]);
+        const cur = live.current;
+        if (!mounted.current) break;
+        // Período trocado no meio: relê no período novo (ele pode estar dentro do intervalo já
+        // carregado, e aí nenhuma outra carga traria os valores conciliados).
+        if (cur.need.from !== want.from || cur.need.to !== want.to) {
+          reloadAgain.current = true;
+          continue;
+        }
+        dataRef.current = d;
+        setData(d);
+        setError(null);
+        if (cur.refMonth === month) setGoalsState({ month, ...goals });
+      } while (reloadAgain.current && mounted.current);
+    };
+    reloading.current = run().finally(() => {
+      reloading.current = null;
+    });
+    return reloading.current;
+  }, [source]);
+
+  // Segundo plano: a rotina de 30 min (ou uma venda recebida) mudou o banco → relê, sem F5 e sem
+  // consultar o MercadoPhone. Erro aqui só mantém os dados na tela.
+  const { baseline } = useSyncSignature(source.loadSyncSignature, () => void reload().catch(() => {}));
+
+  // Abriu com a cópia em cache (voltou à página há pouco): mostra na hora e relê em seguida.
+  const openedFromCache = useRef(isFinanceCached(dashboardCacheKey(need.from, need.to)));
+  useEffect(() => {
+    if (openedFromCache.current) void reload().catch(() => {});
+  }, [reload]);
 
   const view = useMemo(() => {
     if (!data || data.range.from > need.from || data.range.to < need.to) return null;
@@ -133,7 +196,6 @@ export function Dashboard() {
       inRange,
       units: summarizeUnits(inRange, names),
       money: summarizeMoney(inRange),
-      coverage: rangeCoverage(inRange),
       week: unitGoalProgress(data.sales, names, weekWindow, { devices: data.targets.weekly_devices_target, accessories: data.targets.weekly_accessories_target }),
       month: unitGoalProgress(data.sales, names, monthWindow, { devices: data.targets.monthly_devices_target, accessories: data.targets.monthly_accessories_target }),
       topDevice: topProduct(inRange, names, 'devices'),
@@ -162,13 +224,42 @@ export function Dashboard() {
   const [lastView, setLastView] = useState(view);
   if (view && view !== lastView) setLastView(view);
   const shown = view ?? lastView;
-  const reloading = loading || (!view && !!lastView);
+  const dimmed = loading || (!view && !!lastView);
 
   // Cards e seções abaixo da dobra entram quando chegam à tela (no celular, quase tudo).
   const contentRef = useRef<HTMLDivElement>(null);
   useScrollReveal(contentRef, REVEAL_TARGETS, !!shown && !!data && !error);
 
   const deviceRow = view?.deviceRows.find((r) => r.seller.id === deviceSeller);
+
+  // "Atualizar dados": amarelo enquanto houver item não conciliado no período (desde 01/09/2026).
+  // Com pendência, tenta conciliar só os dias pendentes no backend; sempre relê o banco depois.
+  const pendingCount = shown ? refreshPendingCount(shown.inRange) : 0;
+  const [refreshing, setRefreshing] = useState(false);
+  const [refreshFailed, setRefreshFailed] = useState(false);
+  const clicking = useRef(false);
+  const refreshNow = async () => {
+    if (clicking.current) return;
+    clicking.current = true;
+    setRefreshing(true);
+    setRefreshFailed(false);
+    try {
+      if (pendingCount > 0) {
+        const res = await source.runSync(range.from, range.to, 'pending').catch(() => null);
+        if (!res?.ok || (res.days_failed?.length ?? 0) > 0) setRefreshFailed(true);
+      }
+      // Referência antes de reler: a mudança feita por este clique não dispara outra recarga.
+      await baseline();
+      await reload();
+      setNonce((n) => n + 1);
+      notifyFinancialUpdated();
+    } catch {
+      setRefreshFailed(true);
+    } finally {
+      clicking.current = false;
+      if (mounted.current) setRefreshing(false);
+    }
+  };
   const modeKey = `${range.from}|${range.to}`;
   const activeMode: SeriesMode = mode && mode.key === modeKey ? mode.value : defaultMode(range);
 
@@ -180,13 +271,16 @@ export function Dashboard() {
           <h1 className="fin-title">Dashboard</h1>
         </div>
         <div className="dv-head-actions">
-          <button type="button" className="fin-btn" onClick={() => {
-              invalidateFinanceCache();
-              setNonce((n) => n + 1);
-            }} disabled={loading}>
-            <RefreshCw size={15} className={loading ? 'fin-spin' : ''} /> Atualizar
+          <button
+            type="button"
+            className={`fin-btn dv-refresh-btn ${pendingCount > 0 ? 'is-pending' : ''}`}
+            onClick={refreshNow}
+            disabled={refreshing || loading}
+            aria-busy={refreshing}
+            title={refreshFailed ? 'Não foi possível atualizar tudo agora; tente de novo em instantes' : undefined}
+          >
+            <RefreshCw size={15} className={refreshing || loading ? 'fin-spin' : ''} aria-hidden="true" /> Atualizar dados
           </button>
-          <CoverageStatus coverage={view?.coverage ?? null} />
         </div>
       </header>
 
@@ -195,13 +289,13 @@ export function Dashboard() {
       ) : !shown || !data ? (
         <DashboardSkeleton />
       ) : (
-        <div ref={contentRef} className={`dv-content dv-enter ${reloading ? 'dv-reloading' : ''}`} aria-busy={reloading}>
+        <div ref={contentRef} className={`dv-content dv-enter ${dimmed ? 'dv-reloading' : ''}`} aria-busy={dimmed}>
           <span className="dv-reload-bar" aria-hidden="true" />
           <div className="dv-kpis">
             <KpiCard to={cardLinks.sales({ categoria: 'Aparelhos' })} label="Aparelhos vendidos" value={<AnimatedNumber value={shown.units.devices} format={int} delay={countDelay(1)} />} icon={<Smartphone size={18} />} tone="goal" />
             <KpiCard to={cardLinks.sales({ categoria: 'Acessórios' })} label="Acessórios vendidos" value={<AnimatedNumber value={shown.units.accessories} format={int} delay={countDelay(2)} />} icon={<Headphones size={18} />} tone="profit" caption={shown.units.gifts ? `Brindes: ${int(shown.units.gifts)}` : undefined} />
-            <KpiCard to={cardLinks.financial()} label="Faturamento" value={<AnimatedNumber value={shown.money.revenue} format={brl} delay={countDelay(3)} />} icon={<CircleDollarSign size={18} />} tone="neutral" badge={shown.coverage.complete ? undefined : 'Parcial'} />
-            <KpiCard to={cardLinks.financial()} label="Lucro bruto" value={<AnimatedNumber value={shown.money.profit} format={brl} delay={countDelay(4)} />} icon={<Wallet size={18} />} tone={shown.money.profit < 0 ? 'deficit' : 'profit'} highlight badge={shown.coverage.complete ? undefined : 'Parcial'} />
+            <KpiCard to={cardLinks.financial()} label="Faturamento" value={<AnimatedNumber value={confirmedMoney(shown.money.revenue, shown.money.items, shown.money.reconciledItems)} format={brl} delay={countDelay(3)} />} icon={<CircleDollarSign size={18} />} tone="neutral" />
+            <KpiCard to={cardLinks.financial()} label="Lucro bruto" value={<AnimatedNumber value={confirmedMoney(shown.money.profit, shown.money.items, shown.money.reconciledItems)} format={brl} delay={countDelay(4)} />} icon={<Wallet size={18} />} tone={shown.money.profit < 0 ? 'deficit' : 'profit'} highlight />
             <KpiCard to={cardLinks.financial()} label="Margem" value={<AnimatedNumber value={shown.money.margin} format={pct} delay={countDelay(5)} />} icon={<Percent size={18} />} tone="neutral" />
           </div>
 
@@ -254,12 +348,11 @@ export function Dashboard() {
       {view && data && deviceSeller && (
         <SalesItemsDialog
           title={`Aparelhos vendidos por ${view.sellerNames.get(deviceSeller) ?? 'vendedor'}`}
-          summary={`${int(deviceRow?.sold ?? 0)} aparelho(s) · faturamento ${brl(deviceRow?.revenue ?? 0)} · lucro bruto ${brl(deviceRow?.profit ?? 0)}`}
+          summary={`${int(deviceRow?.sold ?? 0)} aparelho(s) · faturamento ${brl(deviceRow ? confirmedMoney(deviceRow.revenue, deviceRow.items, deviceRow.reconciledItems) : 0)} · lucro bruto ${brl(deviceRow ? confirmedMoney(deviceRow.profit, deviceRow.items, deviceRow.reconciledItems) : 0)}`}
           rows={deviceItemsOf(data.sales, view.names, deviceSeller, range)}
           productNames={view.names}
           sellerNames={view.sellerNames}
           columns={{ order: true, profit: true }}
-          unreconciled={deviceRow ? deviceRow.items - deviceRow.reconciledItems : 0}
           onClose={() => setDeviceSeller(null)}
         />
       )}

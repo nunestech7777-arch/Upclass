@@ -9,6 +9,7 @@ import type { SaleOrderDetails } from '../saleDetails';
 import { RECONCILE_SINCE, computeIphoneBaseline, isActive, isReconciled, type FinanceSale, type FinanceSeller, type IphoneBaseline, type ProfitGoal } from './calc';
 import { addDays, firstDay, lastDay, storeToday } from './dates';
 import type { UnitTargets } from './dashboard';
+import { fetchNoticeSignature } from '../notices/noticesApi';
 
 export interface FinancialSyncRun {
   id: string;
@@ -28,6 +29,10 @@ export interface FinancialSyncResponse {
   ok: boolean;
   error?: string;
   mode?: 'preview' | 'apply';
+  /** Modo `pending` (botão "Atualizar dados"): motivo de não ter conciliado nada nesta chamada. */
+  skipped?: 'busy' | 'recent' | 'nothing_pending';
+  days_processed?: string[];
+  days_failed?: { day: string; error: string }[];
   processed_until?: string | null;
   next_start?: string | null;
   counts?: Record<string, number>;
@@ -127,7 +132,10 @@ export interface FinanceSource {
   revenueGoalsAvailable(): Promise<boolean>;
   saveDeviceGoals(month: string, rows: DeviceGoalInput[]): Promise<void>;
   deleteDeviceGoal(month: string, sellerId: string): Promise<void>;
-  runSync(start: string, end: string, mode: 'preview' | 'apply'): Promise<FinancialSyncResponse>;
+  /** `pending`: concilia só os dias do período com itens pendentes (botão "Atualizar dados"). */
+  runSync(start: string, end: string, mode: 'preview' | 'apply' | 'pending'): Promise<FinancialSyncResponse>;
+  /** Muda a cada execução da rotina, conciliação ou venda recebida (só administrador). */
+  loadSyncSignature?(): Promise<string>;
 }
 
 export class MigrationPendingError extends Error {
@@ -443,6 +451,8 @@ export const supabaseFinanceSource: FinanceSource = {
     const { error } = await supabase.from('seller_device_goals').delete().eq('month', firstDay(month)).eq('seller_id', sellerId);
     raise(error);
   },
+
+  loadSyncSignature: fetchNoticeSignature,
 
   async runSync(start, end, mode) {
     const { data, error } = await supabase.functions.invoke('mercadophone-financial-sync', { body: { start, end, mode } });

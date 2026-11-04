@@ -77,19 +77,15 @@
   .dv-custom .fin-input { width: 130px; }
 }
 
-/* Botão e modal de conciliação */
-.dv-coverage-btn.has-pending { color: var(--fin-warn); border-color: color-mix(in srgb, var(--fin-warn) 55%, transparent); }
-.dv-coverage-btn.has-pending:hover:not(:disabled) { color: var(--fin-warn); border-color: var(--fin-warn); }
-.dv-coverage-modal { width: min(560px, calc(100vw - 32px)); }
-.dv-coverage-headline { display: block; font-size: 20px; font-weight: 800; margin-bottom: 2px; }
-.dv-coverage-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px 16px; }
-.dv-coverage-grid dt { font-size: 11px; color: var(--fin-muted); margin-bottom: 2px; }
-.dv-coverage-grid dd { font-size: 17px; font-weight: 800; }
-.dv-coverage-note { font-size: 13px; border-left: 3px solid var(--fin-warn); padding: 6px 0 6px 10px; background: var(--fin-surface-2); border-radius: 0 8px 8px 0; }
-@media (max-width: 480px) {
-  .dv-coverage-grid { grid-template-columns: 1fr 1fr; }
-  .dv-coverage-headline { font-size: 18px; }
+/* Botão "Atualizar dados": amarelo enquanto houver item não conciliado no período */
+.dv-refresh-btn { min-height: 38px; }
+.dv-refresh-btn.is-pending { background: #FBBF24; border-color: #F59E0B; color: #3B2A04; }
+.dv-refresh-btn.is-pending:hover:not(:disabled) { background: #FCD34D; border-color: #D97706; color: #3B2A04; }
+.dv-refresh-btn:disabled { opacity: 0.8; cursor: progress; }
+@media (max-width: 560px) {
+  .dv-refresh-btn { min-height: 44px; padding: 10px 14px; }
 }
+
 
 /* ============================================================
    Movimento — abertura em cascata, recarga discreta, placeholders.

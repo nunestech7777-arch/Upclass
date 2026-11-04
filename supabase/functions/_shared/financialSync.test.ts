@@ -5,9 +5,21 @@
  */
 import { describe, it, beforeEach, afterEach } from 'node:test';
 import assert from 'node:assert/strict';
-import { ATTEMPT_LOG_EVERY, PENDING_ALERT_ATTEMPTS, pickReconcileDays, runFinancialSync, withSyncStamp, type FetchHistory } from './financialSync.ts';
+import {
+  ATTEMPT_LOG_EVERY,
+  PENDING_ALERT_ATTEMPTS,
+  PENDING_REFRESH_COOLDOWN_MS,
+  pickPendingDays,
+  pickReconcileDays,
+  reconcilePendingRange,
+  refreshGate,
+  runFinancialSync,
+  withSyncStamp,
+  type FetchHistory,
+} from './financialSync.ts';
 import type { HistoricoFinanceItem } from './financialReconcile.ts';
 import { fetchHistoricoVendas, retryPolicy } from './mercadophone.ts';
+import { fakeLockDb } from './financialLock.fake.ts';
 
 type Row = Record<string, unknown>;
 
@@ -292,4 +304,186 @@ it('dia que sempre falha vai para o fim da fila (conferência e tentativa regist
   await runFinancialSync(db, down, { start: '2026-09-02', end: '2026-09-02', days: ['2026-09-02'], mode: 'apply', trigger: 'cron', now: new Date('2026-10-31T18:00:00Z') });
   assert.ok(db.tables.sales[0].financial_checked_at);
   assert.equal(db.tables.sales[0].financial_check_attempts, 1);
+});
+
+describe('botão "Atualizar dados" — conciliação só das pendências', () => {
+  const NOW = new Date('2026-11-04T14:50:00Z');
+  // Pedido 8913080 (04/11/2026): 8 itens chegaram às 14:36 UTC sem custo; o histórico trouxe os custos minutos depois.
+  const order = () => [
+    sale('8913080-12012586-0', { sold_date: '2026-11-04', amount: 3460, product_name: 'IPHONE 15 PRO MAX', created_at: '2026-11-04T14:36:13Z' }),
+    sale('8913080-12021477-5', { sold_date: '2026-11-04', amount: 3460, product_name: 'IPHONE 15 PRO MAX', created_at: '2026-11-04T14:36:14Z' }),
+    sale('8913080-328423-6', { sold_date: '2026-11-04', amount: 100, product_name: 'PELÍCULA CERAMICA ', created_at: '2026-11-04T14:36:14Z' }),
+    sale('8913080-149456-3', { sold_date: '2026-11-04', amount: 0, product_name: 'CARREGADOR  COMPLETO  - BND', created_at: '2026-11-04T14:36:13Z' }),
+  ];
+  const at = '2026-11-04 10:56:00';
+  const costs = [
+    item({ vendaId: 8913080, produtoId: 12012586, dataVenda: at, valorTotal: 4500, valorCliente: 3460, valorCusto: 3700, lucro: 800, tipoProdutoDescricao: 'PRODUTO APPLE' }),
+    item({ vendaId: 8913080, produtoId: 12021477, dataVenda: at, valorTotal: 3460, valorCliente: 3460, valorCusto: 3460, lucro: 0, tipoProdutoDescricao: 'PRODUTO APPLE' }),
+    item({ vendaId: 8913080, produtoId: 328423, dataVenda: at, valorTotal: 100, valorCliente: 100, valorCusto: 2.74, lucro: 97.26 }),
+    item({ vendaId: 8913080, produtoId: 149456, dataVenda: at, valorTotal: 0, valorCliente: 0, valorCusto: 11.1, lucro: -11.1, tipoProdutoDescricao: 'BRINDES' }),
+  ];
+  const click = async (db: ReturnType<typeof fakeDb>, fetch: FetchHistory, range = { from: '2026-11-01', to: '2026-11-30' }) => {
+    const days = await pickPendingDays(db, { ...range, now: NOW });
+    if (days.length === 0) return null;
+    const sorted = [...days].sort();
+    return runFinancialSync(db, fetch, { start: sorted[0], end: sorted.at(-1)!, days, mode: 'apply', trigger: 'button:admin@loja', now: NOW, countChecks: false });
+  };
+
+  it('regressão 8913080: custos disponíveis → os itens ficam conciliados com os valores da origem', async () => {
+    const db = fakeDb(order());
+    const res = await click(db, history(costs));
+    assert.deepEqual(res?.days_processed, ['2026-11-04']);
+    const byExt = new Map(db.tables.sales.map((r) => [r.external_id, r]));
+    assert.equal(byExt.get('8913080-12012586-0')?.financial_status, 'ok');
+    assert.equal(byExt.get('8913080-12012586-0')?.cost, 3700);
+    assert.equal(byExt.get('8913080-12012586-0')?.profit, 800);
+    assert.equal(byExt.get('8913080-149456-3')?.profit, -11.1);
+    assert.equal(db.tables.sales.length, 4, 'nenhuma linha nova');
+    assert.equal(db.tables.financial_reconcile_attempts.at(-1)?.outcome, 'reconciled');
+  });
+
+  it('custos ainda indisponíveis (pedido fora do histórico) → seguem em aberto, sem custo inventado', async () => {
+    const db = fakeDb(order());
+    await click(db, history([]));
+    for (const r of db.tables.sales) {
+      // Mesma regra da rotina: pedido ausente vira `not_found` (aberto, conferido de novo depois).
+      assert.equal(r.financial_status, 'not_found');
+      assert.equal(r.cost ?? null, null);
+      assert.equal(r.profit ?? null, null);
+    }
+    assert.equal(db.tables.financial_reconcile_attempts.at(-1)?.outcome, 'empty_history');
+  });
+
+  it('conciliação parcial: item sem custo na origem segue pendente e os demais conciliam', async () => {
+    const db = fakeDb(order());
+    const partial = costs.map((c) => (c.produtoId === 12021477 ? { ...c, valorCusto: null } : c)) as typeof costs;
+    await click(db, history(partial));
+    const byExt = new Map(db.tables.sales.map((r) => [r.external_id, r]));
+    assert.equal(byExt.get('8913080-12021477-5')?.financial_status, 'pending');
+    assert.equal(byExt.get('8913080-12021477-5')?.profit ?? null, null);
+    assert.equal(byExt.get('8913080-12012586-0')?.financial_status, 'ok');
+  });
+
+  it('falha temporária da API → nada gravado nos valores e tentativa registrada como erro', async () => {
+    const db = fakeDb(order());
+    const down: FetchHistory = async () => { throw new Error('MercadoPhone API HistoricoVendaApiController.index failed: 503 — após 2 tentativa(s)'); };
+    const res = await click(db, down);
+    assert.equal(res?.days_failed.length, 1);
+    assert.ok(db.tables.sales.every((r) => r.financial_status === 'pending' && (r.cost ?? null) === null));
+    assert.equal(db.tables.financial_reconcile_attempts.at(-1)?.outcome, 'api_error');
+  });
+
+  it('cliques seguidos não somam conferências da rotina (nem antecipam o alerta de pendência longa)', async () => {
+    const db = fakeDb(order().map((r) => ({ ...r, financial_check_attempts: PENDING_ALERT_ATTEMPTS - 1 })));
+    await click(db, history([]));
+    await click(db, history([]));
+    assert.ok(db.tables.sales.every((r) => r.financial_check_attempts === PENDING_ALERT_ATTEMPTS - 1));
+    assert.equal(db.tables.financial_reconcile_alerts.filter((a) => a.kind === 'pending_too_long').length, 0);
+  });
+
+  it('sem pendências no período não consulta o MercadoPhone', async () => {
+    const db = fakeDb([sale('1-1-0', { sold_date: '2026-11-03', financial_status: 'ok', cost: 10, profit: 60 })]);
+    let calls = 0;
+    const res = await click(db, async () => { calls++; return []; });
+    assert.equal(res, null);
+    assert.equal(calls, 0);
+  });
+
+  it('só dias com pendência, dentro do período visível, desde 01/09 e até hoje — mais recentes primeiro e com limite', async () => {
+    const rows = [
+      ...Array.from({ length: 9 }, (_, i) => sale(`${100 + i}-1-0`, { sold_date: `2026-10-${String(20 + i).padStart(2, '0')}` })),
+      sale('200-1-0', { sold_date: '2026-08-20' }),
+      sale('201-1-0', { sold_date: '2026-10-15', financial_status: 'ok', cost: 5, profit: 1 }),
+      sale('202-1-0', { sold_date: '2026-10-10', item_status: 'cancelled' }),
+    ];
+    const days = await pickPendingDays(fakeDb(rows), { from: '2026-08-01', to: '2026-10-31', now: NOW, maxDays: 6 });
+    assert.deepEqual(days, ['2026-10-28', '2026-10-27', '2026-10-26', '2026-10-25', '2026-10-24', '2026-10-23']);
+    assert.deepEqual(await pickPendingDays(fakeDb(rows), { from: '2026-08-01', to: '2026-08-31', now: NOW }), []);
+  });
+
+  it('iPhone com custo 0 (custo não cadastrado) entra; brinde/serviço com custo 0 não', async () => {
+    const rows = [
+      sale('300-1-0', { sold_date: '2026-10-11', financial_status: 'ok', cost: 0, profit: 4000, amount: 4000, product_type: 'PRODUTO APPLE' }),
+      sale('301-1-0', { sold_date: '2026-10-12', financial_status: 'ok', cost: 0, profit: 0, amount: 0, product_type: 'BRINDES' }),
+      sale('302-1-0', { sold_date: '2026-10-13', financial_status: 'ok', cost: 0, profit: 30, amount: 30, product_type: 'SERVICOS' }),
+    ];
+    assert.deepEqual(await pickPendingDays(fakeDb(rows), { from: '2026-10-01', to: '2026-10-31', now: NOW }), ['2026-10-11']);
+  });
+
+  it('valor já conciliado fora dos dias pendentes não é tocado', async () => {
+    const done = sale('400-1-0', { sold_date: '2026-11-02', financial_status: 'ok', cost: 50, profit: 20, revenue: 70 });
+    const db = fakeDb([...order(), done]);
+    await click(db, history(costs));
+    assert.equal(done.cost, 50);
+    assert.equal(done.profit, 20);
+    assert.equal(done.financial_synced_at, undefined);
+  });
+});
+
+describe('refreshGate — cliques repetidos e execuções simultâneas', () => {
+  const now = Date.parse('2026-11-04T15:10:00Z');
+  const ago = (ms: number) => new Date(now - ms).toISOString();
+  it('libera sem execução recente', () => {
+    assert.equal(refreshGate([{ started_at: ago(30 * 60_000), finished_at: ago(30 * 60_000 - 4000), trigger: 'cron' }], now), 'ok');
+  });
+  it('execução em andamento (rotina ou outro clique) → busy', () => {
+    assert.equal(refreshGate([{ started_at: ago(5000), finished_at: null, trigger: 'cron' }], now), 'busy');
+    assert.equal(refreshGate([{ started_at: ago(5000), finished_at: null, trigger: 'button:outro@loja' }], now), 'busy');
+  });
+  it('execução presa há muito tempo não bloqueia para sempre', () => {
+    assert.equal(refreshGate([{ started_at: ago(10 * 60_000), finished_at: null, trigger: 'cron' }], now), 'ok');
+  });
+  it('clique terminado há pouco → recent; depois do intervalo → ok', () => {
+    assert.equal(refreshGate([{ started_at: ago(5000), finished_at: ago(2000), trigger: 'button:admin@loja' }], now), 'recent');
+    assert.equal(refreshGate([{ started_at: ago(PENDING_REFRESH_COOLDOWN_MS + 1000), finished_at: ago(PENDING_REFRESH_COOLDOWN_MS), trigger: 'button:admin@loja' }], now), 'ok');
+  });
+  it('rotina recém-terminada não impede o clique', () => {
+    assert.equal(refreshGate([{ started_at: ago(5000), finished_at: ago(1000), trigger: 'cron' }], now), 'ok');
+  });
+});
+
+describe('botão com a trava compartilhada (reconcilePendingRange)', () => {
+  const NOW = new Date('2026-11-04T14:50:00Z');
+  const pendingSale = () => sale('8913080-12012586-0', { sold_date: '2026-11-04', amount: 3460, created_at: '2026-11-04T14:36:13Z' });
+  const costs = [item({ vendaId: 8913080, produtoId: 12012586, dataVenda: '2026-11-04 10:56:00', valorTotal: 4500, valorCliente: 3460, valorCusto: 3700, lucro: 800, tipoProdutoDescricao: 'PRODUTO APPLE' })];
+
+  it('trava livre: concilia e libera', async () => {
+    const lock = fakeLockDb();
+    const db = Object.assign(fakeDb([pendingSale()]), { rpc: lock.rpc });
+    const res = await reconcilePendingRange(db, history(costs), { from: '2026-11-01', to: '2026-11-30', trigger: 'button:admin@loja', now: NOW, holder: 'button#1' });
+    assert.equal(res.skipped, undefined);
+    assert.equal(db.tables.sales[0].financial_status, 'ok');
+    assert.equal(lock.row.holder, null);
+  });
+
+  it('rotina conciliando (trava ocupada) → busy, nada gravado e MercadoPhone não consultado', async () => {
+    const lock = fakeLockDb();
+    await lock.rpc('try_financial_sync_lock', { p_holder: 'cron#1', p_ttl_seconds: 180 });
+    const db = Object.assign(fakeDb([pendingSale()]), { rpc: lock.rpc });
+    let calls = 0;
+    const res = await reconcilePendingRange(db, async () => { calls++; return costs; }, { from: '2026-11-01', to: '2026-11-30', trigger: 'button:admin@loja', now: NOW, holder: 'button#1' });
+    assert.equal(res.skipped, 'busy');
+    assert.equal(calls, 0);
+    assert.equal(db.tables.sales[0].financial_status, 'pending');
+    assert.equal(db.tables.financial_sync_runs.length, 0);
+  });
+
+  it('sem pendência: não pega a trava', async () => {
+    const lock = fakeLockDb();
+    const db = Object.assign(fakeDb([sale('1-1-0', { sold_date: '2026-11-03', financial_status: 'ok', cost: 1, profit: 1 })]), { rpc: lock.rpc });
+    const res = await reconcilePendingRange(db, history([]), { from: '2026-11-01', to: '2026-11-30', trigger: 'button:admin@loja', now: NOW });
+    assert.equal(res.skipped, 'nothing_pending');
+    assert.ok(!lock.calls.includes('try_financial_sync_lock'));
+  });
+
+  it('dois cliques simultâneos (instâncias diferentes): uma concilia, a outra fica busy', async () => {
+    const lock = fakeLockDb();
+    const db = Object.assign(fakeDb([pendingSale()]), { rpc: lock.rpc });
+    const slow: FetchHistory = async () => { await new Promise((r) => setTimeout(r, 5)); return costs; };
+    const opts = (h: string) => ({ from: '2026-11-01', to: '2026-11-30', trigger: 'button:admin@loja', now: NOW, holder: h });
+    const [a, b] = await Promise.all([reconcilePendingRange(db, slow, opts('a')), reconcilePendingRange(db, slow, opts('b'))]);
+    assert.deepEqual([a.skipped, b.skipped].sort(), ['busy', undefined].sort());
+    assert.equal(db.tables.financial_sync_runs.length, 1, 'uma execução só');
+    assert.equal(db.tables.sales.length, 1, 'nenhuma linha duplicada');
+  });
 });

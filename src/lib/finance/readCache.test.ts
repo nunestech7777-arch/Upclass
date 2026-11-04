@@ -1,6 +1,6 @@
 import { describe, it } from 'node:test';
 import assert from 'node:assert/strict';
-import { READ_CACHE_MS, invalidateFinanceCache, withReadCache } from './readCache.ts';
+import { READ_CACHE_MS, dashboardCacheKey, invalidateFinanceCache, isFinanceCached, withReadCache } from './readCache.ts';
 import type { FinanceSource } from './financeApi.ts';
 
 function fakeSource() {
@@ -57,5 +57,30 @@ describe('cópia curta das leituras do financeiro', () => {
     await assert.rejects(s.loadForecast('2026-10'));
     fail = false;
     await s.loadForecast('2026-10');
+  });
+});
+
+describe('Dashboard aberto a partir da cópia', () => {
+  it('sabe quando a leitura veio do cache (para reler em segundo plano)', async () => {
+    invalidateFinanceCache();
+    const { source } = fakeSource();
+    const s = withReadCache(source, () => 0);
+    const key = dashboardCacheKey('2026-11-01', '2026-11-30');
+    assert.equal(isFinanceCached(key, 0), false);
+    await s.loadDashboard('2026-11-01', '2026-11-30');
+    assert.equal(isFinanceCached(key, 1000), true);
+    assert.equal(isFinanceCached(key, READ_CACHE_MS + 1), false);
+  });
+  it('conciliação pelo botão (modo pending) descarta a cópia; prévia não', async () => {
+    invalidateFinanceCache();
+    const { source, calls } = fakeSource();
+    const s = withReadCache(source, () => 0);
+    await s.loadDashboard('2026-11-01', '2026-11-30');
+    await s.runSync('2026-11-01', '2026-11-30', 'preview');
+    await s.loadDashboard('2026-11-01', '2026-11-30');
+    assert.equal(calls.filter((c) => c.startsWith('dash')).length, 1);
+    await s.runSync('2026-11-01', '2026-11-30', 'pending');
+    await s.loadDashboard('2026-11-01', '2026-11-30');
+    assert.equal(calls.filter((c) => c.startsWith('dash')).length, 2);
   });
 });
