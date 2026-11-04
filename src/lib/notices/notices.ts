@@ -5,11 +5,12 @@
  * abertas e dias recentes — custo 0 (status ok) de venda antiga só é relido pela conciliação manual.
  *
  * Duas origens:
- * - globais (noticesApi.ts): consultadas no banco, valem em qualquer página — nenhuma hoje;
+ * - globais (noticesApi.ts): consultadas no banco, valem em qualquer página — `missing_cost`, só do
+ *   MÊS ATUAL no fuso da loja (a virada do mês esvazia o aviso do mês anterior sozinha);
  * - da página (PageNotices.tsx): a página aberta publica avisos do período que já carregou, sem
  *   consulta nova — `empty_days` (Resultado financeiro e Resultados diários).
- * Desde 04/11/2026 pendências de conciliação (`missing_cost`, `partial_result`) não vão para o sino:
- * o único sinal delas é o botão "Atualizar dados" do Dashboard. Os montadores ficam para reuso.
+ * `partial_result` (resultado parcial) não vai para o sino: dentro do Dashboard o único sinal de
+ * pendência é o botão "Atualizar dados". Os montadores ficam para reuso.
  * Novos tipos (falha de sincronização, divergências, integrações) entram como novo `kind`.
  */
 import {
@@ -22,6 +23,10 @@ import {
   type FinanceSale,
   type PendingReason,
 } from '../finance/calc.ts';
+import { monthOf, storeToday } from '../finance/dates.ts';
+
+/** Mês atual no fuso da loja (America/Sao_Paulo), AAAA-MM: o escopo dos avisos de custo. */
+export const currentNoticeMonth = (now: Date = new Date()): string => monthOf(storeToday(now));
 
 export type NoticeSeverity = 'critical' | 'warning' | 'info';
 export type NoticeKind = Notice['kind'];
@@ -132,10 +137,13 @@ export type MissingCostRow = Pick<
  * financeiro (`pendingReason` = missing_cost), então o aviso e o banner do Resultado Financeiro
  * nunca divergem. Serviços e brindes com custo 0 não entram (custo zero legítimo).
  */
-export function buildMissingCostNotice(rows: MissingCostRow[]): MissingCostNotice | null {
+export function buildMissingCostNotice(rows: MissingCostRow[], month?: string): MissingCostNotice | null {
   const seen = new Set<string>();
   const items: MissingCostItem[] = [];
   for (const r of rows) {
+    // Escopo do aviso: só o mês informado (AAAA-MM, fuso da loja). Meses anteriores não entram nos
+    // itens, nos contadores nem nos totais — o histórico continua no banco, só não vira aviso.
+    if (month && r.sold_date.slice(0, 7) !== month) continue;
     // Mesmo critério do banner: só linha ativa, não conciliada, com motivo "sem custo".
     if (seen.has(r.id) || !isActive(r) || isReconciled(r) || pendingReason(r) !== 'missing_cost') continue;
     const zero = hasZeroSourceCost(r);

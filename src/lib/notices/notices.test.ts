@@ -4,6 +4,7 @@ import {
   buildEmptyDaysNotice,
   buildMissingCostNotice,
   buildPartialResultNotice,
+  currentNoticeMonth,
   noticeCount,
   pendingItemsOf,
   sortNotices,
@@ -204,5 +205,44 @@ describe('avisos da página (resultado parcial e dias sem vendas)', () => {
     assert.deepEqual(n.days, ['2026-10-04', '2026-10-25']);
     assert.equal(n.count, 2);
     assert.equal(buildEmptyDaysNotice({ key: '2026-10', scope: 'x', days: [], lastSaleAt: null }), null);
+  });
+});
+
+describe('aviso de custo só do mês atual (fuso de Brasília)', () => {
+  const nov = (o: Partial<MissingCostRow> = {}) => row({ sold_at: '2026-11-03T15:00:00+00:00', sold_date: '2026-11-03', ...o });
+  const old = (date: string, o: Partial<MissingCostRow> = {}) => row({ sold_at: `${date}T15:00:00+00:00`, sold_date: date, ...o });
+
+  it('setembro e outubro não entram em lista, contador, pedidos nem valor total', () => {
+    const rows = [old('2026-09-19'), old('2026-10-31', { amount: 2000 }), old('2026-10-02'), nov({ amount: 4000 })];
+    const n = buildMissingCostNotice(rows, '2026-11')!;
+    assert.equal(n.count, 1);
+    assert.equal(n.items.length, 1);
+    assert.equal(n.items[0].amount, 4000);
+    assert.equal(n.orders.length, 1);
+    assert.equal(noticeCount([n]), 1);
+  });
+
+  it('novembro totalmente conciliado: nenhum aviso, mesmo com pendências antigas no banco', () => {
+    assert.equal(buildMissingCostNotice([old('2026-09-19'), old('2026-10-20')], '2026-11'), null);
+  });
+
+  it('sem escopo informado o comportamento anterior é mantido (todos os meses)', () => {
+    assert.equal(buildMissingCostNotice([old('2026-09-19'), nov()])!.count, 2);
+  });
+
+  it('virada do mês: o aviso de novembro deixa de aparecer em dezembro, sozinho', () => {
+    const rows = [nov(), old('2026-12-02')];
+    assert.equal(buildMissingCostNotice(rows, '2026-11')!.count, 1);
+    assert.equal(buildMissingCostNotice(rows, '2026-12')!.count, 1);
+    assert.equal(buildMissingCostNotice(rows, '2026-12')!.items[0].soldDate, '2026-12-02');
+    assert.equal(buildMissingCostNotice([nov()], '2026-12'), null);
+  });
+
+  it('mês atual segue o horário de Brasília, não o UTC', () => {
+    // 01/12 01:30 UTC ainda é 30/11 22:30 em Brasília.
+    assert.equal(currentNoticeMonth(new Date('2026-12-01T01:30:00Z')), '2026-11');
+    assert.equal(currentNoticeMonth(new Date('2026-12-01T03:00:00Z')), '2026-12');
+    assert.equal(currentNoticeMonth(new Date('2027-01-01T02:59:00Z')), '2026-12');
+    assert.equal(currentNoticeMonth(new Date('2027-01-01T03:00:00Z')), '2027-01');
   });
 });
