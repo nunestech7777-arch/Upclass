@@ -1,8 +1,8 @@
 /**
  * Central de Avisos — regras puras (sem Supabase). Cada aviso é DERIVADO dos dados atuais do banco a
  * cada leitura: nada é gravado, então não há registro duplicado e a pendência some na próxima leitura
- * depois que a conciliação grava o custo corrigido. Atenção: a rotina automática só reconfere linhas
- * abertas e dias recentes — custo 0 (status ok) de venda antiga só é relido pela conciliação manual.
+ * depois que a conciliação grava o custo corrigido. Custo R$ 0,00 informado não é aviso: é lucro
+ * integral (regra comercial de 07/11/2026); só custo AUSENTE na origem vira aviso.
  *
  * Duas origens:
  * - globais (noticesApi.ts): consultadas no banco, valem em qualquer página — `missing_cost`, só do
@@ -15,7 +15,6 @@
  */
 import {
   PENDING_REASONS,
-  hasZeroSourceCost,
   isActive,
   isReconciled,
   pendingReason,
@@ -31,8 +30,8 @@ export const currentNoticeMonth = (now: Date = new Date()): string => monthOf(st
 export type NoticeSeverity = 'critical' | 'warning' | 'info';
 export type NoticeKind = Notice['kind'];
 
-/** Situação do custo na origem: vazio (não informado) ou zero informado num produto que tem custo. */
-export type CostSituation = 'cost_missing' | 'cost_zero';
+/** Situação do custo na origem: vazio (não informado). Custo R$ 0,00 é lucro integral, não aviso. */
+export type CostSituation = 'cost_missing';
 
 export interface MissingCostItem {
   saleId: string;
@@ -115,7 +114,6 @@ export const SEVERITY_LABEL: Record<NoticeSeverity, string> = { critical: 'Crít
 
 export const COST_SITUATION_LABEL: Record<CostSituation, string> = {
   cost_missing: 'Não conciliado · custo vazio',
-  cost_zero: 'Não conciliado · custo 0',
 };
 
 /** Gravidade primeiro; dentro da mesma gravidade, o mais recente antes. */
@@ -135,7 +133,7 @@ export type MissingCostRow = Pick<
 /**
  * Aviso "sem custo no Mercado Phone" a partir das linhas lidas. Usa exatamente o critério do módulo
  * financeiro (`pendingReason` = missing_cost), então o aviso e o banner do Resultado Financeiro
- * nunca divergem. Serviços e brindes com custo 0 não entram (custo zero legítimo).
+ * nunca divergem. Custo R$ 0,00 informado (de qualquer produto) não entra: é lucro integral.
  */
 export function buildMissingCostNotice(rows: MissingCostRow[], month?: string): MissingCostNotice | null {
   const seen = new Set<string>();
@@ -146,7 +144,6 @@ export function buildMissingCostNotice(rows: MissingCostRow[], month?: string): 
     if (month && r.sold_date.slice(0, 7) !== month) continue;
     // Mesmo critério do banner: só linha ativa, não conciliada, com motivo "sem custo".
     if (seen.has(r.id) || !isActive(r) || isReconciled(r) || pendingReason(r) !== 'missing_cost') continue;
-    const zero = hasZeroSourceCost(r);
     seen.add(r.id);
     items.push({
       saleId: r.id,
@@ -155,7 +152,7 @@ export function buildMissingCostNotice(rows: MissingCostRow[], month?: string): 
       soldAt: r.sold_at,
       soldDate: r.sold_date,
       amount: Number(r.amount) || 0,
-      situation: zero ? 'cost_zero' : 'cost_missing',
+      situation: 'cost_missing',
     });
   }
   if (items.length === 0) return null;

@@ -505,14 +505,9 @@ export function refreshGate(runs: { started_at: string; finished_at: string | nu
   return runs.some((r) => r.trigger.startsWith('button:') && now - Date.parse(r.started_at) < PENDING_REFRESH_COOLDOWN_MS) ? 'recent' : 'ok';
 }
 
-/** Produto Apple vendido com custo 0 já "ok": custo não cadastrado na origem (mesma regra do painel, `hasZeroSourceCost`). */
-const isZeroSourceCost = (r: { cost?: number | string | null; amount?: number | string | null; product_type?: string | null }) =>
-  r.cost != null && Number(r.cost) === 0 && Number(r.amount) > 0 && /PRODUTO APPLE/i.test(r.product_type ?? '');
-
 /**
  * Dias que o botão "Atualizar dados" concilia: só datas com itens ativos ainda abertos (pendente, não
- * encontrado, ambíguo, divergente) ou com iPhone de custo 0 (custo ainda não cadastrado no MercadoPhone),
- * dentro do período visível e de [`since`, hoje]. Mais recentes primeiro (a venda que acabou de chegar),
+ * encontrado, ambíguo, divergente), dentro do período visível e de [`since`, hoje]. Mais recentes primeiro (a venda que acabou de chegar),
  * até `maxDays` — nunca o histórico inteiro.
  */
 export async function pickPendingDays(
@@ -526,32 +521,18 @@ export async function pickPendingDays(
   const end = to < today ? to : today;
   if (start > end) return [];
 
-  const [open, zero] = await Promise.all([
-    supabase
-      .from('sales')
-      .select('sold_date')
-      .eq('item_status', 'active')
-      .in('financial_status', OPEN_FINANCIAL_STATUSES)
-      .gte('sold_date', start)
-      .lte('sold_date', end)
-      .order('sold_date', { ascending: false })
-      .limit(1000),
-    supabase
-      .from('sales')
-      .select('sold_date, cost, amount, product_type')
-      .eq('item_status', 'active')
-      .eq('financial_status', 'ok')
-      .eq('cost', 0)
-      .gte('sold_date', start)
-      .lte('sold_date', end)
-      .order('sold_date', { ascending: false })
-      .limit(1000),
-  ]);
-  if (open.error) throw new Error(`listar itens pendentes: ${open.error.message}`);
-  if (zero.error) throw new Error(`listar itens sem custo: ${zero.error.message}`);
+  const { data, error } = await supabase
+    .from('sales')
+    .select('sold_date')
+    .eq('item_status', 'active')
+    .in('financial_status', OPEN_FINANCIAL_STATUSES)
+    .gte('sold_date', start)
+    .lte('sold_date', end)
+    .order('sold_date', { ascending: false })
+    .limit(1000);
+  if (error) throw new Error(`listar itens pendentes: ${error.message}`);
   const days = new Set<string>();
-  for (const r of open.data ?? []) if (r.sold_date) days.add(r.sold_date);
-  for (const r of zero.data ?? []) if (r.sold_date && isZeroSourceCost(r)) days.add(r.sold_date);
+  for (const r of data ?? []) if (r.sold_date) days.add(r.sold_date);
   return [...days].filter((d) => ISO_DATE.test(d)).sort().reverse().slice(0, maxDays);
 }
 

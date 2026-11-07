@@ -401,13 +401,16 @@ describe('botão "Atualizar dados" — conciliação só das pendências', () =>
     assert.deepEqual(await pickPendingDays(fakeDb(rows), { from: '2026-08-01', to: '2026-08-31', now: NOW }), []);
   });
 
-  it('iPhone com custo 0 (custo não cadastrado) entra; brinde/serviço com custo 0 não', async () => {
+  it('custo R$ 0,00 (iPhone, serviço ou brinde) não é pendência: o botão não reprocessa esses dias', async () => {
     const rows = [
-      sale('300-1-0', { sold_date: '2026-10-11', financial_status: 'ok', cost: 0, profit: 4000, amount: 4000, product_type: 'PRODUTO APPLE' }),
-      sale('301-1-0', { sold_date: '2026-10-12', financial_status: 'ok', cost: 0, profit: 0, amount: 0, product_type: 'BRINDES' }),
+      // Pedidos 8954713 e 9011427: iPhone com custo 0 na origem = lucro integral (regra de 07/11/2026).
+      sale('8954713-11981523-4', { sold_date: '2026-11-05', financial_status: 'ok', cost: 0, profit: 1312.25, revenue: 1312.25, amount: 1450, product_type: 'PRODUTO APPLE' }),
+      sale('9011427-12091429-0', { sold_date: '2026-11-06', financial_status: 'ok', cost: 0, profit: 1600, revenue: 1600, amount: 1600, product_type: 'PRODUTO APPLE' }),
       sale('302-1-0', { sold_date: '2026-10-13', financial_status: 'ok', cost: 0, profit: 30, amount: 30, product_type: 'SERVICOS' }),
+      // Custo AUSENTE na origem continua pendente e o dia continua elegível.
+      sale('303-1-0', { sold_date: '2026-10-14', financial_status: 'pending', cost: null, profit: null, financial_note: 'Custo não informado pela origem' }),
     ];
-    assert.deepEqual(await pickPendingDays(fakeDb(rows), { from: '2026-10-01', to: '2026-10-31', now: NOW }), ['2026-10-11']);
+    assert.deepEqual(await pickPendingDays(fakeDb(rows), { from: '2026-10-01', to: '2026-11-30', now: new Date('2026-11-07T15:00:00Z') }), ['2026-10-14']);
   });
 
   it('valor já conciliado fora dos dias pendentes não é tocado', async () => {

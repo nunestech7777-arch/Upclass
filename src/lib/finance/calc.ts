@@ -6,8 +6,9 @@
  *   Não é lucro líquido contábil: despesas da operação não são deduzidas.
  * - Somas financeiras usam só linhas ativas com `financial_status = 'ok'`; o restante aparece
  *   como cobertura parcial, nunca como zero.
- * - Produto Apple vendido com custo 0 na origem é custo não cadastrado no MercadoPhone: fica fora
- *   das somas como pendência "sem custo no Mercado Phone", nunca como lucro (ver `hasZeroSourceCost`).
+ * - Custo informado como R$ 0,00 pelo MercadoPhone é regra comercial da loja (07/11/2026): o lucro
+ *   bruto é 100% da receita da linha e o item é conciliado como qualquer outro. Só custo AUSENTE
+ *   (nulo na origem → nota `MISSING_COST_NOTE`) fica pendente, sem lucro inventado.
  * - Pendência tem motivo (`pendingReason`): falta de valor na origem é separada de atraso normal do
  *   histórico e de falha real de sincronização.
  * - Unidades seguem a regra comercial existente (productClassifier): iPhone é aparelho; demais
@@ -257,19 +258,9 @@ type ReconcileFields = {
   product_type?: string | null;
 };
 
-/** Produto Apple vendido com custo 0 na origem: custo não cadastrado no MercadoPhone (serviços e brindes têm custo 0 legítimo). */
-export function hasZeroSourceCost(sale: ReconcileFields): boolean {
-  return (
-    sale.financial_status === 'ok' &&
-    sale.cost != null &&
-    Number(sale.cost) === 0 &&
-    Number(sale.amount) > 0 &&
-    /PRODUTO APPLE/i.test(sale.product_type ?? '')
-  );
-}
-
+/** Conciliado = receita e custo vindos do histórico (custo R$ 0,00 conta: lucro = receita). */
 export function isReconciled(sale: ReconcileFields): boolean {
-  return sale.financial_status === 'ok' && sale.profit != null && !hasZeroSourceCost(sale);
+  return sale.financial_status === 'ok' && sale.profit != null;
 }
 
 /** Notas gravadas pela conciliação quando a origem não informa o valor (financialReconcile.ts). */
@@ -327,7 +318,7 @@ export function pendingReason(
   sale: ReconcileFields & Partial<Pick<FinanceSale, 'financial_note' | 'sold_date' | 'created_at' | 'last_attempt'>>,
   now = Date.now()
 ): PendingReason {
-  if (hasZeroSourceCost(sale) || sale.financial_note === MISSING_COST_NOTE) return 'missing_cost';
+  if (sale.financial_note === MISSING_COST_NOTE) return 'missing_cost';
   if (sale.financial_note === MISSING_REVENUE_NOTE) return 'missing_revenue';
   if (sale.financial_status === 'not_found' || sale.financial_status === 'ambiguous' || sale.financial_status === 'mismatch') {
     return sale.financial_status;

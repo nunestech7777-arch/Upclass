@@ -6,7 +6,6 @@ import {
   buildMonthFinance,
   computeIphoneBaseline,
   goalProgress,
-  hasZeroSourceCost,
   isReconciled,
   pendingReason,
   type FinanceSale,
@@ -200,11 +199,11 @@ describe('motivo da pendência (origem × sincronização)', () => {
   const pending = (o: Partial<FinanceSale> = {}) =>
     sale({ seller_id: 'a', product_id: 'i15', sold_date: '2026-10-31', amount: 3920, financial_status: 'pending', revenue: null, cost: null, profit: null, ...o });
 
-  it('produto Apple com custo 0 na origem não é conciliado: é "sem custo no Mercado Phone"', () => {
-    const s = sale({ seller_id: 'a', product_id: 'i15', sold_date: '2026-10-05', amount: 1300, revenue: 1300, cost: 0, profit: 1300, product_type: 'PRODUTO APPLE', financial_note: 'Custo zero informado pela origem' });
-    assert.equal(hasZeroSourceCost(s), true);
-    assert.equal(isReconciled(s), false);
-    assert.equal(pendingReason(s, now), 'missing_cost');
+  it('aparelho com custo R$ 0,00 informado é conciliado com lucro integral (regra de 07/11/2026)', () => {
+    // Pedido 8954713: valor de exibição 1.450 (com taxa da máquina), valor unitário 1.312,25, custo 0.
+    const s = sale({ seller_id: 'a', product_id: 'i15', sold_date: '2026-11-05', amount: 1450, revenue: 1312.25, cost: 0, profit: 1312.25, product_type: 'PRODUTO APPLE', financial_note: 'Custo zero informado pela origem' });
+    assert.equal(isReconciled(s), true);
+    assert.notEqual(pendingReason(s, now), 'missing_cost');
   });
 
   it('serviço, brinde e acessório com custo 0 continuam conciliados', () => {
@@ -236,15 +235,17 @@ describe('motivo da pendência (origem × sincronização)', () => {
     const sales = [
       sale({ seller_id: 'a', product_id: 'i15', sold_date: '2026-10-05', amount: 1000, revenue: 900, cost: 700, profit: 200, product_type: 'PRODUTO APPLE' }),
       sale({ seller_id: 'a', product_id: 'i15', sold_date: '2026-10-05', amount: 1300, revenue: 1300, cost: 0, profit: 1300, product_type: 'PRODUTO APPLE', mp_order_id: '8881664' }),
+      pending({ financial_note: 'Custo não informado pela origem', created_at: entered(60_000), mp_order_id: '8800099' }),
       pending({ created_at: entered(10 * 60_000), mp_order_id: '8884421' }),
       pending({ created_at: entered(5 * 3_600_000), mp_order_id: '8800000' }),
     ];
     const m = buildMonthFinance({ month: '2026-10', today: '2026-11-02', now, sellers, productNames, sales, goals: [] });
-    assert.equal(m.coverage.reconciled, 1);
-    assert.equal(m.coverage.pending.missing_cost, 1);
+    assert.equal(m.coverage.reconciled, 2, 'custo R$ 0,00 conta como conciliado');
+    assert.equal(m.coverage.pending.missing_cost, 1, 'só o custo AUSENTE é pendência');
     assert.equal(m.coverage.pending.awaiting_source, 1);
     assert.equal(m.coverage.pending.sync_failure, 1);
-    assert.deepEqual(m.coverage.missingCostOrders, ['8881664']);
-    assert.equal(m.totals.profit, 200, 'custo zero não vira lucro');
+    assert.deepEqual(m.coverage.missingCostOrders, ['8800099']);
+    assert.equal(m.totals.profit, 1500, 'custo R$ 0,00 = lucro integral (200 + 1.300); custo ausente não vira lucro');
+    assert.equal(m.totals.revenue, 2200);
   });
 });

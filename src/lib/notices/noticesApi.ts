@@ -14,9 +14,7 @@ import { buildMissingCostNotice, currentNoticeMonth, sortNotices, type MissingCo
 
 const PAGE = 1000;
 
-/** Candidatas no banco; o critério final é o do módulo financeiro (`buildMissingCostNotice`). */
-const MISSING_COST_FILTER = `financial_note.eq."${MISSING_COST_NOTE}",and(financial_status.eq.ok,cost.eq.0,amount.gt.0,product_type.ilike."*PRODUTO APPLE*")`;
-
+/** Só custo AUSENTE na origem (nota da conciliação); custo R$ 0,00 é lucro integral e não vira aviso. */
 async function fetchMissingCostRows(month: string): Promise<MissingCostRow[]> {
   const rows: MissingCostRow[] = [];
   for (let offset = 0; ; offset += PAGE) {
@@ -26,7 +24,7 @@ async function fetchMissingCostRows(month: string): Promise<MissingCostRow[]> {
       .eq('item_status', 'active')
       .gte('sold_date', firstDay(month))
       .lte('sold_date', lastDay(month))
-      .or(MISSING_COST_FILTER)
+      .or(`financial_note.eq."${MISSING_COST_NOTE}"`)
       .order('sold_at', { ascending: false })
       .order('id')
       .range(offset, offset + PAGE - 1);
@@ -38,7 +36,7 @@ async function fetchMissingCostRows(month: string): Promise<MissingCostRow[]> {
 }
 
 /**
- * Avisos globais do sino: "itens sem custo no Mercado Phone" SÓ do mês atual (fuso da loja). Meses
+ * Avisos globais do sino: "itens sem custo no Mercado Phone" (custo ausente na origem) SÓ do mês atual (fuso da loja). Meses
  * anteriores não entram em lista, contador nem total; os dados continuam no banco intactos. Novos tipos
  * de aviso (integrações, falhas que exigem ação) entram aqui.
  */

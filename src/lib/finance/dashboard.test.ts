@@ -547,14 +547,18 @@ describe('botão "Atualizar dados" (amarelo com pendência)', () => {
     const sales = [...Array.from({ length: 66 }, () => ok('2026-11-02')), ...Array.from({ length: 8 }, () => open('2026-11-04', { created_at: '2026-11-04T14:36:13Z' }))];
     assert.equal(refreshPendingCount(sales), 8);
   });
-  it('iPhone com custo 0 na origem acende; cancelado não conta', () => {
-    const zero = sale({ seller_id: 'a', product_id: 'i15', sold_date: '2026-10-11', cost: 0, profit: 4000, amount: 4000, product_type: 'PRODUTO APPLE' });
-    const cancelled = open('2026-10-12', { item_status: 'cancelled' });
-    assert.equal(refreshPendingCount([zero, cancelled, ok('2026-10-13')]), 1);
+  it('iPhone com custo R$ 0,00 NÃO acende (lucro integral); custo ausente acende; cancelado não conta', () => {
+    // Pedidos 8954713 (iPhone 11) e 9011427 (iPhone 11 Pro Max): custo 0 na origem.
+    const zero1 = sale({ seller_id: 'a', product_id: 'i15', sold_date: '2026-11-05', cost: 0, revenue: 1312.25, profit: 1312.25, amount: 1450, product_type: 'PRODUTO APPLE' });
+    const zero2 = sale({ seller_id: 'a', product_id: 'i15', sold_date: '2026-11-06', cost: 0, revenue: 1600, profit: 1600, amount: 1600, product_type: 'PRODUTO APPLE' });
+    const cancelled = open('2026-11-04', { item_status: 'cancelled' });
+    assert.equal(refreshPendingCount([zero1, zero2, cancelled, ok('2026-11-03')]), 0);
+    const missing = open('2026-11-06', { financial_note: 'Custo não informado pela origem', revenue: 1600 });
+    assert.equal(refreshPendingCount([zero1, missing]), 1);
   });
   it('vendas antes de 01/09/2026 (fora da conciliação automática) não deixam o botão amarelo', () => {
     assert.equal(refreshPendingCount([open('2026-08-20'), ok('2026-08-21')]), 0);
-    // Mesmo com motivo que não é "fora da conciliação" (ex.: não encontrado, custo 0 de iPhone).
+    // Mesmo com motivo que não é "fora da conciliação" (ex.: não encontrado).
     const oldZero = sale({ seller_id: 'a', product_id: 'i15', sold_date: '2026-08-20', cost: 0, profit: 4000, amount: 4000, product_type: 'PRODUTO APPLE' });
     assert.equal(refreshPendingCount([open('2026-08-20', { financial_status: 'not_found' }), oldZero]), 0);
   });

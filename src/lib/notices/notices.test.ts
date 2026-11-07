@@ -22,10 +22,10 @@ function row(o: Partial<MissingCostRow> = {}): MissingCostRow {
     sold_at: '2026-10-31T18:00:00+00:00',
     sold_date: '2026-10-31',
     amount: 1300,
-    cost: 0,
-    profit: 1300,
-    financial_status: 'ok',
-    financial_note: 'Custo zero informado pela origem',
+    cost: null,
+    profit: null,
+    financial_status: 'pending',
+    financial_note: 'Custo não informado pela origem',
     product_type: 'PRODUTO APPLE',
     item_status: 'active',
     product_name: 'IPHONE 11',
@@ -34,28 +34,21 @@ function row(o: Partial<MissingCostRow> = {}): MissingCostRow {
 }
 
 describe('aviso de itens sem custo no Mercado Phone', () => {
-  it('produto Apple com custo 0 e custo vazio entram, com a situação de cada um', () => {
+  it('custo vazio na origem entra; custo R$ 0,00 informado é lucro integral e não entra (regra de 07/11/2026)', () => {
     const n = buildMissingCostNotice([
-      row({ id: 'zero', mp_order_id: '8881664' }),
-      row({ id: 'vazio', mp_order_id: '8800001', cost: null, profit: null, financial_status: 'pending', financial_note: 'Custo não informado pela origem', sold_at: '2026-10-30T12:00:00+00:00', sold_date: '2026-10-30' }),
+      row({ id: 'zero', mp_order_id: '8881664', cost: 0, profit: 1300, financial_status: 'ok', financial_note: 'Custo zero informado pela origem' }),
+      row({ id: 'vazio', mp_order_id: '8800001', sold_at: '2026-10-30T12:00:00+00:00', sold_date: '2026-10-30' }),
     ])!;
-    assert.equal(n.count, 2);
-    assert.deepEqual(n.orders, ['8881664', '8800001']);
-    assert.deepEqual(
-      n.items.map((i) => [i.saleId, i.situation]),
-      [
-        ['zero', 'cost_zero'],
-        ['vazio', 'cost_missing'],
-      ]
-    );
-    assert.equal(n.latestAt, '2026-10-31T18:00:00+00:00');
+    assert.equal(n.count, 1);
+    assert.deepEqual(n.orders, ['8800001']);
+    assert.deepEqual(n.items.map((i) => [i.saleId, i.situation]), [['vazio', 'cost_missing']]);
   });
 
   it('custo zero legítimo (serviço, brinde) e itens conciliados não entram', () => {
     const n = buildMissingCostNotice([
-      row({ product_type: 'ACESSORIOS', product_name: 'PROTEÇÃO/SEGURO ADESAO', amount: 100 }),
-      row({ amount: 0, profit: 0, product_name: 'CAPA - BND' }),
-      row({ cost: 2800, profit: 747.6, financial_note: null }),
+      row({ product_type: 'ACESSORIOS', product_name: 'PROTEÇÃO/SEGURO ADESAO', amount: 100, cost: 0, profit: 100, financial_status: 'ok', financial_note: 'Custo zero informado pela origem' }),
+      row({ amount: 0, cost: 0, profit: 0, financial_status: 'ok', financial_note: null, product_name: 'CAPA - BND' }),
+      row({ cost: 2800, profit: 747.6, financial_status: 'ok', financial_note: null }),
     ]);
     assert.equal(n, null);
   });
@@ -67,15 +60,15 @@ describe('aviso de itens sem custo no Mercado Phone', () => {
   });
 
   it('nota antiga de custo vazio numa linha já conciliada não conta (mesmo critério do banner)', () => {
-    assert.equal(buildMissingCostNotice([row({ cost: 900, profit: 400, financial_note: 'Custo não informado pela origem' })]), null);
+    assert.equal(buildMissingCostNotice([row({ cost: 900, profit: 400, financial_status: 'ok' })]), null);
   });
 
-  it('venda anterior ao início da rotina com custo 0 entra (o banner também a classifica como sem custo)', () => {
+  it('venda anterior ao início da rotina com custo vazio entra (o banner também a classifica como sem custo)', () => {
     assert.equal(buildMissingCostNotice([row({ sold_date: '2026-08-20', sold_at: '2026-08-20T12:00:00+00:00' })])!.count, 1);
   });
 
   it('custo corrigido na origem e conciliado: o aviso some', () => {
-    assert.equal(buildMissingCostNotice([row({ cost: 950, profit: 350, financial_note: null })]), null);
+    assert.equal(buildMissingCostNotice([row({ cost: 950, profit: 350, financial_status: 'ok', financial_note: null })]), null);
   });
 
   it('pedido com vários itens sem custo aparece uma vez na lista de pedidos', () => {
@@ -153,10 +146,12 @@ describe('avisos da página (resultado parcial e dias sem vendas)', () => {
     const items = pendingItemsOf(
       [
         sale({ id: 'ok' }),
-        sale({ id: 'zero', cost: 0, profit: 1000, revenue: 1000, mp_order_id: '8881664' }),
+        sale({ id: 'zero', financial_status: 'pending', cost: null, profit: null, revenue: 1000, financial_note: 'Custo não informado pela origem', mp_order_id: '8881664' }),
         sale({ id: 'novo', financial_status: 'pending', revenue: null, cost: null, profit: null, created_at: '2026-11-02T16:50:00Z' }),
         sale({ id: 'velho', financial_status: 'pending', revenue: null, cost: null, profit: null, created_at: '2026-11-01T10:00:00Z' }),
         sale({ id: 'fora', item_status: 'removed', cost: 0, profit: 1000 }),
+        // Custo R$ 0,00 informado: lucro integral, conciliado (regra de 07/11/2026).
+        sale({ id: 'custo0', cost: 0, profit: 1312.25, revenue: 1312.25, financial_note: 'Custo zero informado pela origem' }),
       ],
       names,
       now
@@ -174,7 +169,7 @@ describe('avisos da página (resultado parcial e dias sem vendas)', () => {
   it('resultado parcial: motivos vêm dos itens; "sem custo" não soma de novo no sino', () => {
     const items = pendingItemsOf(
       [
-        sale({ id: 'zero', cost: 0, profit: 1000, revenue: 1000 }),
+        sale({ id: 'zero', financial_status: 'pending', cost: null, profit: null, revenue: 1000, financial_note: 'Custo não informado pela origem' }),
         sale({ id: 'velho', financial_status: 'pending', revenue: null, cost: null, profit: null, created_at: '2026-11-01T10:00:00Z' }),
       ],
       names,
@@ -192,7 +187,7 @@ describe('avisos da página (resultado parcial e dias sem vendas)', () => {
   });
 
   it('só sem custo: aviso informativo e sem somar no sino; tudo conciliado: sem aviso', () => {
-    const items = pendingItemsOf([sale({ id: 'zero', cost: 0, profit: 1000, revenue: 1000 })], names, now);
+    const items = pendingItemsOf([sale({ id: 'zero', financial_status: 'pending', cost: null, profit: null, revenue: 1000, financial_note: 'Custo não informado pela origem' })], names, now);
     const n = buildPartialResultNotice({ key: '2026-10', scope: 'outubro de 2026', coverage: coverage(5, 4), items, at: 'x' })!;
     assert.equal(n.severity, 'info');
     assert.equal(n.count, 0);

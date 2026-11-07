@@ -14,7 +14,7 @@ import { PENDING_REASON_LABEL } from '../../lib/finance/calc';
 import { brl, int, sumMoney } from '../../lib/finance/format';
 import { formatDateBR, formatInstantBR, weekdayShort } from '../../lib/finance/dates';
 
-const SITUATIONS: CostSituation[] = ['cost_missing', 'cost_zero'];
+const SITUATIONS: CostSituation[] = ['cost_missing'];
 
 /** Todos os itens de um aviso. Só leitura: custo e lucro nunca são estimados aqui. */
 export function NoticeDetails({
